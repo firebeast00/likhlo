@@ -46,7 +46,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     state = newState;
     await _saveToHive();
   }
-
+// 5. Brightness
+  Future<void> updateBrightness(double level) async {
+    final box = Hive.box('preferences');
+    await box.put('brightnessLevel', level);
+    state = state.copyWith(brightnessLevel: level);
+  }
   Future<void> updateProfileIcon(int index) async {
     final newState = AppSettings(
       userName: state.userName,

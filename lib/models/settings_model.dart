@@ -1,74 +1,59 @@
 import 'package:hive/hive.dart';
 
+part 'settings_model.g.dart';
+
 @HiveType(typeId: 4)
 class AppSettings extends HiveObject {
-  @HiveField(0)
+  // ✅ FIX 1: Added defaultValue to tell Hive how to handle nulls
+  @HiveField(0, defaultValue: 'system')
+  String themeMode;
+
+  @HiveField(1, defaultValue: '')
   String userName;
 
-  @HiveField(1)
-  String themeMode; // 'system', 'light', 'dark'
+  @HiveField(2, defaultValue: 'Student')
+  String userProfession;
 
-  @HiveField(2)
+  @HiveField(3, defaultValue: 0xFF00BFA5)
   int profileColorValue;
 
-  @HiveField(3)
-  String userProfession; // ✅ NEW FIELD
+  @HiveField(4, defaultValue: 0)
+  int profileIconIndex;
 
-  @HiveField(4)
-  int profileIconIndex; // ✅ NEW FIELD
+  @HiveField(5, defaultValue: 0.0)
+  double brightnessLevel;
+
+  @HiveField(6)
+  String? customRingtonePath;
 
   AppSettings({
-    required this.userName,
-    required this.themeMode,
-    required this.profileColorValue,
-    this.userProfession = '', // Default empty
-    this.profileIconIndex = 0, // Default first icon
+    this.themeMode = 'system',
+    this.userName = '',
+    this.userProfession = 'Student',
+    this.profileColorValue = 0xFF00BFA5,
+    this.profileIconIndex = 0,
+    this.brightnessLevel = 0.0,
+    this.customRingtonePath,
   });
-}
 
-// ✅ MANUAL ADAPTER (Copy this exactly so you don't need build_runner)
-class AppSettingsAdapter extends TypeAdapter<AppSettings> {
-  @override
-  final int typeId = 4;
-
-  @override
-  AppSettings read(BinaryReader reader) {
-    final numOfFields = reader.readByte();
-    final fields = <int, dynamic>{
-      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
-    };
+  // ✅ FIX 2: Added copyWith so Riverpod can update the state properly
+  AppSettings copyWith({
+    String? themeMode,
+    String? userName,
+    String? userProfession,
+    int? profileColorValue,
+    int? profileIconIndex,
+    double? brightnessLevel,
+    String? customRingtonePath,
+  }) {
     return AppSettings(
-      userName: fields[0] as String? ?? '',
-      themeMode: fields[1] as String? ?? 'system',
-      profileColorValue: fields[2] as int? ?? 0xFF2563EB,
-      userProfession: fields[3] as String? ?? '',
-      profileIconIndex: fields[4] as int? ?? 0,
+      themeMode: themeMode ?? this.themeMode,
+      userName: userName ?? this.userName,
+      userProfession: userProfession ?? this.userProfession,
+      profileColorValue: profileColorValue ?? this.profileColorValue,
+      profileIconIndex: profileIconIndex ?? this.profileIconIndex,
+      brightnessLevel: brightnessLevel ?? this.brightnessLevel,
+      customRingtonePath: customRingtonePath ?? this.customRingtonePath,
     );
   }
-
-  @override
-  void write(BinaryWriter writer, AppSettings obj) {
-    writer
-      ..writeByte(5)
-      ..writeByte(0)
-      ..write(obj.userName)
-      ..writeByte(1)
-      ..write(obj.themeMode)
-      ..writeByte(2)
-      ..write(obj.profileColorValue)
-      ..writeByte(3)
-      ..write(obj.userProfession)
-      ..writeByte(4)
-      ..write(obj.profileIconIndex);
-  }
-
-  @override
-  int get hashCode => typeId.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-          other is AppSettingsAdapter &&
-              runtimeType == other.runtimeType &&
-              typeId == other.typeId;
 }

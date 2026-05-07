@@ -36,7 +36,7 @@ class AppDrawer extends ConsumerWidget {
           const SizedBox(height: 10),
           Expanded(
             child: ListView(padding: const EdgeInsets.symmetric(horizontal: 10), children: [
-              _buildDrawerItem(context, 'Likhlo', Icons.dashboard_rounded),
+              _buildDrawerItem(context, 'Dashboard', Icons.dashboard_rounded),
               _buildDrawerItem(context, 'Tasks', Icons.check_circle_outline_rounded),
               _buildDrawerItem(context, 'Tools', Icons.calculate_rounded),
               _buildDrawerItem(context, 'Udhaar', Icons.handshake_rounded),
