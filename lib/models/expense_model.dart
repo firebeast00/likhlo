@@ -21,6 +21,8 @@ class Expense extends HiveObject {
 
   @HiveField(5)
   int colorValue; // Storing color as int (ARGB)
+  @HiveField(6) // 👈 NEW: Optional custom tag field
+  String? tag;
 
   Expense({
     required this.id,
@@ -29,5 +31,6 @@ class Expense extends HiveObject {
     required this.date,
     required this.category,
     required this.colorValue,
+    this.tag
   });
 }

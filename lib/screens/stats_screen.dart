@@ -1,97 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
-import '../providers/expense_provider.dart';
-import '../models/expense_model.dart';
+import '../providers/stats_provider.dart';
+import '../providers/settings_provider.dart';
 
 class StatsScreen extends ConsumerStatefulWidget {
   const StatsScreen({super.key});
-
   @override
   ConsumerState<StatsScreen> createState() => _StatsScreenState();
 }
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
-  int _touchedIndex = -1; // For Pie Chart Animation
-  int _touchedBarIndex = -1; // For Bar Chart Interaction
+  int _touchedIndex = -1;
+  int _touchedBarIndex = -1;
 
   @override
   Widget build(BuildContext context) {
-    final expenseState = ref.watch(expenseProvider);
-    final allExpenses = expenseState.allExpenses;
-    final primaryColor = Theme.of(context).primaryColor;
-
-    // 1. Prepare Data for 6-Month Trend
-    final now = DateTime.now();
-    List<double> monthlyTotals = [];
-    List<String> monthLabels = [];
-    double maxMonthTotal = 0;
-
-    for (int i = 5; i >= 0; i--) {
-      final monthDate = DateTime(now.year, now.month - i, 1);
-      final monthExpenses = allExpenses.where((e) => e.date.month == monthDate.month && e.date.year == monthDate.year);
-      final total = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
-
-      monthlyTotals.add(total);
-      monthLabels.add(DateFormat.MMM().format(monthDate));
-      if (total > maxMonthTotal) maxMonthTotal = total;
-    }
-
-    // 2. Prepare Data for Current Month Pie Chart
-    final currentMonthExpenses = allExpenses.where((e) => e.date.month == now.month && e.date.year == now.year).toList();
-    final Map<String, double> categoryTotals = {};
-    double totalSpentThisMonth = 0;
-
-    for (var e in currentMonthExpenses) {
-      categoryTotals[e.category] = (categoryTotals[e.category] ?? 0) + e.amount;
-      totalSpentThisMonth += e.amount;
-    }
-
-    final sortedCategories = categoryTotals.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value)); // Sort highest first
+    final stats = ref.watch(statsProvider);
+    final settings = ref.watch(settingsProvider);
+    final primaryColor = Color(settings.profileColorValue); // 🛡️ Guaranteed theme color support
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Spending Trends", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            const Text("Last 6 Months History", style: TextStyle(color: Colors.grey, fontSize: 13)),
-            const SizedBox(height: 20),
+            // --- HEADER ---
+            const Text(
+                "Spending Trends",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5)
+            ),
+            const SizedBox(height: 4),
+            Text(
+                "Your financial overview for the last 6 months",
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13)
+            ),
+            const SizedBox(height: 28),
 
-            // --- 📊 6-MONTH BAR CHART ---
+            // --- 6-MONTH BAR CHART CARD ---
             Container(
-              height: 220,
-              padding: const EdgeInsets.all(20),
+              height: 240,
+              padding: const EdgeInsets.fromLTRB(20, 30, 20, 16),
               decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))]
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.12)),
+                  boxShadow: [
+                    BoxShadow(
+                        color: isDark ? Colors.black26 : Colors.black.withOpacity(0.03),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8)
+                    )
+                  ]
               ),
               child: BarChart(
                   BarChartData(
                       alignment: BarChartAlignment.spaceAround,
-                      maxY: maxMonthTotal == 0 ? 100 : maxMonthTotal * 1.2, // Avoid 0 crash
+                      maxY: stats.maxMonthTotal == 0 ? 100 : stats.maxMonthTotal * 1.2,
                       barTouchData: BarTouchData(
                         touchTooltipData: BarTouchTooltipData(
-                            tooltipBgColor: primaryColor,
+                            tooltipBgColor: isDark ? Colors.grey.shade800 : Colors.black87,
+                            tooltipRoundedRadius: 12,
+                            tooltipMargin: 8,
                             getTooltipItem: (group, groupIndex, rod, rodIndex) {
                               return BarTooltipItem(
                                   "Rs. ${rod.toY.toStringAsFixed(0)}",
-                                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
                               );
                             }
                         ),
                         touchCallback: (FlTouchEvent event, barTouchResponse) {
                           setState(() {
-                            // ✅ FIX: Check event type directly
-                            if (barTouchResponse != null &&
-                                barTouchResponse.spot != null &&
-                                event is FlTapUpEvent) {
+                            if (barTouchResponse != null && barTouchResponse.spot != null && event is FlTapUpEvent) {
                               _touchedBarIndex = barTouchResponse.spot!.touchedBarGroupIndex;
                             } else {
                               _touchedBarIndex = -1;
@@ -107,10 +90,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               sideTitles: SideTitles(
                                 showTitles: true,
                                 getTitlesWidget: (val, meta) {
-                                  if (val.toInt() >= 0 && val.toInt() < monthLabels.length) {
+                                  if (val.toInt() >= 0 && val.toInt() < stats.monthLabels.length) {
                                     return Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: Text(monthLabels[val.toInt()], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                      padding: const EdgeInsets.only(top: 12.0),
+                                      child: Text(
+                                          stats.monthLabels[val.toInt()],
+                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500)
+                                      ),
                                     );
                                   }
                                   return const SizedBox();
@@ -120,17 +106,21 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       ),
                       borderData: FlBorderData(show: false),
                       gridData: const FlGridData(show: false),
-                      barGroups: List.generate(monthlyTotals.length, (i) {
+                      barGroups: List.generate(stats.monthlyTotals.length, (i) {
                         bool isTouched = i == _touchedBarIndex;
                         return BarChartGroupData(
                             x: i,
                             barRods: [
                               BarChartRodData(
-                                toY: monthlyTotals[i],
-                                color: isTouched ? Colors.orange : (i == 5 ? primaryColor : primaryColor.withOpacity(0.3)), // Highlight current month
-                                width: 16,
-                                borderRadius: BorderRadius.circular(6),
-                                backDrawRodData: BackgroundBarChartRodData(show: true, toY: maxMonthTotal * 1.2, color: Colors.grey.withOpacity(0.05)),
+                                toY: stats.monthlyTotals[i],
+                                color: isTouched ? primaryColor : (i == 5 ? primaryColor.withOpacity(0.8) : primaryColor.withOpacity(0.25)),
+                                width: 14,
+                                borderRadius: BorderRadius.circular(8),
+                                backDrawRodData: BackgroundBarChartRodData(
+                                    show: true,
+                                    toY: stats.maxMonthTotal * 1.2,
+                                    color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.08)
+                                ),
                               )
                             ]
                         );
@@ -138,97 +128,153 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   )
               ),
             ),
+            const SizedBox(height: 36),
 
-            const SizedBox(height: 30),
-
-            // --- 🍩 BREAKDOWN SECTION ---
+            // --- BREAKDOWN SECTION HEADER ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text("This Month", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                Text("Rs. ${totalSpentThisMonth.toStringAsFixed(0)}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: primaryColor)),
+                const Text(
+                    "This Month",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.5)
+                ),
+                Text(
+                    "Rs. ${stats.totalSpentThisMonth.toStringAsFixed(0)}",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: primaryColor)
+                ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            Divider(color: Colors.grey.withOpacity(0.15)),
+            const SizedBox(height: 24),
 
-            if (totalSpentThisMonth == 0)
-              const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("No data for this month", style: TextStyle(color: Colors.grey)))),
-
-            if (totalSpentThisMonth > 0) ...[
-              SizedBox(
-                height: 200,
-                child: PieChart(
-                  PieChartData(
-                    pieTouchData: PieTouchData(touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                      setState(() {
-                        if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
-                          _touchedIndex = -1;
-                          return;
-                        }
-                        _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                      });
-                    }),
-                    borderData: FlBorderData(show: false),
-                    sectionsSpace: 2, // Space between sections
-                    centerSpaceRadius: 50, // Donut hole size
-                    sections: List.generate(sortedCategories.length, (i) {
-                      final isTouched = i == _touchedIndex;
-                      final fontSize = isTouched ? 20.0 : 0.0; // Hide text inside chart, show only on touch
-                      final radius = isTouched ? 65.0 : 55.0; // Pop out effect
-                      final double percent = (sortedCategories[i].value / totalSpentThisMonth) * 100;
-                      final Color color = _getCategoryColor(i);
-
-                      return PieChartSectionData(
-                        color: color,
-                        value: sortedCategories[i].value,
-                        title: "${percent.toStringAsFixed(0)}%",
-                        radius: radius,
-                        titleStyle: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                        badgeWidget: isTouched ? _buildBadge(sortedCategories[i].key, color) : null,
-                        badgePositionPercentageOffset: 1.3,
-                      );
-                    }),
-                  ),
-                ),
+            if (stats.totalSpentThisMonth == 0)
+              Center(
+                  child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Column(
+                        children: [
+                          Icon(Icons.pie_chart_outline_rounded, size: 60, color: Colors.grey.withOpacity(0.3)),
+                          const SizedBox(height: 12),
+                          Text("No data for this month", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+                        ],
+                      )
+                  )
               ),
 
-              const SizedBox(height: 30),
+            if (stats.totalSpentThisMonth > 0) ...[
+              // --- SLEEK DONUT CHART ---
+              SizedBox(
+                height: 220,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Center Text
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text("Total", style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Text(
+                            "Rs. ${stats.totalSpentThisMonth.toStringAsFixed(0)}",
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)
+                        ),
+                      ],
+                    ),
+                    PieChart(
+                      PieChartData(
+                        pieTouchData: PieTouchData(touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                          setState(() {
+                            if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
+                              _touchedIndex = -1;
+                              return;
+                            }
+                            _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                          });
+                        }),
+                        borderData: FlBorderData(show: false),
+                        sectionsSpace: 4,
+                        centerSpaceRadius: 75, // Large center space for elegant donut look
+                        sections: List.generate(stats.sortedCategories.length, (i) {
+                          final isTouched = i == _touchedIndex;
+                          final radius = isTouched ? 28.0 : 20.0;
+                          final double percent = (stats.sortedCategories[i].value / stats.totalSpentThisMonth) * 100;
+                          final Color color = _getCategoryColor(i, primaryColor);
 
-              // --- 📝 LIST VIEW ---
-              ...List.generate(sortedCategories.length, (i) {
-                final category = sortedCategories[i].key;
-                final amount = sortedCategories[i].value;
-                final percent = (amount / totalSpentThisMonth);
-                final color = _getCategoryColor(i);
+                          return PieChartSectionData(
+                            color: color,
+                            value: stats.sortedCategories[i].value,
+                            title: "", // Hide default titles for a cleaner look
+                            radius: radius,
+                            badgeWidget: isTouched ? _buildBadge(stats.sortedCategories[i].key, percent, color, isDark) : null,
+                            badgePositionPercentageOffset: 1.6,
+                          );
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+
+              // --- ELEGANT CATEGORY LIST ---
+              ...List.generate(stats.sortedCategories.length, (i) {
+                final category = stats.sortedCategories[i].key;
+                final amount = stats.sortedCategories[i].value;
+                final percent = (amount / stats.totalSpentThisMonth);
+                final color = _getCategoryColor(i, primaryColor);
 
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.withOpacity(0.05))
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.12)),
+                      boxShadow: [
+                        BoxShadow(
+                            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4)
+                        )
+                      ]
                   ),
                   child: Column(
                     children: [
                       Row(
                         children: [
-                          Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                          Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))])
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                              child: Text(
+                                category,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                          ),
+                          Text(
+                              "${(percent * 100).toStringAsFixed(1)}%",
+                              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade500, fontSize: 13)
+                          ),
                           const SizedBox(width: 12),
-                          Text(category, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          const Spacer(),
-                          Text("${(percent * 100).toStringAsFixed(1)}%", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                          const SizedBox(width: 10),
-                          Text("Rs. ${amount.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(
+                              "Rs. ${amount.toStringAsFixed(0)}",
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      // Progress Bar
+                      const SizedBox(height: 16),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
                           value: percent,
-                          backgroundColor: color.withOpacity(0.1),
+                          backgroundColor: isDark ? Colors.white.withOpacity(0.05) : color.withOpacity(0.1),
                           valueColor: AlwaysStoppedAnimation(color),
                           minHeight: 6,
                         ),
@@ -237,8 +283,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   ),
                 );
               }),
-
-              const SizedBox(height: 80), // Bottom padding
+              const SizedBox(height: 80),
             ]
           ],
         ),
@@ -246,30 +291,44 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     );
   }
 
-  // Helper to generate elegant badge when chart is touched
-  Widget _buildBadge(String text, Color color) {
+  Widget _buildBadge(String text, double percent, Color color, bool isDark) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [const BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+        color: isDark ? Colors.grey.shade800 : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+              color: color.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4)
+          )
+        ],
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+      child: Text(
+          "$text (${percent.toStringAsFixed(0)}%)",
+          style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87,
+              fontSize: 11,
+              fontWeight: FontWeight.bold
+          )
+      ),
     );
   }
 
-  // Helper to get nice consistent colors
-  Color _getCategoryColor(int index) {
+  Color _getCategoryColor(int index, Color primaryColor) {
+    // Elegant, saturated palette that works well in both light and dark modes
     final colors = [
-      const Color(0xFF3B82F6), // Blue
-      const Color(0xFF10B981), // Green
+      primaryColor, // 1st uses user's theme color
+      const Color(0xFF10B981), // Emerald
       const Color(0xFFF59E0B), // Amber
       const Color(0xFFEF4444), // Red
-      const Color(0xFF8B5CF6), // Purple
-      const Color(0xFFEC4899), // Pink
+      const Color(0xFF8B5CF6), // Violet
       const Color(0xFF06B6D4), // Cyan
+      const Color(0xFFF43F5E), // Rose
+      const Color(0xFF3B82F6), // Blue
     ];
     return colors[index % colors.length];
   }

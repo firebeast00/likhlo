@@ -6,13 +6,15 @@ plugins {
 
 android {
     namespace = "com.example.likhlo"
-    compileSdk = flutter.compileSdkVersion
+
+    // 👇 1. CHANGED TO 34
+    compileSdk = 36
+
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-        // ✅ CORRECT KOTLIN SYNTAX FOR DESUGARING
         isCoreLibraryDesugaringEnabled = true
     }
 
@@ -22,21 +24,28 @@ android {
 
     defaultConfig {
         applicationId = "com.example.likhlo"
+
+        // 👇 2. SET MIN SDK TO 21 AND TARGET TO 34
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
+
+        // 👇 3. ENABLE MULTIDEX (Kotlin Syntax)
+        multiDexEnabled = true
+
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         getByName("release") {
-            // ✅ CORRECT KOTLIN SYNTAX FOR SIGNING CONFIG
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
 dependencies {
-    // ✅ CORRECT KOTLIN SYNTAX FOR DEPENDENCIES
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+    // 👇 4. MULTIDEX DEPENDENCY (Kotlin Syntax)
+    implementation("androidx.multidex:multidex:2.0.1")
 }

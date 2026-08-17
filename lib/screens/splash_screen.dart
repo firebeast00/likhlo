@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart'; // Import Hive
+import 'package:hive_flutter/hive_flutter.dart';
+import '../providers/settings_provider.dart';
 import 'home_screen.dart';
-import 'onboarding_screen.dart'; // Import Onboarding Screen
+import 'onboarding_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -21,28 +22,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2500),
+      duration: const Duration(milliseconds: 2000),
     );
 
-    _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    // Smooth elastic spring entry for the logo
+    _logoScale = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
 
+    // Clean fade-in effect
     _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6, curve: Curves.easeIn)),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.5, curve: Curves.easeIn)),
     );
 
-    _slideUp = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.5, 1.0, curve: Curves.easeOutQuart)),
+    // Elegant upward slide for text elements
+    _slideUp = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.3, 1.0, curve: Curves.easeOutQuart)),
     );
 
     _controller.forward();
 
-    // Check First Time User Logic
-    Timer(const Duration(milliseconds: 3000), () {
+    // Navigate seamlessly after the animation completes
+    Timer(const Duration(milliseconds: 1600), () {
       if (mounted) {
         _checkFirstTime();
       }
@@ -52,13 +55,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   Future<void> _checkFirstTime() async {
     final box = Hive.box('preferences');
     bool hasOnboarded = box.get('has_onboarded', defaultValue: false);
+    if (!mounted) return;
 
+    // 🚀 FIX: Direct material replacement to prevent double-rendering canvas frames
     Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        // ✅ LOGIC: If onboarded -> Home, Else -> Onboarding
-        pageBuilder: (_, __, ___) => hasOnboarded ? const HomeScreen() : const OnboardingScreen(),
-        transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
-        transitionDuration: const Duration(milliseconds: 800),
+      MaterialPageRoute(
+        builder: (_) => hasOnboarded ? const HomeScreen() : const OnboardingScreen(),
       ),
     );
   }
@@ -71,48 +73,46 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final primaryColor = Color(settings.profileColorValue);
+
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1E3A8A), // Deep Royal Blue
-              Color(0xFF172554), // Dark Navy
-              Color(0xFF0F172A), // Almost Black
-            ],
-          ),
-        ),
+      backgroundColor: Colors.white,
+      body: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Spacer(),
+
+            // Animated Logo Badge
             ScaleTransition(
               scale: _logoScale,
               child: FadeTransition(
                 opacity: _logoFade,
                 child: Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 30, spreadRadius: 5),
-                      ]
+                    color: primaryColor.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withOpacity(0.12),
+                        blurRadius: 30,
+                        spreadRadius: 8,
+                      ),
+                    ],
                   ),
                   child: Image.asset(
                     'assets/app_logo.png',
-                    width: 120,
-                    height: 120,
+                    width: 100,
+                    height: 100,
                   ),
                 ),
               ),
             ),
+            const SizedBox(height: 32),
 
-            const SizedBox(height: 30),
-
+            // Animated App Name & Developer Info
             SlideTransition(
               position: _slideUp,
               child: FadeTransition(
@@ -122,31 +122,54 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                     const Text(
                       "Likhlo",
                       style: TextStyle(
-                        fontSize: 42,
+                        fontSize: 40,
                         fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 1.5,
-                        fontFamily: 'Roboto',
+                        color: Colors.black87,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Container(
                       height: 3,
-                      width: 50,
+                      width: 40,
                       decoration: BoxDecoration(
-                          color: Colors.blueAccent,
-                          borderRadius: BorderRadius.circular(2)
+                        color: primaryColor,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    // ✅ UPDATED FOOTER TEXT
+                    const SizedBox(height: 12),
                     Text(
                       "Made by Jawad Rajper",
                       style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.7),
-                          letterSpacing: 1.2,
-                          fontWeight: FontWeight.w400
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                        letterSpacing: 1.0,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Spacer(),
+
+            // Bottom Security/Privacy Tagline Footer
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24.0),
+              child: FadeTransition(
+                opacity: _logoFade,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lock_rounded, size: 12, color: Colors.grey.shade400),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Secure, local & private expense tracking",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade400,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],

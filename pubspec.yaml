@@ -27,6 +27,11 @@ dependencies:
   # 👇 NEW PACKAGES
   file_picker: ^8.0.0
   permission_handler: ^11.3.0
+  speech_to_text: ^7.4.0
+  google_mlkit_text_recognition: ^0.16.0
+  image_picker: ^1.1.2
+  quick_actions: ^1.1.0
+
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +40,7 @@ dev_dependencies:
   build_runner: ^2.4.8
   flutter_lints: ^2.0.0
   flutter_launcher_icons: ^0.13.1 # Add this line
+  flutter_native_splash: ^2.4.7
 
 flutter:
   uses-material-design: true
@@ -53,3 +59,16 @@ flutter_launcher_icons:
   adaptive_icon_background: "#1E3A8A" # Optional: Matches your deep blue splash theme
   adaptive_icon_foreground: "assets/app_logo.png"
 
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/app_logo.png"
+
+  color_dark: "#0F172A"
+  image_dark: "assets/app_logo.png"
+
+  android_12:
+    image: "assets/app_logo.png"
+    icon_background_color: "#FFFFFF"
+    image_dark: "assets/app_logo.png"
+    icon_background_color_dark: "#0F172A"

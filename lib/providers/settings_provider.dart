@@ -1,88 +1,89 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/settings_model.dart';
 
-class SettingsNotifier extends StateNotifier<AppSettings> {
-  SettingsNotifier() : super(AppSettings(
-      userName: '',
-      themeMode: 'system',
-      profileColorValue: 0xFF2563EB,
-      userProfession: '', // ✅ Added
-      profileIconIndex: 0 // ✅ Added
-  )) {
+// ✅ Renamed to SettingsState to avoid colliding with your settings_model.dart
+class SettingsState {
+  final String themeMode;
+  final double brightnessLevel;
+  final String userName;
+  final String userProfession;
+  final int profileColorValue;
+
+  SettingsState({
+    this.themeMode = 'light',
+    this.brightnessLevel = 0.0,
+    this.userName = '',
+    this.userProfession = '',
+    this.profileColorValue = 0xFF009688, // Default Teal
+  });
+
+  SettingsState copyWith({
+    String? themeMode,
+    double? brightnessLevel,
+    String? userName,
+    String? userProfession,
+    int? profileColorValue,
+  }) {
+    return SettingsState(
+      themeMode: themeMode ?? this.themeMode,
+      brightnessLevel: brightnessLevel ?? this.brightnessLevel,
+      userName: userName ?? this.userName,
+      userProfession: userProfession ?? this.userProfession,
+      profileColorValue: profileColorValue ?? this.profileColorValue,
+    );
+  }
+}
+
+class SettingsNotifier extends StateNotifier<SettingsState> {
+  final Box _box = Hive.box('settings');
+
+  SettingsNotifier() : super(SettingsState()) {
     _loadSettings();
   }
 
   void _loadSettings() {
-    if (!Hive.isBoxOpen('settings')) return;
-
-    final box = Hive.box<AppSettings>('settings');
-    final stored = box.get('user_settings');
-    if (stored != null) {
-      state = stored;
-    }
-  }
-
-  Future<void> updateProfile(String name, String profession) async {
-    final newState = AppSettings(
-      userName: name,
-      userProfession: profession, // ✅ Added
-      themeMode: state.themeMode,
-      profileColorValue: state.profileColorValue,
-      profileIconIndex: state.profileIconIndex, // ✅ Added
+    state = SettingsState(
+      themeMode: _box.get('themeMode', defaultValue: 'light'),
+      brightnessLevel: _box.get('brightnessLevel', defaultValue: 0.0),
+      userName: _box.get('userName', defaultValue: ''),
+      userProfession: _box.get('userProfession', defaultValue: ''),
+      profileColorValue: _box.get('profileColorValue', defaultValue: 0xFF009688),
     );
-    state = newState;
-    await _saveToHive();
   }
 
-  Future<void> updateThemeMode(String mode) async {
-    final newState = AppSettings(
-      userName: state.userName,
-      userProfession: state.userProfession,
-      themeMode: mode,
-      profileColorValue: state.profileColorValue,
-      profileIconIndex: state.profileIconIndex,
-    );
-    state = newState;
-    await _saveToHive();
+  void updateThemeMode(String mode) {
+    _box.put('themeMode', mode);
+    state = state.copyWith(themeMode: mode);
   }
-// 5. Brightness
-  Future<void> updateBrightness(double level) async {
-    final box = Hive.box('preferences');
-    await box.put('brightnessLevel', level);
+
+  void updateBrightness(double level) {
+    _box.put('brightnessLevel', level);
     state = state.copyWith(brightnessLevel: level);
   }
-  Future<void> updateProfileIcon(int index) async {
-    final newState = AppSettings(
-      userName: state.userName,
-      userProfession: state.userProfession,
-      themeMode: state.themeMode,
-      profileColorValue: state.profileColorValue,
-      profileIconIndex: index, // ✅ Updating this
-    );
-    state = newState;
-    await _saveToHive();
+
+  void updateUserName(String name) {
+    _box.put('userName', name);
+    state = state.copyWith(userName: name);
   }
 
-  Future<void> updateThemeColor(int colorValue) async {
-    final newState = AppSettings(
-      userName: state.userName,
-      userProfession: state.userProfession,
-      themeMode: state.themeMode,
-      profileColorValue: colorValue,
-      profileIconIndex: state.profileIconIndex,
-    );
-    state = newState;
-    await _saveToHive();
+  void updateUserProfession(String prof) {
+    _box.put('userProfession', prof);
+    state = state.copyWith(userProfession: prof);
+  }
+  // ✅ Restored method for your Onboarding Screen
+  void updateProfile(String name, String prof) {
+    _box.put('userName', name);
+    _box.put('userProfession', prof);
+    state = state.copyWith(userName: name, userProfession: prof);
   }
 
-  Future<void> _saveToHive() async {
-    if (!Hive.isBoxOpen('settings')) return;
-    final box = Hive.box<AppSettings>('settings');
-    await box.put('user_settings', state);
+  void updateProfileColor(int colorValue) {
+    _box.put('profileColorValue', colorValue);
+    state = state.copyWith(profileColorValue: colorValue);
   }
 }
 
-final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>((ref) {
+// ✅ Updated Provider definition to use SettingsState
+final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
   return SettingsNotifier();
 });

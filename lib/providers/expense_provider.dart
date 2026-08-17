@@ -51,16 +51,18 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 
   // Edit Expense (New Feature)
-  Future<void> editExpense(String key, Expense updatedExpense) async {
-    // Note: Hive objects extend HiveObject, so they have a .save() method,
-    // but saving by key in the box is safer for updates.
+  // Edit Expense (Upgraded to preserve database index)
+  Future<void> editExpense(String id, Expense updatedExpense) async {
     final box = Hive.box<Expense>('expenses');
-    // Find the item index or key to update.
-    // In strict Hive, we often use the key. Assuming 'id' is managed or we iterate:
-    final expenseToEdit = box.values.firstWhere((e) => e.id == updatedExpense.id);
-    await expenseToEdit.delete(); // Simple replace strategy for now
-    await box.add(updatedExpense);
-    loadExpenses();
+
+    // Find the item to get its specific Hive internal key
+    final expenseToEdit = box.values.firstWhere((e) => e.id == id);
+
+    // Use .put() with the exact key to overwrite it in place,
+    // rather than deleting and appending to the bottom.
+    await box.put(expenseToEdit.key, updatedExpense);
+
+    loadExpenses(); // Reload to update Riverpod state
   }
 
   // Delete Expense

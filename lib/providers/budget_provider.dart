@@ -10,15 +10,16 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
 
   void _loadBudgets() {
     final box = Hive.box('preferences');
-    // Load the map or default to empty
     final Map<dynamic, dynamic>? saved = box.get('monthly_budgets');
-    if (saved != null) {
+    final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
+
+    if (saved != null && saved.isNotEmpty) {
       state = saved.map((key, value) => MapEntry(key.toString(), value as double));
     } else {
-      // Fallback for migration: try loading old single limit
+      // 🚀 FIX: Actually SAVE the fallback to the box so Insights Engine can read it
       final oldLimit = box.get('limit', defaultValue: 20000.0);
-      final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
       state = {currentMonthKey: oldLimit};
+      box.put('monthly_budgets', state);
     }
   }
 

@@ -99,6 +99,34 @@ class NotificationService {
       print("❌ Error Showing Notification: $e");
     }
   }
+  Future<void> scheduleDailyReminder() async {
+    try {
+      final details = await _getDetails();
+
+      // Calculate next 8:00 PM
+      final now = tz.TZDateTime.now(tz.local);
+      var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, 20, 0);
+
+      // If it's already past 8:00 PM today, schedule for tomorrow
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      await _notifications.zonedSchedule(
+        999, // Static ID so it doesn't duplicate
+        "Daily Check-in 💸",
+        "What did you spend today? Tap to log it quickly.",
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time, // Repeats daily at this time
+      );
+      print("🔔 Daily 8 PM Reminder scheduled!");
+    } catch (e) {
+      print("🔔 Error scheduling daily reminder: $e");
+    }
+  }
 
   Future<void> scheduleNotification(int id, String title, String body, DateTime scheduledTime) async {
     try {
@@ -127,4 +155,6 @@ class NotificationService {
   Future<void> cancelAll() async {
     await _notifications.cancelAll();
   }
+  // ✅ NEW: 8:00 PM Daily Reminder
+
 }

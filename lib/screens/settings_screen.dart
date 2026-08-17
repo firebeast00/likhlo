@@ -1,213 +1,444 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:hive/hive.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
+
 import '../providers/settings_provider.dart';
-import '../providers/category_provider.dart';
 import '../providers/expense_provider.dart';
-import '../services/notification_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
+
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  String? _ringtoneName;
-  final List<IconData> _profileIcons = const [
-    Icons.person_rounded, Icons.school_rounded, Icons.work_rounded, Icons.face_rounded, Icons.emoji_emotions_rounded, Icons.sports_esports_rounded
-  ];
+  // --- PROFILE EDIT DIALOG ---
+  void _showEditProfileDialog(String currentName, String currentProfession) {
+    final nameCtrl = TextEditingController(text: currentName);
+    final profCtrl = TextEditingController(text: currentProfession);
+    final primaryColor = Color(ref.read(settingsProvider).profileColorValue);
 
-  // 🎨 DESIGNER'S CHOICE: Expanded Premium Color Palette
-  final Map<String, Color> _premiumThemes = {
-    // Classics
-    "Royal Blue": const Color(0xFF2563EB),    // Trust & Professionalism (Default)
-    "Emerald": const Color(0xFF059669),       // Growth & Money
-    "Sunset Orange": const Color(0xFFEA580C), // Energy & Warmth
-
-    // Vibrant
-    "Berry Fusion": const Color(0xFFBE185D),  // Creativity & Passion
-    "Deep Violet": const Color(0xFF7C3AED),   // Luxury & Wisdom
-    "Ocean Teal": const Color(0xFF0D9488),    // Calm & Balance
-
-    // ✨ NEW DARK THEMES
-    "Midnight Slate": const Color(0xFF475569), // Minimalist & Sleek
-    "Crimson Ruby": const Color(0xFFE11D48),   // Bold & Exclusive
-    "Electric Cyan": const Color(0xFF0891B2),  // Modern & Tech-focused
-    "Golden Amber": const Color(0xFFCA8A04),   // Rich & High Contrast
-  };
-
-  @override
-  void initState() { super.initState(); _loadRingtone(); }
-
-  void _loadRingtone() { final path = Hive.box('preferences').get('custom_ringtone'); if (path != null) setState(() => _ringtoneName = path.split('/').last); }
-
-  Future<void> _pickRingtone() async {
-    if (await Permission.audio.request().isGranted || await Permission.storage.request().isGranted) {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.audio);
-      if (result != null && result.files.single.path != null) {
-        String path = result.files.single.path!;
-        await Hive.box('preferences').put('custom_ringtone', path);
-        setState(() => _ringtoneName = result.files.single.name);
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Ringtone updated!")));
-      }
-    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text("Edit Profile", style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: "Full Name",
+                prefixIcon: Icon(Icons.person_rounded, color: primaryColor),
+                filled: true,
+                fillColor: Theme.of(context).scaffoldBackgroundColor,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: profCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: "Profession / Role",
+                prefixIcon: Icon(Icons.work_rounded, color: primaryColor),
+                filled: true,
+                fillColor: Theme.of(context).scaffoldBackgroundColor,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  onPressed: () {
+                    ref.read(settingsProvider.notifier).updateUserName(nameCtrl.text);
+                    ref.read(settingsProvider.notifier).updateUserProfession(profCtrl.text);
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
   }
 
-  Future<void> _generatePdf() async {
-    final expenses = ref.read(expenseProvider).allExpenses;
-    final pdf = pw.Document();
-    pdf.addPage(pw.Page(build: (pw.Context context) => pw.Column(children: [pw.Header(level: 0, child: pw.Text("Expense Report")), pw.Table.fromTextArray(context: context, data: <List<String>>[<String>['Date', 'Title', 'Amt'], ...expenses.map((e) => [e.date.toString().substring(0, 10), e.title, e.amount.toString()])])])));
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  // --- THEME COLOR PICKER DIALOG ---
+  void _showColorPicker(int activeColor) {
+    final colors = [
+      0xFF3B82F6, // Blue
+      0xFF10B981, // Emerald
+      0xFFF59E0B, // Amber
+      0xFFEF4444, // Red
+      0xFF8B5CF6, // Violet
+      0xFFEC4899, // Pink
+      0xFF009688, // Teal
+      0xFF0F172A, // Slate
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text("Theme Color", style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          alignment: WrapAlignment.center,
+          children: colors.map((colorValue) {
+            final isSelected = colorValue == activeColor;
+            return GestureDetector(
+              onTap: () {
+                ref.read(settingsProvider.notifier).updateProfileColor(colorValue);
+                Navigator.pop(ctx);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 55,
+                height: 55,
+                decoration: BoxDecoration(
+                  color: Color(colorValue),
+                  shape: BoxShape.circle,
+                  border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                  boxShadow: [
+                    BoxShadow(color: Color(colorValue).withOpacity(0.4), blurRadius: isSelected ? 12 : 6, offset: const Offset(0, 4))
+                  ],
+                ),
+                child: isSelected ? const Icon(Icons.check_rounded, color: Colors.white, size: 28) : null,
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
-    final notifier = ref.read(settingsProvider.notifier);
-    final categories = ref.watch(categoryProvider);
+    final primaryColor = Color(settings.profileColorValue);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final String displayName = (settings.userName.isNotEmpty) ? settings.userName : "Set up profile";
+    final String displayProf = (settings.userProfession.isNotEmpty) ? settings.userProfession : "Tap to add details";
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         children: [
-          const Text("Profile", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 13)),
-          const SizedBox(height: 10),
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.withOpacity(0.1))),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+          const Text("Preferences", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+          const SizedBox(height: 24),
+
+          // 1. 🌟 PREMIUM PROFILE HERO CARD
+          GestureDetector(
+            onTap: () => _showEditProfileDialog(settings.userName, settings.userProfession),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryColor, primaryColor.withOpacity(0.75)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(32),
+                boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 10))],
+              ),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => _pickIcon(context, notifier),
-                    child: CircleAvatar(radius: 32, backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1), child: Icon(_profileIcons[settings.profileIconIndex], size: 32, color: Theme.of(context).primaryColor)),
+                  Container(
+                    width: 65, height: 65,
+                    decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)]),
+                    child: Center(
+                      child: Text(
+                        displayName.isNotEmpty ? displayName[0].toUpperCase() : "?",
+                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: primaryColor),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 15),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(settings.userName.isEmpty ? "Set Name" : settings.userName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text(settings.userProfession.isEmpty ? "Set Profession" : settings.userProfession, style: const TextStyle(color: Colors.grey))])),
-                  IconButton(icon: const Icon(Icons.edit_rounded, color: Colors.blue), onPressed: () => _startProfileWizard(context, notifier, settings.userName, settings.userProfession))
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 4),
+                        Text(displayProf, style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                    child: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+                  ),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 32),
 
-          const SizedBox(height: 24),
-          const Text("Theme Appearance", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 13)),
-          const SizedBox(height: 15),
-
-          // 🎨 Premium Theme Selector
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            alignment: WrapAlignment.center,
-            children: _premiumThemes.entries.map((entry) {
-              return _themeBubble(context, notifier, entry.value, entry.key, settings.profileColorValue);
-            }).toList(),
+          // 2. 🎨 APPEARANCE
+          const Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 12),
+            child: Text("Appearance", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
           ),
-
-          const Divider(height: 40),
-          const Text("Preferences", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 13)),
-
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.notifications_active_rounded, color: Colors.orange)),
-            title: const Text("Notification Sound", style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(_ringtoneName ?? "Default System"),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                    onPressed: () => NotificationService().showInstantNotification("Test", "This is how your ringtone sounds!"),
-                    child: const Text("TEST")
+          _buildSettingsGroup(
+            isDark: isDark,
+            children: [
+              _buildSwitchTile(
+                title: "Dark Mode",
+                subtitle: "Sleek theme for night use",
+                icon: isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                iconColor: Colors.indigo,
+                value: settings.themeMode == 'dark',
+                onChanged: (val) => ref.read(settingsProvider.notifier).updateThemeMode(val ? 'dark' : 'light'),
+              ),
+              _buildDivider(),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: _buildIconBox(Icons.color_lens_rounded, primaryColor),
+                title: const Text("Theme Color", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                subtitle: const Text("Customize app accent", style: TextStyle(fontSize: 13, color: Colors.grey)),
+                trailing: Container(
+                  width: 30, height: 30,
+                  decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle, border: Border.all(color: isDark ? Colors.white24 : Colors.black12, width: 2)),
                 ),
-                const Icon(Icons.chevron_right_rounded),
-              ],
-            ),
-            onTap: _pickRingtone,
+                onTap: () => _showColorPicker(settings.profileColorValue),
+              ),
+              _buildDivider(),
+
+              // REFINED BRIGHTNESS SLIDER
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _buildIconBox(Icons.brightness_medium_rounded, Colors.orange),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("Screen Dimmer", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                              Text("Dims the entire app interface", style: TextStyle(fontSize: 13, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.brightness_7_rounded, size: 18, color: Colors.grey.shade400),
+                        Expanded(
+                          child: Slider(
+                            value: settings.brightnessLevel,
+                            min: 0.0,
+                            max: 0.75, // Prevents pitch black screen
+                            activeColor: primaryColor,
+                            inactiveColor: primaryColor.withOpacity(0.2),
+                            onChanged: (val) => ref.read(settingsProvider.notifier).updateBrightness(val),
+                          ),
+                        ),
+                        Icon(Icons.brightness_3_rounded, size: 18, color: Colors.grey.shade600),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 32),
 
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.analytics_rounded, color: Colors.red)),
-            title: const Text("Export Monthly Report", style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text("Download PDF"),
-            onTap: _generatePdf,
+          // 3. 📂 EXPORT REPORT
+          const Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 12),
+            child: Text("Data & Reports", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
           ),
-
-          const Divider(height: 30),
-          const Text("Categories", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 13)),
-          ...categories.map((c) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            leading: const Icon(Icons.label_important_outline_rounded, size: 20),
-            title: Text(c, style: const TextStyle(fontWeight: FontWeight.w500)),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [IconButton(icon: const Icon(Icons.edit_rounded, size: 18), onPressed: () => _editCategory(context, ref, c)), IconButton(icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red), onPressed: () => ref.read(categoryProvider.notifier).deleteCategory(c))]),
-          )),
-          TextButton.icon(icon: const Icon(Icons.add_rounded), label: const Text("Add New Category"), onPressed: () => _addCategory(context, ref)),
-
+          _buildSettingsGroup(
+            isDark: isDark,
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: _buildIconBox(Icons.picture_as_pdf_rounded, Colors.red.shade400),
+                title: const Text("Export Monthly PDF", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                subtitle: const Text("Generate a professional statement", style: TextStyle(fontSize: 13, color: Colors.grey)),
+                trailing: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(Icons.download_rounded, size: 20, color: Colors.red.shade400),
+                ),
+                onTap: () => _generatePdf(context, ref, primaryColor),
+              ),
+            ],
+          ),
           const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  // 🎨 Beautiful Color Bubble with Selection State
-  Widget _themeBubble(BuildContext context, SettingsNotifier notifier, Color color, String name, int currentColorValue) {
-    bool isSelected = color.value == currentColorValue;
-    return GestureDetector(
-      onTap: () {
-        notifier.updateThemeColor(color.value);
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.palette_rounded, color: Colors.white),
-                  const SizedBox(width: 10),
-                  Text("Theme applied: $name", style: const TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-              backgroundColor: color,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              duration: const Duration(seconds: 1),
-            )
-        );
-      },
-      child: Column(
-        children: [
-          Container(
-            width: 45,
-            height: 45,
-            decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: isSelected ? Theme.of(context).iconTheme.color! : Colors.transparent,
-                    width: isSelected ? 3 : 0
-                ),
-                boxShadow: [
-                  if (isSelected) BoxShadow(color: color.withOpacity(0.4), blurRadius: 10, spreadRadius: 2)
-                ]
-            ),
-            child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
-          ),
-          const SizedBox(height: 6),
-          Text(name, style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-        ],
+  // --- UI HELPERS ---
+  Widget _buildSettingsGroup({required List<Widget> children, required bool isDark}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 8))],
       ),
+      child: Column(children: children),
     );
   }
 
-  void _startProfileWizard(BuildContext context, SettingsNotifier notifier, String n, String p) { final nc=TextEditingController(text:n); showDialog(context: context, builder: (ctx)=>AlertDialog(title: const Text("Name"), content: TextField(controller: nc), actions: [TextButton(onPressed: (){Navigator.pop(ctx); _askProfession(context, notifier, nc.text, p);}, child: const Text("Next"))])); }
-  void _askProfession(BuildContext context, SettingsNotifier notifier, String n, String p) { final pc=TextEditingController(text:p); showDialog(context: context, builder: (ctx)=>AlertDialog(title: const Text("Profession"), content: TextField(controller: pc), actions: [TextButton(onPressed: (){notifier.updateProfile(n, pc.text); Navigator.pop(ctx);}, child: const Text("Save"))])); }
-  void _pickIcon(BuildContext context, SettingsNotifier notifier) { showDialog(context: context, builder: (ctx)=>AlertDialog(content: Wrap(spacing:15, runSpacing:15, children: List.generate(_profileIcons.length, (i)=>GestureDetector(onTap:(){notifier.updateProfileIcon(i); Navigator.pop(ctx);}, child: CircleAvatar(child: Icon(_profileIcons[i]))))))); }
-  void _editCategory(BuildContext context, WidgetRef ref, String old) { final c=TextEditingController(text:old); showDialog(context: context, builder: (ctx)=>AlertDialog(title: const Text("Edit"), content: TextField(controller: c), actions: [TextButton(onPressed: (){ref.read(categoryProvider.notifier).editCategory(old, c.text); Navigator.pop(ctx);}, child: const Text("Save"))])); }
-  void _addCategory(BuildContext context, WidgetRef ref) { final c=TextEditingController(); showDialog(context: context, builder: (ctx)=>AlertDialog(title: const Text("New"), content: TextField(controller: c), actions: [TextButton(onPressed: (){ref.read(categoryProvider.notifier).addCategory(c.text); Navigator.pop(ctx);}, child: const Text("Add"))])); }
+  Widget _buildDivider() {
+    return Divider(height: 1, thickness: 1, color: Colors.grey.withOpacity(0.1), indent: 70, endIndent: 20);
+  }
+
+  Widget _buildIconBox(IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  Widget _buildSwitchTile({required String title, required String subtitle, required IconData icon, required Color iconColor, required bool value, required Function(bool) onChanged}) {
+    return SwitchListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      secondary: _buildIconBox(icon, iconColor),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+      activeColor: Color(ref.read(settingsProvider).profileColorValue),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+
+  // --- PROFESSIONAL PDF GENERATOR ---
+  Future<void> _generatePdf(BuildContext context, WidgetRef ref, Color primaryColor) async {
+    final expenses = ref.read(expenseProvider).allExpenses;
+    final settings = ref.read(settingsProvider);
+    final pdf = pw.Document();
+
+    final totalSpent = expenses.fold(0.0, (sum, item) => sum + item.amount);
+    final dateStr = DateFormat.yMMMM().format(DateTime.now());
+
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text("LIKHLO", style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: pdfPrimaryColor)),
+                          pw.SizedBox(height: 4),
+                          pw.Text("Financial Statement", style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
+                        ]
+                    ),
+                    pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text(settings.userName.isNotEmpty ? settings.userName : "Student Account", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                          pw.Text(dateStr, style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                        ]
+                    )
+                  ]
+              ),
+              pw.SizedBox(height: 30),
+              pw.Container(
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(12)),
+                      border: pw.Border.all(color: PdfColors.grey300)
+                  ),
+                  child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text("Total Outflow:", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                        pw.Text("Rs. ${totalSpent.toStringAsFixed(0)}", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: pdfPrimaryColor)),
+                      ]
+                  )
+              ),
+              pw.SizedBox(height: 30),
+              pw.Text("Transaction History", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+              pw.TableHelper.fromTextArray(
+                context: context,
+                border: const pw.TableBorder(
+                  horizontalInside: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                  bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                ),
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+                cellPadding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                headers: ['Date', 'Title', 'Category', 'Amount (Rs)'],
+                data: expenses.map((e) => [
+                  DateFormat('dd MMM yyyy').format(e.date),
+                  e.title,
+                  e.category,
+                  e.amount.toStringAsFixed(0)
+                ]).toList(),
+              ),
+              pw.Spacer(),
+              pw.Divider(color: PdfColors.grey400),
+              pw.SizedBox(height: 8),
+              pw.Center(
+                  child: pw.Text("Generated securely via Likhlo Expense Manager.", style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600))
+              )
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+        onLayout: (format) async => pdf.save(),
+        name: 'Likhlo_Statement_$dateStr.pdf'
+    );
+  }
 }
