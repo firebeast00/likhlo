@@ -214,10 +214,12 @@ class IncomeAccountsNotifier extends StateNotifier<IncomeAccountsState> {
       throw ArgumentError('Transfer amount must be greater than zero.');
     }
 
-    final source = state.accounts
-        .where((account) => account.id == fromAccountId)
-        .firstOrNull;
-    if (source == null) throw StateError('Source account was not found.');
+    final sourceMatches =
+        state.accounts.where((account) => account.id == fromAccountId);
+    if (sourceMatches.isEmpty) {
+      throw StateError('Source account was not found.');
+    }
+    final source = sourceMatches.first;
     if (!state.accounts.any((account) => account.id == toAccountId)) {
       throw StateError('Destination account was not found.');
     }
