@@ -24,6 +24,9 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
   }
 
   Future<void> setBudget(double amount, DateTime date) async {
+    if (!amount.isFinite || amount < 0) {
+      throw ArgumentError('Budget cannot be negative.');
+    }
     final key = DateFormat('yyyy-MM').format(date);
     final newState = Map<String, double>.from(state);
     newState[key] = amount;
