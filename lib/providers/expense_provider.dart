@@ -45,9 +45,12 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 
   // Add Expense
   Future<void> addExpense(Expense expense) async {
+    if (!expense.amount.isFinite || expense.amount <= 0) {
+      throw ArgumentError('Expense amount must be greater than zero.');
+    }
     final box = Hive.box<Expense>('expenses');
     await box.add(expense);
-    loadExpenses(); // Reload to update state
+    loadExpenses();
   }
 
   // Edit Expense (New Feature)
@@ -55,11 +58,14 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   Future<void> editExpense(String id, Expense updatedExpense) async {
     final box = Hive.box<Expense>('expenses');
 
-    // Find the item to get its specific Hive internal key
-    final expenseToEdit = box.values.firstWhere((e) => e.id == id);
-
-    // Use .put() with the exact key to overwrite it in place,
-    // rather than deleting and appending to the bottom.
+    if (!updatedExpense.amount.isFinite || updatedExpense.amount <= 0) {
+      throw ArgumentError('Expense amount must be greater than zero.');
+    }
+    final matches = box.values.where((expense) => expense.id == id);
+    if (matches.isEmpty) {
+      throw StateError('Expense was not found.');
+    }
+    final expenseToEdit = matches.first;
     await box.put(expenseToEdit.key, updatedExpense);
 
     loadExpenses(); // Reload to update Riverpod state
@@ -68,8 +74,9 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   // Delete Expense
   Future<void> deleteExpense(String id) async {
     final box = Hive.box<Expense>('expenses');
-    final expenseToDelete = box.values.firstWhere((e) => e.id == id);
-    await expenseToDelete.delete();
+    final matches = box.values.where((expense) => expense.id == id);
+    if (matches.isEmpty) return;
+    await matches.first.delete();
     loadExpenses();
   }
 
