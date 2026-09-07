@@ -1,30 +1,32 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:student_expense_manager/main.dart';
+import 'package:student_expense_manager/services/local_nlp_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const LikhloApp());
+  group('LocalNlpService', () {
+    const categories = ['General', 'Food', 'Transport', 'Education'];
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('extracts an amount and food category', () {
+      final result =
+          LocalNlpService().parseExpense('500 for biryani', categories);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      expect(result['amount'], 500);
+      expect(result['category'], 'Food');
+      expect(result['title'], 'Biryani');
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('uses a custom category mentioned by the user', () {
+      final result =
+          LocalNlpService().parseExpense('1200 for education books', categories);
+
+      expect(result['amount'], 1200);
+      expect(result['category'], 'Education');
+    });
+
+    test('returns zero when no amount is present', () {
+      final result =
+          LocalNlpService().parseExpense('bought lunch', categories);
+
+      expect(result['amount'], 0);
+    });
   });
 }
