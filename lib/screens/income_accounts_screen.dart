@@ -77,7 +77,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
           title: const Text('Add income'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             DropdownButtonFormField<String>(
-              initialValue: accountId,
+              value: accountId,
               decoration: const InputDecoration(labelText: 'Income source'),
               items: accounts
                   .map((item) =>
@@ -147,7 +147,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
           title: const Text('Transfer'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             DropdownButtonFormField<String>(
-              initialValue: fromId,
+              value: fromId,
               decoration: const InputDecoration(labelText: 'From'),
               items: accounts
                   .map((item) =>
@@ -159,7 +159,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: toId,
+              value: toId,
               decoration: const InputDecoration(labelText: 'To'),
               items: accounts
                   .map((item) =>
@@ -277,17 +277,17 @@ class IncomeAccountsScreen extends ConsumerWidget {
                               await _rename(context, ref, account);
                             } else if (action == 'clear') {
                               if (await _confirm(context, 'Clear account?',
-                                  'This balance will also be reconciled with the current main budget.')) {
+                                  'This resets the account balance. Existing income history and budgets stay unchanged.')) {
                                 await ref
                                     .read(incomeAccountsProvider.notifier)
-                                    .clearAccount(account.id, DateTime.now());
+                                    .clearAccount(account.id);
                               }
                             } else if (action == 'delete') {
                               if (await _confirm(context, 'Delete account?',
-                                  'The balance will be reconciled with the current main budget.')) {
+                                  'The account will be removed. Existing income history and budgets stay unchanged.')) {
                                 await ref
                                     .read(incomeAccountsProvider.notifier)
-                                    .deleteAccount(account.id, DateTime.now());
+                                    .deleteAccount(account.id);
                               }
                             }
                           },
