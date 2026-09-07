@@ -253,32 +253,22 @@ class IncomeAccountsNotifier extends StateNotifier<IncomeAccountsState> {
     ));
   }
 
-  Future<void> clearAccount(String id, DateTime budgetMonth) async {
-    final account = state.accounts.where((item) => item.id == id).firstOrNull;
-    if (account == null) throw StateError('Income account was not found.');
-
-    if (account.balance != 0) {
-      await ref
-          .read(budgetProvider.notifier)
-          .adjustBudget(-account.balance, budgetMonth);
+  Future<void> clearAccount(String id) async {
+    if (!state.accounts.any((item) => item.id == id)) {
+      throw StateError('Income account was not found.');
     }
-
     final accounts = state.accounts
         .map((item) => item.id == id ? item.copyWith(balance: 0) : item)
         .toList();
+    // Clearing the account view must not erase income already credited to a
+    // historical monthly budget.
     await _persist(state.copyWith(accounts: accounts));
   }
 
-  Future<void> deleteAccount(String id, DateTime budgetMonth) async {
-    final account = state.accounts.where((item) => item.id == id).firstOrNull;
-    if (account == null) return;
-
-    if (account.balance != 0) {
-      await ref
-          .read(budgetProvider.notifier)
-          .adjustBudget(-account.balance, budgetMonth);
-    }
-
+  Future<void> deleteAccount(String id) async {
+    if (!state.accounts.any((item) => item.id == id)) return;
+    // Income entries remain as an audit trail and previously credited budgets
+    // are left unchanged.
     await _persist(state.copyWith(
       accounts: state.accounts.where((item) => item.id != id).toList(),
     ));
