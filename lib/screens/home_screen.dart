@@ -62,6 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     quickActions.initialize((String shortcutType) {
       // Add a slight delay to ensure the UI is fully mounted before triggering dialogs/mic
       Future.delayed(const Duration(milliseconds: 400), () {
+        if (!mounted) return;
         if (shortcutType == 'action_voice_log') {
           _listenForExpense();
         } else if (shortcutType == 'action_add_expense') {
@@ -89,7 +90,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     // Scenario A: App launched from a dead state
     platform.invokeMethod<String>('getQuickAction').then((action) {
       if (action == 'add_expense') {
-        Future.delayed(const Duration(milliseconds: 500), () => _showAddOrEditModal());
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) _showAddOrEditModal();
+        });
       }
     }).catchError((e) => print("Quick Tile Error: $e"));
 
@@ -832,7 +835,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  void _processNLP(String text) {
+  Future<void> _processNLP(String text) async {
     if (text.isEmpty || text == "Listening...") return;
     final categories = ref.read(categoryProvider);
     final result = LocalNlpService().parseExpense(text, categories);
@@ -847,12 +850,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         colorValue: Colors.purple.value,
       );
 
-      ref.read(expenseProvider.notifier).addExpense(newExpense);
+      await ref.read(expenseProvider.notifier).addExpense(newExpense);
 
       // 🚀 NEW: Resets the daily 8 PM reminder since you logged an entry via Voice/Text!
       try {
-        NotificationService().cancelAll();
-        NotificationService().scheduleDailyReminder();
+        await NotificationService().cancelAll();
+        await NotificationService().scheduleDailyReminder();
       } catch (e) {
         print("Notification reset failed: $e");
       }
