@@ -26,6 +26,7 @@ import "../services/ocr_scanner_service.dart";
 import "./insights_screen.dart";
 import "./mess_khata_screen.dart";
 import "./recurring_bills_screen.dart";
+import "./income_accounts_screen.dart";
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -104,6 +105,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   void dispose() {
     _fabController.dispose();
     _categoryScrollCtrl.dispose();
+    _speech.stop();
+    platform.setMethodCallHandler(null);
     _smartInputCtrl.dispose();
     super.dispose();
   }
@@ -386,8 +389,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         centerTitle: true,
         leading: Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu_rounded, size: 24), onPressed: () => Scaffold.of(context).openDrawer())),
         actions: [
-          if(_currentView=='Dashboard')
-            IconButton(icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded, size: 22), onPressed: ()=>setState(()=>_isSearching=!_isSearching))
+          if (_currentView == 'Dashboard' && !_isSearching)
+            IconButton(
+              tooltip: 'Voice log',
+              icon: Icon(_isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                  color: _isListening ? Colors.red : null),
+              onPressed: _listenForExpense,
+            ),
+          if (_currentView == 'Dashboard' && !_isSearching)
+            IconButton(
+              tooltip: 'Income accounts',
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const IncomeAccountsScreen()),
+              ),
+            ),
+          if (_currentView == 'Dashboard')
+            IconButton(
+              icon: Icon(
+                  _isSearching ? Icons.close_rounded : Icons.search_rounded,
+                  size: 22),
+              onPressed: () => setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) _searchQuery = '';
+              }),
+            ),
         ],
       ),
       body: Column(
@@ -397,62 +425,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             const SizedBox(height: 12),
             _buildHeroCard(monthlyBudget, remaining, spent, primaryColor),
 
-            // 🎙️ SLEEK SMART ENTRY WIDGET
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: isDark ? primaryColor.withOpacity(0.3) : Colors.grey.withOpacity(0.15),
-                    width: 1.2,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        _isListening ? Icons.mic : Icons.mic_none_rounded,
-                        size: 20,
-                        color: _isListening ? Colors.red : (isDark ? Colors.white70 : primaryColor),
-                      ),
-                      onPressed: _listenForExpense,
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _smartInputCtrl,
-                        style: const TextStyle(fontSize: 13),
-                        decoration: InputDecoration(
-                            hintText: _isListening ? 'Listening...' : 'Speak/Type: "1500 for Pizza"',
-                            border: InputBorder.none,
-                            isDense: true,
-                            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12)
-                        ),
-                        onSubmitted: (val) => _processNLP(val),
-                      ),
-                    ),
-                    IconButton(
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(Icons.document_scanner_rounded, color: Colors.blueAccent, size: 18),
-                      onPressed: _startReceiptScan,
-                      tooltip: "Scan Receipt",
-                    ),
-                    IconButton(
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                      padding: EdgeInsets.zero,
-                      icon: Icon(Icons.send_rounded, color: primaryColor, size: 18),
-                      onPressed: () => _processNLP(_smartInputCtrl.text),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
+            // Keep the main feed focused: voice and income actions live in
+            // the app bar, while the transaction list stays uncluttered.
             // CATEGORY TABS WITH "ADD" BUTTON
             Container(
               height: 40, margin: const EdgeInsets.only(top: 8, bottom: 4),
@@ -473,23 +447,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
           // LIST VIEW
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero).animate(animation),
-                    child: child,
-                  ),
-                );
-              },
-              child: KeyedSubtree(
-                key: ValueKey<String>(_currentView),
-                child: _buildBody(expenses, primaryColor, isDark),
-              ),
+            child: KeyedSubtree(
+              key: ValueKey<String>(_currentView),
+              child: _buildBody(expenses, primaryColor, isDark),
             ),
           ),
         ],
@@ -818,30 +778,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  void _listenForExpense() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          if (val == 'done' || val == 'notListening') {
-            setState(() => _isListening = false);
-            if (_smartInputCtrl.text.isNotEmpty) {
-              _processNLP(_smartInputCtrl.text);
-            }
-          }
-        },
-        onError: (val) => print('STT Error: $val'),
-      );
-      if (available) {
-        setState(() => _isListening = true);
-        _smartInputCtrl.text = "Listening...";
-        _speech.listen(onResult: (val) => setState(() { _smartInputCtrl.text = val.recognizedWords; }));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Speech recognition denied/unavailable.", style: TextStyle(fontSize: 13))));
-      }
-    } else {
-      setState(() => _isListening = false);
-      _speech.stop();
+  Future<void> _listenForExpense() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
     }
+
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+        if (status == 'done' || status == 'notListening') {
+          setState(() => _isListening = false);
+        }
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() => _isListening = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Voice log error: ' + error.errorMsg)),
+        );
+      },
+    );
+
+    if (!mounted) return;
+    if (!available) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'Microphone access is unavailable. Enable it in app settings.'),
+      ));
+      return;
+    }
+
+    _smartInputCtrl.clear();
+    setState(() => _isListening = true);
+    await _speech.listen(
+      partialResults: true,
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 4),
+      onResult: (result) {
+        if (!mounted) return;
+        _smartInputCtrl.text = result.recognizedWords;
+        _smartInputCtrl.selection = TextSelection.collapsed(
+            offset: _smartInputCtrl.text.length);
+        if (result.finalResult) {
+          final spokenText = result.recognizedWords.trim();
+          setState(() => _isListening = false);
+          if (spokenText.isNotEmpty) {
+            Future.microtask(() => _processNLP(spokenText));
+          }
+        }
+      },
+    );
   }
 
   void _processNLP(String text) {
