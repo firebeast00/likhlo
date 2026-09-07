@@ -73,7 +73,7 @@ final velocityProvider = Provider<EnhancedVelocityInsight>((ref) {
     // Cold start adjustment
     final earliest = recentExpenses.map((e) => e.date).reduce((a, b) => a.isBefore(b) ? a : b);
     final daysSpan = now.difference(earliest).inDays + 1;
-    activeDays = daysSpan.clamp(1, 7);
+    activeDays = daysSpan.clamp(1, 7).toInt();
   }
 
   final double dailyVelocity = activeDays > 0 ? (spentLast7Days / activeDays) : 0.0;
@@ -97,7 +97,7 @@ final velocityProvider = Provider<EnhancedVelocityInsight>((ref) {
   final double projectedSurplusDeficit = remainingBudget - (dailyVelocity * daysRemaining);
 
   if (remainingBudget <= 0 || burnRatio > 1.3) {
-    final exhaustionDays = daysUntilBroke.clamp(0, daysRemaining);
+    final exhaustionDays = daysUntilBroke.clamp(0, daysRemaining).toInt();
     final exhaustionDate = now.add(Duration(days: exhaustionDays));
     final double trimNeeded = dailyVelocity - safeDailyCap;
 
