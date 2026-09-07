@@ -104,20 +104,25 @@ class IncomeAccountsNotifier extends StateNotifier<IncomeAccountsState> {
   Box get _box => Hive.box('preferences');
 
   void _load() {
-    final rawAccounts = (_box.get(_accountsKey, defaultValue: const []) as List)
+    final storedAccounts = _box.get(_accountsKey, defaultValue: const []);
+    final storedEntries = _box.get(_entriesKey, defaultValue: const []);
+    final accountMaps = storedAccounts is List ? storedAccounts : const [];
+    final entryMaps = storedEntries is List ? storedEntries : const [];
+
+    final accounts = accountMaps
         .whereType<Map>()
         .map(IncomeAccount.fromMap)
         .where((account) => account.id.isNotEmpty)
         .toList();
 
-    final rawEntries = (_box.get(_entriesKey, defaultValue: const []) as List)
+    final entries = entryMaps
         .whereType<Map>()
         .map(IncomeEntry.fromMap)
         .where((entry) => entry.id.isNotEmpty)
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    state = IncomeAccountsState(accounts: rawAccounts, entries: rawEntries);
+    state = IncomeAccountsState(accounts: accounts, entries: entries);
   }
 
   Future<void> _persist(IncomeAccountsState next) async {
