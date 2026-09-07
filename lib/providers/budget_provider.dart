@@ -41,7 +41,7 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
     final key = DateFormat('yyyy-MM').format(date);
     final current = state[key] ?? 0.0;
     final updated = Map<String, double>.from(state);
-    updated[key] = (current + delta).clamp(0.0, double.infinity);
+    updated[key] = (current + delta).clamp(0.0, double.infinity).toDouble();
     state = updated;
     await Hive.box('preferences').put('monthly_budgets', updated);
   }
