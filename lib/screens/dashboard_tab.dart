@@ -26,7 +26,7 @@ class DashboardTab extends ConsumerWidget {
     final double remaining = monthlyBudget - totalSpent;
 
     // 3. Health & Progress Math
-    final double progress = monthlyBudget > 0 ? (totalSpent / monthlyBudget).clamp(0.0, 1.0).toDouble() : 0.0;
+    final double progress = monthlyBudget > 0 ? (totalSpent / monthlyBudget).clamp(0.0, 1.0) : 0.0;
     final bool isOverBudget = totalSpent > monthlyBudget && monthlyBudget > 0;
 
     final primaryColor = Theme.of(context).primaryColor;

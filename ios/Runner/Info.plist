@@ -22,12 +22,6 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
-		<key>NSMicrophoneUsageDescription</key>
-		<string>Likhlo uses the microphone only when you choose Voice Log to add an expense.</string>
-		<key>NSSpeechRecognitionUsageDescription</key>
-		<string>Likhlo converts your spoken expense into text for quick logging.</string>
-		<key>NSCameraUsageDescription</key>
-		<string>Likhlo uses the camera only when you choose to scan a receipt.</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UILaunchStoryboardName</key>

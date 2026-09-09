@@ -46,16 +46,10 @@ class CategoryNotifier extends StateNotifier<List<String>> {
   void editCategory(String oldName, String newName) {
     if (!Hive.isBoxOpen('preferences')) return; // Safety
 
-    final cleanName = newName.trim();
-    final duplicate = state.any(
-      (category) =>
-          category != oldName &&
-          category.toLowerCase() == cleanName.toLowerCase(),
-    );
-    if (cleanName.isNotEmpty && state.contains(oldName) && !duplicate) {
+    if (newName.isNotEmpty && state.contains(oldName)) {
       final index = state.indexOf(oldName);
       final updated = List<String>.from(state);
-      updated[index] = cleanName;
+      updated[index] = newName;
 
       final box = Hive.box('preferences');
       box.put('categories', updated);

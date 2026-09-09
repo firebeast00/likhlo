@@ -42,7 +42,7 @@ class GoalsNotifier extends StateNotifier<List<SmartGoal>> {
   Future<void> depositFunds(String id, double amount) async {
     final box = Hive.box<SmartGoal>('goals');
     final goal = box.values.firstWhere((g) => g.id == id);
-    goal.savedAmount = (goal.savedAmount + amount).clamp(0.0, goal.targetAmount).toDouble();
+    goal.savedAmount = (goal.savedAmount + amount).clamp(0.0, goal.targetAmount);
     await goal.save();
     loadGoals();
   }
@@ -69,7 +69,7 @@ final goalFeasibilityProvider = Provider.family<GoalFeasibility, SmartGoal>((ref
   final now = DateTime.now();
   final daysLeft = goal.targetDate.difference(now).inDays;
   final double remainingTarget = (goal.targetAmount - goal.savedAmount);
-  final double progress = (goal.savedAmount / (goal.targetAmount > 0 ? goal.targetAmount : 1.0)).clamp(0.0, 1.0).toDouble();
+  final double progress = (goal.savedAmount / (goal.targetAmount > 0 ? goal.targetAmount : 1.0)).clamp(0.0, 1.0);
 
   if (remainingTarget <= 0) {
     return GoalFeasibility(

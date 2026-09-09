@@ -150,7 +150,7 @@ class InsightsScreen extends ConsumerWidget {
         else if (feasibility.status == GoalStatus.completed) score += 5;
       }
     }
-    return score.clamp(0, 100).toInt();
+    return score.clamp(0, 100);
   }
 
   // --- DYNAMIC RANKING SYSTEM ---
@@ -381,7 +381,7 @@ class InsightsScreen extends ConsumerWidget {
 
                   ...goals.map((goal) {
                     final feasibility = ref.watch(goalFeasibilityProvider(goal));
-                    final double progress = (goal.savedAmount / goal.targetAmount).clamp(0.0, 1.0).toDouble();
+                    final double progress = (goal.savedAmount / goal.targetAmount).clamp(0.0, 1.0);
 
                     // 🧠 DYNAMIC THEME GOAL COLOR
                     Color goalColor = primaryColor;
