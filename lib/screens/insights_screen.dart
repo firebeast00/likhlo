@@ -6,13 +6,14 @@ import 'package:uuid/uuid.dart';
 import '../providers/velocity_providers.dart';
 import '../providers/goals_providers.dart';
 import '../providers/expense_provider.dart';
+import '../providers/settings_provider.dart'; // 🚀 ADDED: To fetch dynamic user theme
 import '../models/goal_model.dart';
 
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
 
   // --- DIALOGS ---
-  void _showDepositDialog(BuildContext context, WidgetRef ref, SmartGoal goal) {
+  void _showDepositDialog(BuildContext context, WidgetRef ref, SmartGoal goal, Color primaryColor) {
     final depositCtrl = TextEditingController();
     showDialog(
       context: context,
@@ -22,8 +23,8 @@ class InsightsScreen extends ConsumerWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.savings_rounded, color: Colors.teal, size: 32),
+              decoration: BoxDecoration(color: primaryColor.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(Icons.savings_rounded, color: primaryColor, size: 32),
             ),
             const SizedBox(height: 12),
             Text("Fund ${goal.title}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
@@ -48,13 +49,13 @@ class InsightsScreen extends ConsumerWidget {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
               onPressed: () {
                 final amt = double.tryParse(depositCtrl.text) ?? 0.0;
                 if (amt > 0) {
                   ref.read(goalsProvider.notifier).depositFunds(goal.id, amt);
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Rs. ${amt.toStringAsFixed(0)} added to ${goal.title}!"), backgroundColor: Colors.teal));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Rs. ${amt.toStringAsFixed(0)} added to ${goal.title}!"), backgroundColor: Colors.green));
                 }
               },
               child: const Text("Confirm Deposit", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -65,7 +66,7 @@ class InsightsScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddGoalDialog(BuildContext context, WidgetRef ref) {
+  void _showAddGoalDialog(BuildContext context, WidgetRef ref, Color primaryColor) {
     final titleCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
     DateTime targetDate = DateTime.now().add(const Duration(days: 90));
@@ -92,10 +93,23 @@ class InsightsScreen extends ConsumerWidget {
                     Text(DateFormat('MMM yyyy').format(targetDate), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                     GestureDetector(
                       onTap: () async {
-                        final picked = await showDatePicker(context: context, initialDate: targetDate, firstDate: DateTime.now(), lastDate: DateTime(2035));
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: targetDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime(2035),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.light(primary: primaryColor), // Match date picker to theme
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
                         if (picked != null) setState(() => targetDate = picked);
                       },
-                      child: const Icon(Icons.edit_calendar_rounded, color: Colors.teal),
+                      child: Icon(Icons.edit_calendar_rounded, color: primaryColor),
                     )
                   ],
                 ),
@@ -103,9 +117,9 @@ class InsightsScreen extends ConsumerWidget {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey))),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               onPressed: () {
                 final amt = double.tryParse(amountCtrl.text) ?? 0.0;
                 if (titleCtrl.text.isNotEmpty && amt > 0) {
@@ -113,7 +127,7 @@ class InsightsScreen extends ConsumerWidget {
                   Navigator.pop(ctx);
                 }
               },
-              child: const Text("Initialize Goal", style: TextStyle(color: Colors.white)),
+              child: const Text("Initialize Goal", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
           ],
         ),
@@ -150,6 +164,9 @@ class InsightsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final primaryColor = Color(settings.profileColorValue); // 🚀 DYNAMIC THEME COLOR
+
     final velocity = ref.watch(velocityProvider);
     final goals = ref.watch(goalsProvider);
     final expenses = ref.watch(expenseProvider).allExpenses;
@@ -158,11 +175,12 @@ class InsightsScreen extends ConsumerWidget {
     final int healthScore = _calculateHealthScore(velocity, goals, ref);
     final String healthRank = _getRank(healthScore);
 
+    // 🧠 SEMANTIC COLORS: Health state should always be intuitive regardless of user's theme choice.
     Color themeAlertColor;
     switch (velocity.riskLevel) {
       case VelocityRiskLevel.critical: themeAlertColor = Colors.red; break;
       case VelocityRiskLevel.caution: themeAlertColor = Colors.orange; break;
-      case VelocityRiskLevel.healthy: themeAlertColor = Colors.teal; break;
+      case VelocityRiskLevel.healthy: themeAlertColor = Colors.green; break;
     }
 
     // --- CALCULATE RECENT MONEY LEAK ---
@@ -245,7 +263,6 @@ class InsightsScreen extends ConsumerWidget {
                                 children: [
                                   Icon(Icons.water_drop_rounded, color: Colors.blue.shade400, size: 16),
                                   const SizedBox(width: 4),
-                                  // 🚀 FIX: Wrapped in Expanded to prevent text overflow
                                   const Expanded(
                                     child: Text("7-Day Leak", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                                   ),
@@ -290,7 +307,6 @@ class InsightsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 20),
 
-                        // Telemetry Metrics Grid
                         Row(
                           children: [
                             Expanded(child: _buildMetricCol("Burn Rate", "Rs. ${velocity.dailyVelocity.toStringAsFixed(0)}", "/day")),
@@ -319,11 +335,11 @@ class InsightsScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 35),
-// --- 3. DYNAMIC SMART GOALS SECTION ---
+
+                  // --- 3. DYNAMIC SMART GOALS SECTION ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // 🚀 FIX: Wrapped in Expanded with an ellipsis so it yields space to the button on 320px screens
                       const Expanded(
                         child: Text(
                           "Strategic Objectives",
@@ -332,16 +348,15 @@ class InsightsScreen extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // 🚀 FIX: Reduced default padding/size of the button so it fits perfectly
                       TextButton.icon(
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        icon: const Icon(Icons.add_rounded, color: Colors.teal, size: 20),
-                        label: const Text("New Target", style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 14)),
-                        onPressed: () => _showAddGoalDialog(context, ref),
+                        icon: Icon(Icons.add_rounded, color: primaryColor, size: 20),
+                        label: Text("New Target", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                        onPressed: () => _showAddGoalDialog(context, ref, primaryColor),
                       )
                     ],
                   ),
@@ -349,16 +364,16 @@ class InsightsScreen extends ConsumerWidget {
 
                   if (goals.isEmpty)
                     GestureDetector(
-                      onTap: () => _showAddGoalDialog(context, ref),
+                      onTap: () => _showAddGoalDialog(context, ref, primaryColor),
                       child: Container(
                         padding: const EdgeInsets.all(30),
                         width: double.infinity,
-                        decoration: BoxDecoration(color: Colors.teal.withOpacity(0.05), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.teal.withOpacity(0.2))),
-                        child: const Column(
+                        decoration: BoxDecoration(color: primaryColor.withOpacity(0.05), borderRadius: BorderRadius.circular(24), border: Border.all(color: primaryColor.withOpacity(0.2))),
+                        child: Column(
                           children: [
-                            Icon(Icons.flag_circle_rounded, size: 48, color: Colors.teal),
-                            SizedBox(height: 10),
-                            Text("Initialize your first AI Goal", style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 16)),
+                            Icon(Icons.flag_circle_rounded, size: 48, color: primaryColor),
+                            const SizedBox(height: 10),
+                            Text("Initialize your first AI Goal", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
                           ],
                         ),
                       ),
@@ -368,7 +383,8 @@ class InsightsScreen extends ConsumerWidget {
                     final feasibility = ref.watch(goalFeasibilityProvider(goal));
                     final double progress = (goal.savedAmount / goal.targetAmount).clamp(0.0, 1.0);
 
-                    Color goalColor = Colors.teal;
+                    // 🧠 DYNAMIC THEME GOAL COLOR
+                    Color goalColor = primaryColor;
                     IconData statusIcon = Icons.lightbulb_rounded;
 
                     if (feasibility.status == GoalStatus.atRisk) {
@@ -387,8 +403,6 @@ class InsightsScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Top Header
-                          // Top Header
                           Padding(
                             padding: const EdgeInsets.only(left: 20, top: 20, right: 12),
                             child: Row(
@@ -399,7 +413,6 @@ class InsightsScreen extends ConsumerWidget {
                                     child: Text(goal.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18), overflow: TextOverflow.ellipsis)
                                 ),
                                 const SizedBox(width: 8),
-                                // 🚀 FIX: Wrapped in Flexible and FittedBox so it doesn't overflow
                                 Flexible(
                                   flex: 3,
                                   child: Container(
@@ -421,7 +434,6 @@ class InsightsScreen extends ConsumerWidget {
                             ),
                           ),
 
-                          // Progress Section
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: Column(
@@ -429,7 +441,7 @@ class InsightsScreen extends ConsumerWidget {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text("Rs. ${goal.savedAmount.toStringAsFixed(0)}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.teal)),
+                                    Text("Rs. ${goal.savedAmount.toStringAsFixed(0)}", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: primaryColor)),
                                     Text("of Rs. ${goal.targetAmount.toStringAsFixed(0)}", style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                                   ],
                                 ),
@@ -439,7 +451,7 @@ class InsightsScreen extends ConsumerWidget {
                                     Container(height: 12, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), borderRadius: BorderRadius.circular(10))),
                                     FractionallySizedBox(
                                       widthFactor: progress,
-                                      child: Container(height: 12, decoration: BoxDecoration(color: Colors.teal, borderRadius: BorderRadius.circular(10))),
+                                      child: Container(height: 12, decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(10))),
                                     ),
                                   ],
                                 ),
@@ -453,7 +465,6 @@ class InsightsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 12),
 
-                          // 🧠 DYNAMIC AI Callout Box
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: AnimatedContainer(
@@ -476,7 +487,6 @@ class InsightsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 16),
 
-                          // Deposit Button
                           Container(
                             width: double.infinity,
                             height: 55,
@@ -485,13 +495,13 @@ class InsightsScreen extends ConsumerWidget {
                             ),
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: progress >= 1.0 ? Colors.grey.shade400 : Colors.teal,
+                                backgroundColor: progress >= 1.0 ? Colors.grey.shade400 : primaryColor,
                                 shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24))),
                                 elevation: 0,
                               ),
                               icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
                               label: Text(progress >= 1.0 ? "Target Reached!" : "Allocate Funds", style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                              onPressed: progress >= 1.0 ? null : () => _showDepositDialog(context, ref, goal),
+                              onPressed: progress >= 1.0 ? null : () => _showDepositDialog(context, ref, goal, primaryColor),
                             ),
                           )
                         ],
@@ -513,7 +523,6 @@ class InsightsScreen extends ConsumerWidget {
       children: [
         Text(title, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 4),
-        // 🚀 FIX: Added FittedBox to scale text down gracefully on narrow screens
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Row(

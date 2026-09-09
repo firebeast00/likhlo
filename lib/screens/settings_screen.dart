@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
+import '../services/notification_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -16,6 +18,14 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  late Box _prefBox;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefBox = Hive.box('preferences');
+  }
+
   // --- PROFILE EDIT DIALOG ---
   void _showEditProfileDialog(String currentName, String currentProfession) {
     final nameCtrl = TextEditingController(text: currentName);
@@ -151,6 +161,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final String displayName = (settings.userName.isNotEmpty) ? settings.userName : "Set up profile";
     final String displayProf = (settings.userProfession.isNotEmpty) ? settings.userProfession : "Tap to add details";
 
+    // Read Hive states for Notification toggles
+    final bool persistentEnabled = _prefBox.get('persistent_bar_enabled', defaultValue: true);
+    final bool remindersEnabled = _prefBox.get('daily_reminder_enabled', defaultValue: true);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: ListView(
@@ -283,7 +297,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 32),
 
-          // 3. 📂 EXPORT REPORT
+          // 3. 🔔 NOTIFICATIONS & ALERTS
+          const Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 12),
+            child: Text("Notifications & Alerts", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
+          ),
+          _buildSettingsGroup(
+            isDark: isDark,
+            children: [
+              _buildSwitchTile(
+                title: "Persistent Quick-Log",
+                subtitle: "Keep a live budget widget in status bar",
+                icon: Icons.space_dashboard_rounded,
+                iconColor: Colors.teal,
+                value: persistentEnabled,
+                onChanged: (val) {
+                  setState(() => _prefBox.put('persistent_bar_enabled', val));
+                  if (!val) {
+                    NotificationService().cancelNotification(NotificationService.persistentBarId);
+                  }
+                  // Will auto-rebuild on home screen next load
+                },
+              ),
+              _buildDivider(),
+              _buildSwitchTile(
+                title: "Smart Entry Reminders",
+                subtitle: "Receive daily nudges to log your expenses",
+                icon: Icons.notifications_active_rounded,
+                iconColor: Colors.amber.shade600,
+                value: remindersEnabled,
+                onChanged: (val) {
+                  setState(() => _prefBox.put('daily_reminder_enabled', val));
+                  if (val) {
+                    NotificationService().scheduleSmartEntryReminders();
+                  } else {
+                    NotificationService().cancelNotification(NotificationService.middayReminderId);
+                    NotificationService().cancelNotification(NotificationService.eveningReminderId);
+                    NotificationService().cancelNotification(NotificationService.weekendReviewId);
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
+          // 4. 📂 EXPORT REPORT
           const Padding(
             padding: EdgeInsets.only(left: 8, bottom: 12),
             child: Text("Data & Reports", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
