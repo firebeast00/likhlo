@@ -1,18 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'expense_provider.dart';
 import 'budget_provider.dart';
-import '../services/time_series_engine.dart';
+import 'package:intl/intl.dart';
 
-// 🚀 RESTORED: The Enum your UI relies on
 enum VelocityRiskLevel { healthy, caution, critical }
 
-// 🚀 RESTORED: The Model your Insights Screen relies on
 class EnhancedVelocityInsight {
   final double dailyVelocity;
   final double safeDailyCap;
-  final double burnRatio;
+  final double burnRatio; // actual / safe
   final int daysUntilBroke;
+  final DateTime? predictedExhaustionDate;
   final VelocityRiskLevel riskLevel;
   final String headline;
   final String actionableAdvice;
@@ -23,6 +21,7 @@ class EnhancedVelocityInsight {
     required this.safeDailyCap,
     required this.burnRatio,
     required this.daysUntilBroke,
+    this.predictedExhaustionDate,
     required this.riskLevel,
     required this.headline,
     required this.actionableAdvice,
@@ -30,92 +29,113 @@ class EnhancedVelocityInsight {
   });
 }
 
-// 1. The Advanced Time Series Engine (Used by the AI Chatbot)
-final timeSeriesForecastProvider = Provider<VelocityForecast>((ref) {
-  final expenses = ref.watch(expenseProvider).allExpenses;
-  final budgets = ref.watch(budgetProvider);
-
-  final now = DateTime.now();
-  final monthKey = DateFormat('yyyy-MM').format(now);
-
-  final double baseBudget = budgets[monthKey] ?? 0.0;
-  final double totalIncome = expenses
-      .where((e) => e.date.month == now.month && e.date.year == now.year && e.type == 'income' && e.category != 'Transfer')
-      .fold(0.0, (sum, e) => sum + e.amount);
-
-  final double effectiveBudget = baseBudget + totalIncome;
-
-  final monthlyExpenses = expenses
-      .where((e) => e.date.month == now.month && e.date.year == now.year)
-      .toList();
-
-  return TimeSeriesEngine.generateForecast(
-    monthlyExpenses: monthlyExpenses,
-    monthlyBudget: effectiveBudget,
-    focusedMonth: now,
-  );
-});
-
-// 2. 🚀 THE BRIDGE: Packages the Time Series math for your UI Screens
 final velocityProvider = Provider<EnhancedVelocityInsight>((ref) {
-  final forecast = ref.watch(timeSeriesForecastProvider);
-  final expenses = ref.watch(expenseProvider).allExpenses;
-  final budgets = ref.watch(budgetProvider);
+  final expenseState = ref.watch(expenseProvider);
+  final budgetState = ref.watch(budgetProvider);
 
   final now = DateTime.now();
   final monthKey = DateFormat('yyyy-MM').format(now);
+  final double monthlyBudget = budgetState[monthKey] ?? 0.0;
 
-  // Calculate Budgets
-  final double baseBudget = budgets[monthKey] ?? 0.0;
-  final double totalIncome = expenses
-      .where((e) => e.date.month == now.month && e.date.year == now.year && e.type == 'income' && e.category != 'Transfer')
-      .fold(0.0, (sum, e) => sum + e.amount);
-  final double effectiveBudget = baseBudget + totalIncome;
+  // 1. Current Month Overview
+  final monthExpenses = expenseState.allExpenses.where(
+        (e) => e.date.month == now.month && e.date.year == now.year,
+  ).toList();
 
-  final double globalSpent = expenses
-      .where((e) => e.date.month == now.month && e.date.year == now.year && e.type == 'expense' && e.category != 'Transfer')
-      .fold(0.0, (sum, e) => sum + e.amount);
+  final double totalSpent = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
+  final double remainingBudget = monthlyBudget - totalSpent;
 
-  // Calculate Caps & Ratios
-  final double remaining = effectiveBudget - globalSpent;
-  final int daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-  final int daysLeft = daysInMonth - now.day > 0 ? daysInMonth - now.day : 1;
+  final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+  final int daysRemaining = (daysInMonth - now.day) + 1; // including today
 
-  final double safeCap = remaining > 0 ? remaining / daysLeft : 0.0;
-  final double ratio = safeCap > 0 ? forecast.currentEmaVelocity / safeCap : 99.0;
+  // 2. Safe Daily Cap
+  final double safeDailyCap = monthlyBudget > 0
+      ? (remainingBudget > 0 ? remainingBudget / daysRemaining : 0.0)
+      : 0.0;
 
-  // Translate Time Series to UI Warnings
-  VelocityRiskLevel risk;
-  String headline;
-  String advice;
-  int daysToBroke = 999; // 999 acts as "Safe" in UI
+  // 3. Outlier-Filtered 7-Day Moving Velocity
+  final sevenDaysAgo = now.subtract(const Duration(days: 7));
+  final recentExpenses = expenseState.allExpenses.where(
+        (e) => e.date.isAfter(sevenDaysAgo) && e.date.isBefore(now.add(const Duration(days: 1))),
+  ).toList();
 
-  if (forecast.projectedBankruptcyDate != null) {
-    risk = VelocityRiskLevel.critical;
-    headline = "Critical: Bankruptcy Projected";
-    advice = "Cut Rs. ${forecast.suggestedCorrection.toStringAsFixed(0)}/day immediately.";
-    daysToBroke = forecast.projectedBankruptcyDate!.difference(now).inDays;
-    if (daysToBroke < 0) daysToBroke = 0;
-  } else if (forecast.trend == 'accelerating') {
-    risk = VelocityRiskLevel.caution;
-    headline = "Caution: Velocity Spiking";
-    advice = "Spending is accelerating. Cut back slightly to stabilize.";
-  } else {
-    risk = VelocityRiskLevel.healthy;
-    headline = "Velocity Stable";
-    advice = "Pacing perfectly. You are on track to survive the month.";
+  double spentLast7Days = 0.0;
+  int activeDays = 7;
+
+  if (recentExpenses.isNotEmpty) {
+    // Exclude single extreme outlier payments (e.g. fees > 40% of entire budget)
+    final filtered = monthlyBudget > 0
+        ? recentExpenses.where((e) => e.amount < (monthlyBudget * 0.40)).toList()
+        : recentExpenses;
+
+    spentLast7Days = filtered.fold(0.0, (sum, e) => sum + e.amount);
+
+    // Cold start adjustment
+    final earliest = recentExpenses.map((e) => e.date).reduce((a, b) => a.isBefore(b) ? a : b);
+    final daysSpan = now.difference(earliest).inDays + 1;
+    activeDays = daysSpan.clamp(1, 7);
   }
 
-  final double surplusDeficit = effectiveBudget - forecast.predictedMonthEndSpend;
+  final double dailyVelocity = activeDays > 0 ? (spentLast7Days / activeDays) : 0.0;
+
+  // 4. Evaluation & Classification
+  if (monthlyBudget <= 0) {
+    return EnhancedVelocityInsight(
+      dailyVelocity: dailyVelocity,
+      safeDailyCap: 0.0,
+      burnRatio: 0.0,
+      daysUntilBroke: 999,
+      riskLevel: VelocityRiskLevel.healthy,
+      headline: "No Budget Limit Configured",
+      actionableAdvice: "Set a monthly budget on the dashboard to activate real-time velocity tracking.",
+      projectedSurplusDeficit: 0.0,
+    );
+  }
+
+  final double burnRatio = safeDailyCap > 0 ? (dailyVelocity / safeDailyCap) : (remainingBudget <= 0 ? 2.0 : 1.0);
+  final int daysUntilBroke = dailyVelocity > 0 ? (remainingBudget / dailyVelocity).floor() : 999;
+  final double projectedSurplusDeficit = remainingBudget - (dailyVelocity * daysRemaining);
+
+  if (remainingBudget <= 0 || burnRatio > 1.3) {
+    final exhaustionDays = daysUntilBroke.clamp(0, daysRemaining);
+    final exhaustionDate = now.add(Duration(days: exhaustionDays));
+    final double trimNeeded = dailyVelocity - safeDailyCap;
+
+    return EnhancedVelocityInsight(
+      dailyVelocity: dailyVelocity,
+      safeDailyCap: safeDailyCap,
+      burnRatio: burnRatio,
+      daysUntilBroke: exhaustionDays,
+      predictedExhaustionDate: exhaustionDate,
+      riskLevel: VelocityRiskLevel.critical,
+      headline: "High Spending Velocity",
+      actionableAdvice: remainingBudget <= 0
+          ? "Monthly limit exceeded by Rs. ${remainingBudget.abs().toStringAsFixed(0)}. Halt non-essential expenses."
+          : "Reduce spending by Rs. ${trimNeeded.toStringAsFixed(0)}/day. Restrict daily spend to Rs. ${safeDailyCap.toStringAsFixed(0)}/day to last until month-end.",
+      projectedSurplusDeficit: projectedSurplusDeficit,
+    );
+  } else if (burnRatio > 1.0) {
+    return EnhancedVelocityInsight(
+      dailyVelocity: dailyVelocity,
+      safeDailyCap: safeDailyCap,
+      burnRatio: burnRatio,
+      daysUntilBroke: daysUntilBroke,
+      predictedExhaustionDate: now.add(Duration(days: daysUntilBroke)),
+      riskLevel: VelocityRiskLevel.caution,
+      headline: "Slight Budget Pressure",
+      actionableAdvice: "You are pacing slightly above target. Keep daily spend under Rs. ${safeDailyCap.toStringAsFixed(0)} to preserve a safety buffer.",
+      projectedSurplusDeficit: projectedSurplusDeficit,
+    );
+  }
 
   return EnhancedVelocityInsight(
-    dailyVelocity: forecast.currentEmaVelocity,
-    safeDailyCap: safeCap,
-    burnRatio: ratio,
-    daysUntilBroke: daysToBroke,
-    riskLevel: risk,
-    headline: headline,
-    actionableAdvice: advice,
-    projectedSurplusDeficit: surplusDeficit,
+    dailyVelocity: dailyVelocity,
+    safeDailyCap: safeDailyCap,
+    burnRatio: burnRatio,
+    daysUntilBroke: daysUntilBroke,
+    riskLevel: VelocityRiskLevel.healthy,
+    headline: "Optimal Spending Velocity",
+    actionableAdvice: "Pacing is sustainable. You are on track to save ~Rs. ${projectedSurplusDeficit.toStringAsFixed(0)} this month.",
+    projectedSurplusDeficit: projectedSurplusDeficit,
   );
 });

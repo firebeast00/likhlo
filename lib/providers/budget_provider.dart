@@ -14,7 +14,7 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
     final currentMonthKey = DateFormat('yyyy-MM').format(DateTime.now());
 
     if (saved != null && saved.isNotEmpty) {
-      state = saved.map((key, value) => MapEntry(key.toString(), value as double));
+      state = saved.map((key, value) => MapEntry(key.toString(), (value as num).toDouble()));
     } else {
       // 🚀 FIX: Actually SAVE the fallback to the box so Insights Engine can read it
       final oldLimit = box.get('limit', defaultValue: 20000.0);
@@ -24,6 +24,9 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
   }
 
   Future<void> setBudget(double amount, DateTime date) async {
+    if (!amount.isFinite || amount < 0) {
+      throw ArgumentError('Budget cannot be negative.');
+    }
     final key = DateFormat('yyyy-MM').format(date);
     final newState = Map<String, double>.from(state);
     newState[key] = amount;
@@ -31,6 +34,16 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
 
     final box = Hive.box('preferences');
     await box.put('monthly_budgets', newState);
+  }
+
+  Future<void> adjustBudget(double delta, DateTime date) async {
+    if (!delta.isFinite || delta == 0) return;
+    final key = DateFormat('yyyy-MM').format(date);
+    final current = state[key] ?? 0.0;
+    final updated = Map<String, double>.from(state);
+    updated[key] = (current + delta).clamp(0.0, double.infinity).toDouble();
+    state = updated;
+    await Hive.box('preferences').put('monthly_budgets', updated);
   }
 
   // Helper to get budget for a specific month
