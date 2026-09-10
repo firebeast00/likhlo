@@ -14,14 +14,39 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     _loadExpenses();
   }
 
-  void _loadExpenses() {
-    state = ExpenseState(allExpenses: _box.values.toList());
+  List<Expense> _sortByNewest(Iterable<Expense> expenses) {
+    final sorted = expenses.toList();
+    sorted.sort((a, b) => b.date.compareTo(a.date));
+    return sorted;
   }
 
-  Future<void> addExpense(Expense expense) async {
-    if (!expense.amount.isFinite || expense.amount <= 0) return;
-    await _box.put(expense.id, expense);
-    state = ExpenseState(allExpenses: _box.values.toList());
+  void _loadExpenses() {
+    state = ExpenseState(allExpenses: _sortByNewest(_box.values));
+  }
+
+  Future<bool> addExpense(Expense expense) async {
+    return addExpenses([expense]);
+  }
+
+  /// Persists related records together and emits a single UI update. Transfers
+  /// use this path so the dashboard never renders a half-complete pair.
+  Future<bool> addExpenses(Iterable<Expense> expenses) async {
+    final additions = expenses.toList(growable: false);
+    if (additions.isEmpty ||
+        additions.any((entry) =>
+            !entry.amount.isFinite || entry.amount <= 0)) {
+      return false;
+    }
+
+    await _box.putAll({for (final entry in additions) entry.id: entry});
+    final addedIds = additions.map((entry) => entry.id).toSet();
+    state = ExpenseState(
+      allExpenses: _sortByNewest([
+        ...state.allExpenses.where((entry) => !addedIds.contains(entry.id)),
+        ...additions,
+      ]),
+    );
+    return true;
   }
 
   Future<bool> editExpense(String id, Expense updated) async {
@@ -34,7 +59,9 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     if (keyToEdit == null) return false;
     await _box.put(keyToEdit, updated);
 
-    state = ExpenseState(allExpenses: _box.values.toList());
+    final updatedExpenses = state.allExpenses
+        .map((entry) => entry.id == id ? updated : entry);
+    state = ExpenseState(allExpenses: _sortByNewest(updatedExpenses));
     return true;
   }
 
@@ -50,7 +77,10 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     }
 
     // Updates the UI synchronously so Flutter knows the item is gone!
-    state = ExpenseState(allExpenses: _box.values.toList());
+    state = ExpenseState(
+      allExpenses:
+          state.allExpenses.where((entry) => entry.id != id).toList(),
+    );
     return true;
   }
 
@@ -71,7 +101,13 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
         })
         .toList();
     await _box.deleteAll(keys);
-    state = ExpenseState(allExpenses: _box.values.toList());
+    state = ExpenseState(
+      allExpenses: state.allExpenses
+          .where((entry) =>
+              entry.id != '${transferId}_out' &&
+              entry.id != '${transferId}_in')
+          .toList(),
+    );
   }
 
   Future<void> reassignWallet(String fromWalletId, String toWalletId) async {
@@ -80,13 +116,17 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
         .where((entry) => entry.value.walletId == fromWalletId)
         .toList();
 
-    for (final entry in entries) {
-      await _box.put(
-        entry.key,
-        entry.value.copyWith(walletId: toWalletId),
-      );
-    }
-    state = ExpenseState(allExpenses: _box.values.toList());
+    await _box.putAll({
+      for (final entry in entries)
+        entry.key: entry.value.copyWith(walletId: toWalletId),
+    });
+    state = ExpenseState(
+      allExpenses: state.allExpenses
+          .map((entry) => entry.walletId == fromWalletId
+              ? entry.copyWith(walletId: toWalletId)
+              : entry)
+          .toList(),
+    );
   }
 }
 

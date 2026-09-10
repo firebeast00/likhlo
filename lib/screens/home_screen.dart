@@ -575,8 +575,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             final toName = wallets.firstWhere((w) => w.id == transferToWalletId).name;
                             final transferId = const Uuid().v4();
 
-                            await ref.read(expenseProvider.notifier).addExpense(Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'expense', walletId: selectedWalletId));
-                            await ref.read(expenseProvider.notifier).addExpense(Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'income', walletId: transferToWalletId));
+                            await ref.read(expenseProvider.notifier).addExpenses([
+                              Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'expense', walletId: selectedWalletId),
+                              Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'income', walletId: transferToWalletId),
+                            ]);
                           } else {
                             String finalTitle = titleCtrl.text.trim();
                             if (finalTitle.isEmpty) {
@@ -720,8 +722,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (_selectedCategoryTab != 'All') displayExpenses = displayExpenses.where((e) => e.category == _selectedCategoryTab).toList();
     if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-    displayExpenses.sort((a,b) => b.date.compareTo(a.date));
 
     return Scaffold(
       drawer: AppDrawer(currentView: _currentView, onViewChanged: (v)=>setState(()=>_currentView=v)),
@@ -904,35 +904,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return isSliver ? SliverFillRemaining(hasScrollBody: false, child: emptyState) : emptyState;
     }
 
-    final double todaySpend = expenses.where((e) => e.type == 'expense' && e.category != 'Transfer' && e.date.day == DateTime.now().day && e.date.month == DateTime.now().month && e.date.year == DateTime.now().year).fold(0.0, (sum, e) => sum + e.amount);
+    final now = DateTime.now();
+    final double todaySpend = expenses
+        .where((e) =>
+            e.type == 'expense' &&
+            e.category != 'Transfer' &&
+            e.date.day == now.day &&
+            e.date.month == now.month &&
+            e.date.year == now.year)
+        .fold(0.0, (sum, e) => sum + e.amount);
+    final hasTodaySummary = todaySpend > 0;
+    final itemCount = expenses.length + (hasTodaySummary ? 1 : 0);
 
-    final listContents = <Widget>[
-      if (todaySpend > 0)
-        Padding(
-          key: const ValueKey('daily_spend_pill'),
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: Align(
-            alignment: Alignment.center,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(color: primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: primaryColor.withOpacity(0.2))),
-              child: Text("Today's Spend: Rs. ${todaySpend.toStringAsFixed(0)}", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
-            ),
-          ),
-        ),
-      ...expenses.map((e) => _buildExpenseTile(e, primaryColor, isDark)),
-    ];
+    Widget buildItem(BuildContext context, int index) {
+      if (hasTodaySummary && index == 0) {
+        return _buildTodaySpendPill(todaySpend, primaryColor);
+      }
+      final expenseIndex = index - (hasTodaySummary ? 1 : 0);
+      return _buildExpenseTile(
+        expenses[expenseIndex],
+        primaryColor,
+        isDark,
+      );
+    }
 
     if (isSliver) {
       return SliverPadding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 80),
-        sliver: SliverList(delegate: SliverChildListDelegate(listContents)),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            buildItem,
+            childCount: itemCount,
+          ),
+        ),
       );
     }
 
-    return ListView(
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 80),
-      children: listContents,
+      itemCount: itemCount,
+      itemBuilder: buildItem,
+    );
+  }
+
+  Widget _buildTodaySpendPill(double todaySpend, Color primaryColor) {
+    return Padding(
+      key: const ValueKey('daily_spend_pill'),
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Align(
+        alignment: Alignment.center,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: primaryColor.withOpacity(0.2)),
+          ),
+          child: Text(
+            "Today's Spend: Rs. ${todaySpend.toStringAsFixed(0)}",
+            style: TextStyle(
+              color: primaryColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
