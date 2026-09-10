@@ -7,6 +7,18 @@ class ExpenseState {
   ExpenseState({required this.allExpenses});
 }
 
+class MonthlyLedgerSummary {
+  final List<Expense> transactions;
+  final double income;
+  final double spent;
+
+  const MonthlyLedgerSummary({
+    required this.transactions,
+    required this.income,
+    required this.spent,
+  });
+}
+
 class ExpenseNotifier extends StateNotifier<ExpenseState> {
   final Box<Expense> _box = Hive.box<Expense>('expenses');
 
@@ -132,4 +144,35 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 
 final expenseProvider = StateNotifierProvider<ExpenseNotifier, ExpenseState>((ref) {
   return ExpenseNotifier();
+});
+
+/// Cached, single-pass monthly projection. Recomputed only when transaction
+/// data changes or a different month is selected.
+final monthlyLedgerProvider =
+    Provider.family<MonthlyLedgerSummary, DateTime>((ref, focusedMonth) {
+  final allExpenses = ref.watch(expenseProvider).allExpenses;
+  final transactions = <Expense>[];
+  double income = 0;
+  double spent = 0;
+
+  for (final entry in allExpenses) {
+    if (entry.date.year != focusedMonth.year ||
+        entry.date.month != focusedMonth.month) {
+      continue;
+    }
+
+    transactions.add(entry);
+    if (entry.category == 'Transfer') continue;
+    if (entry.type == 'income') {
+      income += entry.amount;
+    } else if (entry.type == 'expense') {
+      spent += entry.amount;
+    }
+  }
+
+  return MonthlyLedgerSummary(
+    transactions: transactions,
+    income: income,
+    spent: spent,
+  );
 });

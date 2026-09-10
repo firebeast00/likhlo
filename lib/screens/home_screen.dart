@@ -164,6 +164,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
   }
 
+  void _changeView(String view) {
+    if (!mounted || view == _currentView) return;
+    setState(() {
+      _currentView = view;
+      _isSearching = false;
+      _searchQuery = '';
+    });
+    if (view == 'Dashboard') _queuePersistentNotificationUpdate();
+  }
+
   // ==================== 🧮 INSTANT CALCULATOR BOTTOM SHEET ====================
   void _showCalculator() {
     String calcDisplay = '0';
@@ -693,23 +703,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _queuePersistentNotificationUpdate();
     });
 
-    final settings = ref.watch(settingsProvider);
-    final expenseState = ref.watch(expenseProvider);
-    final budgetState = ref.watch(budgetProvider);
-    final categories = ref.watch(categoryProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = Color(settings.profileColorValue);
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    // Secondary screens do not subscribe to or process the dashboard ledger.
+    // This keeps drawer navigation and settings interactions lightweight.
+    if (_currentView != 'Dashboard') {
+      return Scaffold(
+        drawer: AppDrawer(
+          currentView: _currentView,
+          onViewChanged: _changeView,
+        ),
+        appBar: AppBar(
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: Text(
+            _currentView,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          ),
+          centerTitle: true,
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu_rounded, size: 24),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+        ),
+        body: _buildOtherViews(),
+      );
+    }
+
+    final monthKey = DateFormat('yyyy-MM').format(_focusedMonth);
+    final monthlyBudget = ref.watch(
+      budgetProvider.select((budgets) => budgets[monthKey] ?? 0.0),
+    );
+    final ledger = ref.watch(monthlyLedgerProvider(_focusedMonth));
+    final categories = ref.watch(categoryProvider);
 
     final bool isAiChatOpen = ref.watch(isAiChatOpenProvider);
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-    final monthKey = DateFormat('yyyy-MM').format(_focusedMonth);
-    final double monthlyBudget = budgetState[monthKey] ?? 0.0;
-
-    final monthlyTransactions = expenseState.allExpenses.where((e) => e.date.month == _focusedMonth.month && e.date.year == _focusedMonth.year).toList();
-
-    final double globalIncome = monthlyTransactions.where((e) => e.type == 'income' && e.category != 'Transfer').fold(0.0, (sum, e) => sum + e.amount);
-    final double globalSpent = monthlyTransactions.where((e) => e.type == 'expense' && e.category != 'Transfer').fold(0.0, (sum, e) => sum + e.amount);
+    final monthlyTransactions = ledger.transactions;
+    final globalIncome = ledger.income;
+    final globalSpent = ledger.spent;
 
     final double effectiveBudget = monthlyBudget + globalIncome;
     final double globalRemaining = effectiveBudget - globalSpent;
@@ -724,7 +760,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
     return Scaffold(
-      drawer: AppDrawer(currentView: _currentView, onViewChanged: (v)=>setState(()=>_currentView=v)),
+      drawer: AppDrawer(
+        currentView: _currentView,
+        onViewChanged: _changeView,
+      ),
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,

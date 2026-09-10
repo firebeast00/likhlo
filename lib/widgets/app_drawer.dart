@@ -117,7 +117,11 @@ class AppDrawer extends ConsumerWidget {
               activeColor: primaryColor,
               value: settings.themeMode == 'dark',
               onChanged: (val) {
-                ref.read(settingsProvider.notifier).updateThemeMode(val ? 'dark' : 'light');
+                final notifier = ref.read(settingsProvider.notifier);
+                Navigator.pop(context);
+                Future<void>.delayed(const Duration(milliseconds: 180), () {
+                  notifier.updateThemeMode(val ? 'dark' : 'light');
+                });
               },
             ),
           )
@@ -154,7 +158,9 @@ class AppDrawer extends ConsumerWidget {
             : null,
         onTap: () {
           Navigator.pop(context);
-          onViewChanged(title);
+          Future<void>.delayed(const Duration(milliseconds: 180), () {
+            onViewChanged(title);
+          });
         },
       ),
     );

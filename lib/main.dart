@@ -94,8 +94,13 @@ class LikhloApp extends ConsumerWidget {
       );
     }
 
-    final settings = ref.watch(settingsProvider);
-    final primaryColor = Color(settings.profileColorValue);
+    final themeSettings = ref.watch(
+      settingsProvider.select(
+        (settings) => (settings.themeMode, settings.profileColorValue),
+      ),
+    );
+    final themeMode = themeSettings.$1;
+    final primaryColor = Color(themeSettings.$2);
 
     // DYNAMIC THEME TINTING: Mix your active theme color into the dark background and cards
     final Color darkScaffoldBg = Color.lerp(const Color(0xFF05070B), primaryColor, 0.10)!;
@@ -104,9 +109,9 @@ class LikhloApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Likhlo',
       debugShowCheckedModeBanner: false,
-      themeMode: settings.themeMode == 'system'
+      themeMode: themeMode == 'system'
           ? ThemeMode.system
-          : (settings.themeMode == 'dark' ? ThemeMode.dark : ThemeMode.light),
+          : (themeMode == 'dark' ? ThemeMode.dark : ThemeMode.light),
 
       theme: ThemeData(
         useMaterial3: true,
@@ -129,24 +134,8 @@ class LikhloApp extends ConsumerWidget {
 
       // 🚀 THE BUILDER: Handles Global Overlays (Dimmer & AI Chat)
       builder: (context, child) {
-        // Wrapped in Directionality to ensure text renders safely over all routes
-        return Directionality(
-          textDirection: TextDirection.ltr,
-          child: Stack(
-            children: [
-              // 1. The main app content (Navigators, Screens, etc.)
-              if (child != null) child,
-
-              // 3. 🌙 SCREEN DIMMER
-              // Draws a black screen over the app based on the brightness level
-              if (settings.brightnessLevel > 0)
-                IgnorePointer(
-                  child: Container(
-                    color: Colors.black.withOpacity(settings.brightnessLevel),
-                  ),
-                ),
-            ],
-          ),
+        return _AppContentWithDimmer(
+          child: child ?? const SizedBox.shrink(),
         );
       },
 
@@ -154,6 +143,35 @@ class LikhloApp extends ConsumerWidget {
                   .get('has_onboarded', defaultValue: false) as bool)
               ? const HomeScreen()
               : const OnboardingScreen(),
+    );
+  }
+}
+
+class _AppContentWithDimmer extends ConsumerWidget {
+  final Widget child;
+
+  const _AppContentWithDimmer({required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final brightnessLevel = ref.watch(
+      settingsProvider.select((settings) => settings.brightnessLevel),
+    );
+
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        children: [
+          child,
+          if (brightnessLevel > 0)
+            IgnorePointer(
+              child: ColoredBox(
+                color: Colors.black.withOpacity(brightnessLevel),
+                child: const SizedBox.expand(),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
