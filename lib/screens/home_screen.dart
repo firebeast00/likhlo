@@ -25,6 +25,7 @@ import 'settings_screen.dart';
 import 'stats_screen.dart';
 import 'about_screen.dart';
 import '../services/local_nlp_service.dart';
+import '../services/ocr_scanner_service.dart';
 import "./mess_khata_screen.dart";
 import './income_accounts_screen.dart';
 
@@ -49,6 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   bool _voiceResultProcessed = false;
+  bool _isScanningReceipt = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
   Timer? _notificationUpdateTimer;
 
@@ -247,6 +249,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           )
         ],
       ),
+    );
+  }
+
+  Future<void> _confirmDeleteCategory(String category) async {
+    if (category == 'All') return;
+
+    final categories = ref.read(categoryProvider);
+    if (categories.length <= 1) {
+      _showTransactionError('Keep at least one expense category.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Delete Category?',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          "Delete '$category'? Existing transactions will remain unchanged.",
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    ref.read(categoryProvider.notifier).deleteCategory(category);
+    if (_selectedCategoryTab == category) {
+      setState(() => _selectedCategoryTab = 'All');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Category '$category' deleted.")),
     );
   }
 
@@ -670,7 +720,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(baseBudget, effectiveBudget, remaining, spent, primaryColor), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
+          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(baseBudget, effectiveBudget, remaining, spent, primaryColor), const SizedBox(height: 10), _buildSmartInputBar(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
           Expanded(flex: 1, child: _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: false)),
         ],
       );
@@ -691,6 +741,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 spent,
                 primaryColor,
               ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: _buildSmartInputBar(primaryColor, isDark),
             ),
           ),
           SliverPersistentHeader(
@@ -875,7 +931,102 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     bool isSelected = _selectedCategoryTab == label;
     return GestureDetector(
         onTap: () => _selectCategory(label, index),
-        child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: isSelected ? primaryColor : Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), border: isSelected ? null : Border.all(color: isDark ? primaryColor.withValues(alpha: 0.25) : Colors.grey.withValues(alpha: 0.15), width: 1.2)), child: Center(child: Text(label, style: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87), fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, fontSize: 12))))
+        onLongPress: label == 'All' ? null : () => _confirmDeleteCategory(label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor : Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: isSelected ? null : Border.all(color: isDark ? primaryColor.withValues(alpha: 0.25) : Colors.grey.withValues(alpha: 0.15), width: 1.2),
+          ),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label, style: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87), fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, fontSize: 12)),
+                if (isSelected && label != 'All') ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _confirmDeleteCategory(label),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2),
+                      child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        )
+    );
+  }
+
+  Widget _buildSmartInputBar(Color primaryColor, bool isDark) {
+    return Container(
+      height: 52,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _isListening
+              ? Colors.red.withValues(alpha: 0.55)
+              : primaryColor.withValues(alpha: isDark ? 0.28 : 0.16),
+        ),
+      ),
+      child: TextField(
+        controller: _smartInputCtrl,
+        textInputAction: TextInputAction.done,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        onSubmitted: _processNLP,
+        decoration: InputDecoration(
+          hintText: _isListening ? 'Listening…' : 'e.g. 500 for groceries',
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.only(left: 16, top: 16, bottom: 16),
+          suffixIconConstraints: const BoxConstraints(minHeight: 40),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Scan receipt',
+                visualDensity: VisualDensity.compact,
+                onPressed: _isScanningReceipt ? null : _scanReceiptIntoInput,
+                icon: _isScanningReceipt
+                    ? SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: primaryColor,
+                        ),
+                      )
+                    : Icon(Icons.document_scanner_outlined, size: 20, color: primaryColor),
+              ),
+              IconButton(
+                tooltip: _isListening ? 'Stop listening' : 'Voice input',
+                visualDensity: VisualDensity.compact,
+                onPressed: _listenForExpense,
+                icon: Icon(
+                  _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                  size: 20,
+                  color: _isListening ? Colors.red : primaryColor,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Save quick expense',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _processNLP(_smartInputCtrl.text),
+                icon: Icon(Icons.arrow_upward_rounded, size: 20, color: primaryColor),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -952,6 +1103,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
+  Future<void> _scanReceiptIntoInput() async {
+    if (_isScanningReceipt) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _isScanningReceipt = true);
+
+    try {
+      final receiptData = await OcrScannerService().scanReceipt();
+      if (!mounted) return;
+
+      final amount = receiptData?['amount'];
+      final title = receiptData?['title']?.toString().trim() ?? '';
+      if (amount is! num || !amount.isFinite || amount <= 0) {
+        _showTransactionError('Could not read a valid amount from the receipt.');
+        return;
+      }
+
+      final amountText = amount.toDouble() == amount.toDouble().truncateToDouble()
+          ? amount.toStringAsFixed(0)
+          : amount.toStringAsFixed(2);
+      _smartInputCtrl.text = title.isEmpty
+          ? amountText
+          : '$amountText for $title';
+      _smartInputCtrl.selection = TextSelection.collapsed(
+        offset: _smartInputCtrl.text.length,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Receipt read. Review it, then tap the arrow to save.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isScanningReceipt = false);
+    }
+  }
+
   void _handleSpeechStatus(String status) {
     if (!mounted || (status != 'done' && status != 'notListening')) return;
     final words = _smartInputCtrl.text.trim();
@@ -972,7 +1156,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (amount is num && amount.isFinite && amount > 0) {
       final wallets = ref.read(walletProvider);
       if (wallets.isEmpty) {
-        _showTransactionError('Create an income account before using Voice Log.');
+        _showTransactionError('Create an income account before saving this entry.');
         return;
       }
 
