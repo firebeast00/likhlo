@@ -33,8 +33,10 @@ class IncomeAccountsScreen extends ConsumerWidget {
 
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => _DialogControllerScope(
+        controllers: [controller, balanceController],
+        child: StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
           scrollable: true,
           title: Text(existing == null ? 'New money account' : 'Update account'),
           content: Column(
@@ -123,22 +125,22 @@ class IncomeAccountsScreen extends ConsumerWidget {
                         currentBalance: balance,
                       );
 
+                if (!dialogContext.mounted) return;
                 if (!saved) {
                   setDialogState(
                     () => nameError = 'An account with this name already exists.',
                   );
                   return;
                 }
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                Navigator.pop(dialogContext);
               },
               child: Text(existing == null ? 'Create' : 'Update'),
             ),
           ],
+          ),
         ),
       ),
     );
-    controller.dispose();
-    balanceController.dispose();
   }
 
   Future<void> _addIncome(BuildContext context, WidgetRef ref) async {
@@ -153,8 +155,10 @@ class IncomeAccountsScreen extends ConsumerWidget {
 
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => _DialogControllerScope(
+        controllers: [titleController, amountController],
+        child: StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add income'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -216,7 +220,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                   return;
                 }
 
-                await ref.read(expenseProvider.notifier).addExpense(
+                final saved = await ref.read(expenseProvider.notifier).addExpense(
                       Expense(
                         id: const Uuid().v4(),
                         title: titleController.text.trim().isEmpty
@@ -230,17 +234,20 @@ class IncomeAccountsScreen extends ConsumerWidget {
                         walletId: walletId,
                       ),
                     );
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (!dialogContext.mounted) return;
+                if (!saved) {
+                  setDialogState(() => error = 'Could not save this income.');
+                  return;
+                }
+                Navigator.pop(dialogContext);
               },
               child: const Text('Add income'),
             ),
           ],
+          ),
         ),
       ),
     );
-
-    titleController.dispose();
-    amountController.dispose();
   }
 
   Future<void> _clearAccount(
@@ -410,4 +417,31 @@ class IncomeAccountsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _DialogControllerScope extends StatefulWidget {
+  final List<TextEditingController> controllers;
+  final Widget child;
+
+  const _DialogControllerScope({
+    required this.controllers,
+    required this.child,
+  });
+
+  @override
+  State<_DialogControllerScope> createState() =>
+      _DialogControllerScopeState();
+}
+
+class _DialogControllerScopeState extends State<_DialogControllerScope> {
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
