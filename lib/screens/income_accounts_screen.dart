@@ -17,14 +17,26 @@ class IncomeAccountsScreen extends ConsumerWidget {
     Wallet? existing,
   }) async {
     final controller = TextEditingController(text: existing?.name ?? '');
+    final currentBalance = existing == null
+        ? 0.0
+        : ref.read(walletProvider.notifier).getBalanceForWallet(existing.id);
+    final balanceController = TextEditingController(
+      text: existing == null
+          ? '0'
+          : currentBalance.toStringAsFixed(
+              currentBalance == currentBalance.truncateToDouble() ? 0 : 2,
+            ),
+    );
     bool isBackup = existing?.isBackup ?? false;
-    String? error;
+    String? nameError;
+    String? balanceError;
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? 'New income account' : 'Update account'),
+          scrollable: true,
+          title: Text(existing == null ? 'New money account' : 'Update account'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -34,15 +46,42 @@ class IncomeAccountsScreen extends ConsumerWidget {
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   labelText: 'Account name',
-                  errorText: error,
+                  errorText: nameError,
                   prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                 ),
+                onChanged: (_) {
+                  if (nameError != null) {
+                    setDialogState(() => nameError = null);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: balanceController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Current balance',
+                  hintText: 'Amount currently available',
+                  prefixText: 'Rs. ',
+                  errorText: balanceError,
+                ),
+                onChanged: (_) {
+                  if (balanceError != null) {
+                    setDialogState(() => balanceError = null);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'This amount is included automatically in the total shown on the Home screen.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Reserve account'),
-                subtitle: const Text('Keep this money outside daily spending guidance.'),
+                subtitle: const Text('Mark money that you prefer to keep aside.'),
                 value: isBackup,
                 onChanged: (value) => setDialogState(() => isBackup = value),
               ),
@@ -56,8 +95,13 @@ class IncomeAccountsScreen extends ConsumerWidget {
             FilledButton(
               onPressed: () async {
                 final name = controller.text.trim();
+                final balance = double.tryParse(balanceController.text.trim());
                 if (name.isEmpty) {
-                  setDialogState(() => error = 'Enter an account name.');
+                  setDialogState(() => nameError = 'Enter an account name.');
+                  return;
+                }
+                if (balance == null || !balance.isFinite || balance < 0) {
+                  setDialogState(() => balanceError = 'Enter a valid balance of zero or more.');
                   return;
                 }
 
@@ -67,7 +111,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                         Wallet(
                           id: const Uuid().v4(),
                           name: name,
-                          balance: 0,
+                          balance: balance,
                           isBackup: isBackup,
                           colorValue:
                               ref.read(settingsProvider).profileColorValue,
@@ -76,11 +120,12 @@ class IncomeAccountsScreen extends ConsumerWidget {
                       )
                     : await notifier.updateWallet(
                         existing.copyWith(name: name, isBackup: isBackup),
+                        currentBalance: balance,
                       );
 
                 if (!saved) {
                   setDialogState(
-                    () => error = 'An account with this name already exists.',
+                    () => nameError = 'An account with this name already exists.',
                   );
                   return;
                 }
@@ -93,6 +138,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
       ),
     );
     controller.dispose();
+    balanceController.dispose();
   }
 
   Future<void> _addIncome(BuildContext context, WidgetRef ref) async {
@@ -152,7 +198,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'This income will increase the selected account and this month’s main budget.',
+                'This income increases the selected account and the total available balance.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
@@ -288,7 +334,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Income Accounts'),
+        title: const Text('Money Accounts'),
         actions: [
           IconButton(
             tooltip: 'Create account',

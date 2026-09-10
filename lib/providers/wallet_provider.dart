@@ -42,12 +42,27 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
     return true;
   }
 
-  Future<bool> updateWallet(Wallet wallet) async {
+  Future<bool> updateWallet(
+    Wallet wallet, {
+    double? currentBalance,
+  }) async {
     if (wallet.name.trim().isEmpty ||
-        nameExists(wallet.name, excludingId: wallet.id)) {
+        nameExists(wallet.name, excludingId: wallet.id) ||
+        (currentBalance != null && !currentBalance.isFinite)) {
       return false;
     }
-    await _box.put(wallet.id, wallet);
+
+    var updatedWallet = wallet;
+    if (currentBalance != null) {
+      final storedWallet = _box.get(wallet.id);
+      if (storedWallet == null) return false;
+      final balanceAdjustment = currentBalance - getBalanceForWallet(wallet.id);
+      updatedWallet = wallet.copyWith(
+        balance: storedWallet.balance + balanceAdjustment,
+      );
+    }
+
+    await _box.put(wallet.id, updatedWallet);
     state = _box.values.toList();
     return true;
   }

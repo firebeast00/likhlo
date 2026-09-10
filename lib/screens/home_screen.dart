@@ -10,7 +10,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import "../services/notification_service.dart";
 import '../providers/expense_provider.dart';
-import '../providers/budget_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
@@ -131,27 +130,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (!mounted) return;
 
       final now = DateTime.now();
-      final monthKey = DateFormat('yyyy-MM').format(now);
       final expenses = ref.read(expenseProvider).allExpenses;
-      final baseBudget = ref.read(budgetProvider)[monthKey] ?? 0.0;
-      double income = 0;
-      double spentThisMonth = 0;
+      final wallets = ref.read(walletProvider);
+      final walletNotifier = ref.read(walletProvider.notifier);
+      final totalAvailable = wallets.fold<double>(
+        0,
+        (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+      );
       double spentToday = 0;
 
       for (final entry in expenses) {
         if (entry.category == 'Transfer') continue;
-        if (entry.date.year == now.year && entry.date.month == now.month) {
-          if (entry.type == 'income') {
-            income += entry.amount;
-          } else if (entry.type == 'expense') {
-            spentThisMonth += entry.amount;
-            if (entry.date.day == now.day) spentToday += entry.amount;
-          }
+        if (entry.type == 'expense' &&
+            entry.date.year == now.year &&
+            entry.date.month == now.month &&
+            entry.date.day == now.day) {
+          spentToday += entry.amount;
         }
       }
 
       NotificationService().updatePersistentStatusBarWidget(
-        remainingToday: baseBudget + income - spentThisMonth,
+        remainingToday: totalAvailable,
         spentToday: spentToday,
       );
     });
@@ -558,21 +557,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  void _editBudget(double currentBudget) {
-    final c = TextEditingController(text: currentBudget > 0 ? currentBudget.toStringAsFixed(0) : "");
-    final primaryColor = Color(ref.read(settingsProvider).profileColorValue);
-
-    showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          insetPadding: const EdgeInsets.all(20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), shape: BoxShape.circle), child: const Icon(Icons.savings_rounded, color: Colors.green, size: 20)), const SizedBox(width: 12), const Expanded(child: Text("Monthly Limit", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))]),
-          content: _buildModernInput(c, "Enter Budget Limit", Icons.currency_rupee_rounded, primaryColor, isNumber: true),
-          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          actions: [Row(children: [Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)), onPressed: () async { final val = double.tryParse(c.text.trim()); if (val == null || !val.isFinite || val < 0) { _showTransactionError('Enter a valid budget amount.'); return; } await ref.read(budgetProvider.notifier).setBudget(val, _focusedMonth); if (ctx.mounted) Navigator.pop(ctx); }, child: const Text("Save")))])],
-        )
+  Future<void> _openIncomeAccounts() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const IncomeAccountsScreen()),
     );
+    if (mounted) _queuePersistentNotificationUpdate();
   }
 
   @override
@@ -580,7 +569,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     ref.listen<ExpenseState>(expenseProvider, (_, __) {
       _queuePersistentNotificationUpdate();
     });
-    ref.listen<Map<String, double>>(budgetProvider, (_, __) {
+    ref.listen<List<Wallet>>(walletProvider, (_, __) {
       _queuePersistentNotificationUpdate();
     });
 
@@ -614,21 +603,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
     }
 
-    final monthKey = DateFormat('yyyy-MM').format(_focusedMonth);
-    final monthlyBudget = ref.watch(
-      budgetProvider.select((budgets) => budgets[monthKey] ?? 0.0),
-    );
     final ledger = ref.watch(monthlyLedgerProvider(_focusedMonth));
     final categories = ref.watch(categoryProvider);
+    final wallets = ref.watch(walletProvider);
 
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final monthlyTransactions = ledger.transactions;
-    final globalIncome = ledger.income;
     final globalSpent = ledger.spent;
-
-    final double effectiveBudget = monthlyBudget + globalIncome;
-    final double globalRemaining = effectiveBudget - globalSpent;
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final totalAvailable = wallets.fold<double>(
+      0,
+      (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+    );
 
     var displayExpenses = List<Expense>.from(monthlyTransactions);
 
@@ -655,21 +642,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             IconButton(
               tooltip: 'Income Accounts',
               icon: const Icon(Icons.account_balance_wallet_outlined, size: 22),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const IncomeAccountsScreen(),
-                ),
-              ),
-            ),
-          if (_currentView == 'Dashboard' && !_isSearching)
-            IconButton(
-              tooltip: 'Voice Log',
-              icon: Icon(
-                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                color: _isListening ? Colors.red : null,
-                size: 22,
-              ),
-              onPressed: _listenForExpense,
+              onPressed: _openIncomeAccounts,
             ),
           if (_currentView == 'Dashboard')
             IconButton(
@@ -689,10 +662,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         isLandscape,
         isDark,
         primaryColor,
-        monthlyBudget,
-        effectiveBudget,
-        globalRemaining,
+        totalAvailable,
         globalSpent,
+        wallets.length,
         categories,
         displayExpenses,
       ),
@@ -713,14 +685,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildResponsiveBody(bool isLandscape, bool isDark, Color primaryColor, double baseBudget, double effectiveBudget, double remaining, double spent, List<String> categories, List<Expense> displayExpenses) {
+  Widget _buildResponsiveBody(bool isLandscape, bool isDark, Color primaryColor, double totalAvailable, double spent, int accountCount, List<String> categories, List<Expense> displayExpenses) {
     if (_currentView != 'Dashboard') return _buildOtherViews();
 
     if (isLandscape && !_isSearching) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(baseBudget, effectiveBudget, remaining, spent, primaryColor), const SizedBox(height: 10), _buildSmartInputBar(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
+          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(totalAvailable, spent, accountCount, primaryColor), const SizedBox(height: 10), _buildSmartInputBar(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
           Expanded(flex: 1, child: _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: false)),
         ],
       );
@@ -735,10 +707,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             child: Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: _buildHeroCard(
-                baseBudget,
-                effectiveBudget,
-                remaining,
+                totalAvailable,
                 spent,
+                accountCount,
                 primaryColor,
               ),
             ),
@@ -1030,22 +1001,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildHeroCard(double baseBudget, double effectiveBudget, double r, double s, Color primary) {
-    bool isAlert = effectiveBudget > 0 && s > effectiveBudget;
+  Widget _buildHeroCard(double totalAvailable, double spent, int accountCount, Color primary) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 500), width: double.infinity, margin: const EdgeInsets.symmetric(horizontal: 20), padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: isAlert ? [Colors.red.shade900, Colors.red] : [primary, primary.withValues(alpha: 0.75)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: (isAlert ? Colors.red : primary).withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))]),
+      duration: const Duration(milliseconds: 300), width: double.infinity, margin: const EdgeInsets.symmetric(horizontal: 20), padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: [primary, primary.withValues(alpha: 0.75)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(isAlert ? "Limit Exceeded!" : "Remaining Balance", style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 13)), Icon(isAlert ? Icons.warning_amber_rounded : Icons.account_balance_wallet_rounded, color: Colors.white70, size: 20)]),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Total Available", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 13)),
+              IconButton(
+                tooltip: 'Manage money accounts',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                onPressed: _openIncomeAccounts,
+                icon: const Icon(Icons.edit_outlined, color: Colors.white70, size: 19),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
-          effectiveBudget == 0 ? GestureDetector(onTap: () => _editBudget(baseBudget), child: const Row(children: [Text("Set Limit", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)), SizedBox(width: 6), Icon(Icons.edit_rounded, color: Colors.white, size: 18)])) : FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text("Rs. ${r.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5))),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text("Rs. ${totalAvailable.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5))),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(onTap: () => _editBudget(baseBudget), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text("Budget + Income", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(width: 4), Icon(Icons.edit_outlined, color: Colors.white.withValues(alpha: 0.65), size: 10)]), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text(effectiveBudget.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Total Spent", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(s.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
+              GestureDetector(onTap: _openIncomeAccounts, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text("Money Accounts", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(width: 4), Icon(Icons.edit_outlined, color: Colors.white.withValues(alpha: 0.65), size: 11)]), const SizedBox(height: 2), Text("$accountCount ${accountCount == 1 ? 'account' : 'accounts'}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Spent This Month", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(spent.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
             ],
           )
         ],
