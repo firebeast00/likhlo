@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -52,6 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _isListening = false;
   bool _voiceResultProcessed = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
+  Timer? _notificationUpdateTimer;
 
   @override
   void initState() {
@@ -79,6 +81,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final pendingAction = NotificationService().takePendingAction();
       if (pendingAction != null) _handleNotificationAction(pendingAction);
+      _queuePersistentNotificationUpdate(
+        delay: const Duration(seconds: 2),
+      );
     });
   }
 
@@ -110,9 +115,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     NotificationService().onActionTriggered = null;
     _speech.cancel();
     _fabController.dispose();
+    _notificationUpdateTimer?.cancel();
     _categoryScrollCtrl.dispose();
     _smartInputCtrl.dispose();
     super.dispose();
+  }
+
+  void _queuePersistentNotificationUpdate({
+    Duration delay = const Duration(milliseconds: 350),
+  }) {
+    _notificationUpdateTimer?.cancel();
+    _notificationUpdateTimer = Timer(delay, () {
+      if (!mounted) return;
+
+      final now = DateTime.now();
+      final monthKey = DateFormat('yyyy-MM').format(now);
+      final expenses = ref.read(expenseProvider).allExpenses;
+      final baseBudget = ref.read(budgetProvider)[monthKey] ?? 0.0;
+      double income = 0;
+      double spentThisMonth = 0;
+      double spentToday = 0;
+
+      for (final entry in expenses) {
+        if (entry.category == 'Transfer') continue;
+        if (entry.date.year == now.year && entry.date.month == now.month) {
+          if (entry.type == 'income') {
+            income += entry.amount;
+          } else if (entry.type == 'expense') {
+            spentThisMonth += entry.amount;
+            if (entry.date.day == now.day) spentToday += entry.amount;
+          }
+        }
+      }
+
+      NotificationService().updatePersistentStatusBarWidget(
+        remainingToday: baseBudget + income - spentThisMonth,
+        spentToday: spentToday,
+      );
+    });
   }
 
   void _selectCategory(String category, int index) {
@@ -559,11 +599,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                               }
                             }
                           }
-                          try {
-                            await NotificationService().scheduleSmartEntryReminders();
-                          } catch (e) {
-                            debugPrint("Notification reset failed: $e");
-                          }
                           if (ctx.mounted) Navigator.pop(ctx);
                       },
                       child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
@@ -649,6 +684,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<ExpenseState>(expenseProvider, (_, __) {
+      _queuePersistentNotificationUpdate();
+    });
+    ref.listen<Map<String, double>>(budgetProvider, (_, __) {
+      _queuePersistentNotificationUpdate();
+    });
+
     final settings = ref.watch(settingsProvider);
     final expenseState = ref.watch(expenseProvider);
     final budgetState = ref.watch(budgetProvider);
@@ -670,15 +712,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final double effectiveBudget = monthlyBudget + globalIncome;
     final double globalRemaining = effectiveBudget - globalSpent;
 
-    final now = DateTime.now();
-    final double actualTodaySpent = expenseState.allExpenses
-        .where((e) => e.type == 'expense' &&
-        e.category != 'Transfer' &&
-        e.date.day == now.day &&
-        e.date.month == now.month &&
-        e.date.year == now.year)
-        .fold(0.0, (sum, e) => sum + e.amount);
-
     var displayExpenses = List<Expense>.from(monthlyTransactions);
 
     if (_selectedCategoryTab != 'All' && !categories.contains(_selectedCategoryTab)) {
@@ -689,13 +722,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
     displayExpenses.sort((a,b) => b.date.compareTo(a.date));
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationService().updatePersistentStatusBarWidget(
-        remainingToday: globalRemaining,
-        spentToday: actualTodaySpent,
-      );
-    });
 
     return Scaffold(
       drawer: AppDrawer(currentView: _currentView, onViewChanged: (v)=>setState(()=>_currentView=v)),
@@ -1115,11 +1141,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
       final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.value, walletId: defaultWalletId);
       await ref.read(expenseProvider.notifier).addExpense(newExpense);
-      try {
-        await NotificationService().scheduleSmartEntryReminders();
-      } catch (e) {
-        debugPrint("Notification reset failed: $e");
-      }
       if (!mounted) return;
       _smartInputCtrl.clear();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Saved: ${result['title']} (Rs. ${amount.toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));

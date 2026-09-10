@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:student_expense_manager/screens/splash_screen.dart';
+import 'package:student_expense_manager/screens/home_screen.dart';
+import 'package:student_expense_manager/screens/onboarding_screen.dart';
 
 // Models
 import 'models/expense_model.dart';
@@ -57,19 +58,25 @@ void main() async {
     debugPrint("Hive Initialization Error: $e");
   }
 
-  if (storageError == null) {
-    try {
-      await NotificationService().init();
-    } catch (e) {
-      debugPrint("Notification Initialization Error: $e");
-    }
-  }
-
   runApp(
     ProviderScope(
       child: LikhloApp(startupError: storageError?.toString()),
     ),
   );
+
+  // Keep the first frame independent from notification plug-in work. The
+  // native splash remains visible only while essential local storage opens.
+  if (storageError == null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 300), () async {
+        try {
+          await NotificationService().init();
+        } catch (e) {
+          debugPrint("Notification Initialization Error: $e");
+        }
+      });
+    });
+  }
 }
 
 class LikhloApp extends ConsumerWidget {
@@ -143,7 +150,10 @@ class LikhloApp extends ConsumerWidget {
         );
       },
 
-      home: const SplashScreen(),
+      home: (Hive.box('preferences')
+                  .get('has_onboarded', defaultValue: false) as bool)
+              ? const HomeScreen()
+              : const OnboardingScreen(),
     );
   }
 }
