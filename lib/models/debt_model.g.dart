@@ -19,7 +19,7 @@ class DebtEntryAdapter extends TypeAdapter<DebtEntry> {
     return DebtEntry(
       id: fields[0] as String,
       borrowerName: fields[1] as String,
-      amount: fields[2] as double,
+      amount: (fields[2] as num).toDouble(),
       type: fields[3] as String,
       dueDate: fields[4] as DateTime?,
     );

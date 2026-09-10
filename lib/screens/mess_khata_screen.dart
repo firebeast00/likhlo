@@ -338,7 +338,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    double totalMessSpend = entries.fold(0, (sum, e) => sum + e.totalAmount);
+    double totalMessSpend =
+        entries.fold(0.0, (sum, e) => sum + e.totalAmount);
 
     return Scaffold(
       backgroundColor: Colors.transparent,

@@ -31,7 +31,11 @@ final statsProvider = Provider<ExpenseStats>((ref) {
 
   for (int i = 5; i >= 0; i--) {
     final monthDate = DateTime(now.year, now.month - i, 1);
-    final monthExpenses = allExpenses.where((e) => e.date.month == monthDate.month && e.date.year == monthDate.year);
+    final monthExpenses = allExpenses.where((e) =>
+        e.date.month == monthDate.month &&
+        e.date.year == monthDate.year &&
+        e.type == 'expense' &&
+        e.category != 'Transfer');
     final total = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
 
     monthlyTotals.add(total);
@@ -41,7 +45,11 @@ final statsProvider = Provider<ExpenseStats>((ref) {
   }
 
   // 2. Calculate Current Month Category Breakdown
-  final currentMonthExpenses = allExpenses.where((e) => e.date.month == now.month && e.date.year == now.year).toList();
+  final currentMonthExpenses = allExpenses.where((e) =>
+      e.date.month == now.month &&
+      e.date.year == now.year &&
+      e.type == 'expense' &&
+      e.category != 'Transfer').toList();
   final Map<String, double> categoryTotals = {};
   double totalSpentThisMonth = 0;
 

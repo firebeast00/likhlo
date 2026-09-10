@@ -343,8 +343,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    double iGave = debts.where((e) => e.type == 'lent').fold(0, (sum, e) => sum + e.amount);
-    double iTook = debts.where((e) => e.type == 'borrowed').fold(0, (sum, e) => sum + e.amount);
+    double iGave = debts
+        .where((e) => e.type == 'lent')
+        .fold(0.0, (sum, e) => sum + e.amount);
+    double iTook = debts
+        .where((e) => e.type == 'borrowed')
+        .fold(0.0, (sum, e) => sum + e.amount);
     double balance = iGave - iTook;
 
     return Scaffold(

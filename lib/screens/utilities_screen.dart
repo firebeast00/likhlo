@@ -244,7 +244,8 @@ class _UtilitiesScreenState extends ConsumerState<UtilitiesScreen> {
                     final coupon = double.tryParse(extraVoucherCtrl.text) ?? 0;
                     if (original <= 0) return;
                     final discounted = original - (original * (pct / 100));
-                    final finalPrice = (discounted - coupon).clamp(0, double.infinity);
+                    final double finalPrice =
+                        (discounted - coupon).clamp(0.0, double.infinity).toDouble();
                     final totalSaved = original - finalPrice;
                     Navigator.pop(ctx);
                     _alert("Savings Summary", "Final Payable: Rs. ${finalPrice.toStringAsFixed(0)}\nTotal Saved: Rs. ${totalSaved.toStringAsFixed(0)} (${((totalSaved / original) * 100).toStringAsFixed(1)}% off)");

@@ -26,22 +26,42 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
     state = _box.values.toList();
   }
 
-  void addWallet(Wallet wallet) {
-    _box.put(wallet.id, wallet);
-    state = _box.values.toList();
+  bool nameExists(String name, {String? excludingId}) {
+    final normalized = name.trim().toLowerCase();
+    return state.any(
+      (wallet) =>
+          wallet.id != excludingId &&
+          wallet.name.trim().toLowerCase() == normalized,
+    );
   }
 
-  void updateWallet(Wallet wallet) {
-    _box.put(wallet.id, wallet);
+  Future<bool> addWallet(Wallet wallet) async {
+    if (wallet.name.trim().isEmpty || nameExists(wallet.name)) return false;
+    await _box.put(wallet.id, wallet);
     state = _box.values.toList();
+    return true;
   }
 
-  void deleteWallet(String id) {
-    _box.delete(id);
+  Future<bool> updateWallet(Wallet wallet) async {
+    if (wallet.name.trim().isEmpty ||
+        nameExists(wallet.name, excludingId: wallet.id)) {
+      return false;
+    }
+    await _box.put(wallet.id, wallet);
     state = _box.values.toList();
+    return true;
+  }
+
+  Future<bool> deleteWallet(String id) async {
+    if (state.length <= 1 || !_box.containsKey(id)) return false;
+    await _box.delete(id);
+    state = _box.values.toList();
+    return true;
   }
 
   double getBalanceForWallet(String walletId) {
+    final wallet = _box.get(walletId);
+    if (wallet == null) return 0.0;
     final expenses = _ref.read(expenseProvider).allExpenses;
 
     double totalIncome = expenses
@@ -52,7 +72,19 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
         .where((e) => e.walletId == walletId && e.type == 'expense')
         .fold(0.0, (sum, e) => sum + e.amount);
 
-    return totalIncome - totalExpense;
+    return wallet.balance + totalIncome - totalExpense;
+  }
+
+  Future<void> clearBalance(String walletId) async {
+    final wallet = _box.get(walletId);
+    if (wallet == null) return;
+
+    final currentBalance = getBalanceForWallet(walletId);
+    await _box.put(
+      walletId,
+      wallet.copyWith(balance: wallet.balance - currentBalance),
+    );
+    state = _box.values.toList();
   }
 }
 

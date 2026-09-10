@@ -15,7 +15,6 @@ import '../providers/wallet_provider.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import '../widgets/app_drawer.dart';
-import "../widgets/trajectory_card.dart";
 import '../widgets/ai_chat_overlay.dart';
 
 import 'todo_screen.dart';
@@ -29,6 +28,7 @@ import "../services/ocr_scanner_service.dart";
 import "./insights_screen.dart";
 import "./mess_khata_screen.dart";
 import "./recurring_bills_screen.dart";
+import './income_accounts_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -50,6 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
+  bool _voiceResultProcessed = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
 
   @override
@@ -74,6 +75,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       const ShortcutItem(type: 'action_add_expense', localizedTitle: 'Add Transaction', icon: 'ic_add'),
     ]);
     _setupNativeQuickTile();
+    NotificationService().onActionTriggered = _handleNotificationAction;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pendingAction = NotificationService().takePendingAction();
+      if (pendingAction != null) _handleNotificationAction(pendingAction);
+    });
+  }
+
+  void _handleNotificationAction(String action) {
+    if (!mounted) return;
+    if (action == 'action_voice_log') {
+      _listenForExpense();
+    } else if (action == 'action_add_expense') {
+      _showAddOrEditModal();
+    }
   }
 
   void _setupNativeQuickTile() {
@@ -92,6 +107,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   @override
   void dispose() {
+    NotificationService().onActionTriggered = null;
+    _speech.cancel();
     _fabController.dispose();
     _categoryScrollCtrl.dispose();
     _smartInputCtrl.dispose();
@@ -252,7 +269,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)),
                   onPressed: () {
                     if (catCtrl.text.trim().isNotEmpty) {
-                      ref.read(categoryProvider.notifier).addCategory(catCtrl.text.trim());
+                      final added = ref
+                          .read(categoryProvider.notifier)
+                          .addCategory(catCtrl.text.trim());
+                      if (!added) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('That category already exists.'),
+                          ),
+                        );
+                        return;
+                      }
                       Navigator.pop(ctx);
                       Future.delayed(const Duration(milliseconds: 300), () {
                         if (_categoryScrollCtrl.hasClients) {
@@ -344,6 +371,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   // ==================== TRANSACTION / TRANSFER MODAL ====================
   void _showAddOrEditModal({Expense? existing, String? prefilledAmount}) {
+    if (existing?.category == 'Transfer') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transfers cannot be edited. Delete the transfer and create it again.'),
+        ),
+      );
+      return;
+    }
     final titleCtrl = TextEditingController(text: existing?.title ?? "");
     final amountCtrl = TextEditingController(text: prefilledAmount ?? (existing?.amount.toString() ?? ""));
     String selectedCategory = existing?.category ?? "General";
@@ -467,38 +502,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     width: double.infinity, height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: transactionType == 'transfer' ? Colors.blue : primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                      onPressed: () {
-                        final amt = double.tryParse(amountCtrl.text) ?? 0;
-                        if(amt > 0 && wallets.isNotEmpty) {
+                      onPressed: () async {
+                        final amt = double.tryParse(amountCtrl.text.trim());
+                        if (amt == null || !amt.isFinite || amt <= 0) {
+                          _showTransactionError('Enter a valid amount above zero.');
+                          return;
+                        }
+                        if (wallets.isEmpty) {
+                          _showTransactionError('Create an income account first.');
+                          return;
+                        }
 
-                          if (transactionType == 'transfer') {
-                            if (selectedWalletId == transferToWalletId) return;
+                        if (transactionType == 'transfer') {
+                            if (wallets.length < 2) {
+                              _showTransactionError('Create at least two accounts to transfer money.');
+                              return;
+                            }
+                            if (selectedWalletId == transferToWalletId) {
+                              _showTransactionError('Choose two different accounts.');
+                              return;
+                            }
+                            final available = ref
+                                .read(walletProvider.notifier)
+                                .getBalanceForWallet(selectedWalletId);
+                            if (amt > available) {
+                              _showTransactionError(
+                                'Insufficient balance. Available: Rs. ${available.toStringAsFixed(0)}',
+                              );
+                              return;
+                            }
                             final fromName = wallets.firstWhere((w) => w.id == selectedWalletId).name;
                             final toName = wallets.firstWhere((w) => w.id == transferToWalletId).name;
                             final transferId = const Uuid().v4();
 
-                            ref.read(expenseProvider.notifier).addExpense(Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'expense', walletId: selectedWalletId));
-                            ref.read(expenseProvider.notifier).addExpense(Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'income', walletId: transferToWalletId));
+                            await ref.read(expenseProvider.notifier).addExpense(Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'expense', walletId: selectedWalletId));
+                            await ref.read(expenseProvider.notifier).addExpense(Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'income', walletId: transferToWalletId));
                           } else {
                             String finalTitle = titleCtrl.text.trim();
                             if (finalTitle.isEmpty) {
                               if (transactionType == 'income') {
                                 finalTitle = 'Income / Allowance';
                               } else {
+                                _showTransactionError('Enter a transaction title.');
                                 return;
                               }
                             }
 
                             final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
                             if (existing == null) {
-                              ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.value, type: transactionType, walletId: selectedWalletId));
+                              await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.value, type: transactionType, walletId: selectedWalletId));
                             } else {
-                              ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
+                              final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
+                              if (!updated) {
+                                _showTransactionError('This transaction no longer exists.');
+                                return;
+                              }
                             }
                           }
-                          try { NotificationService().cancelAll(); NotificationService().scheduleSmartEntryReminders(); } catch (e) { debugPrint("Notification reset failed: $e"); }
-                          Navigator.pop(ctx);
-                        }
+                          try {
+                            await NotificationService().scheduleSmartEntryReminders();
+                          } catch (e) {
+                            debugPrint("Notification reset failed: $e");
+                          }
+                          if (ctx.mounted) Navigator.pop(ctx);
                       },
                       child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
@@ -508,6 +574,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
           ),
         )
+    );
+  }
+
+  void _showTransactionError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -569,7 +642,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           title: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), shape: BoxShape.circle), child: const Icon(Icons.savings_rounded, color: Colors.green, size: 20)), const SizedBox(width: 12), const Expanded(child: Text("Monthly Limit", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))]),
           content: _buildModernInput(c, "Enter Budget Limit", Icons.currency_rupee_rounded, primaryColor, isNumber: true),
           actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          actions: [Row(children: [Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)), onPressed: (){ final val = double.tryParse(c.text) ?? 0; ref.read(budgetProvider.notifier).setBudget(val, _focusedMonth); Navigator.pop(ctx); }, child: const Text("Save")))])],
+          actions: [Row(children: [Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)), onPressed: () async { final val = double.tryParse(c.text.trim()); if (val == null || !val.isFinite || val < 0) { _showTransactionError('Enter a valid budget amount.'); return; } await ref.read(budgetProvider.notifier).setBudget(val, _focusedMonth); if (ctx.mounted) Navigator.pop(ctx); }, child: const Text("Save")))])],
         )
     );
   }
@@ -579,7 +652,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final settings = ref.watch(settingsProvider);
     final expenseState = ref.watch(expenseProvider);
     final budgetState = ref.watch(budgetProvider);
-    final wallets = ref.watch(walletProvider);
     final categories = ref.watch(categoryProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Color(settings.profileColorValue);
@@ -592,8 +664,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     final monthlyTransactions = expenseState.allExpenses.where((e) => e.date.month == _focusedMonth.month && e.date.year == _focusedMonth.year).toList();
 
-    final double globalIncome = monthlyTransactions.where((e) => e.type == 'income' && e.category != 'Transfer').fold(0, (sum, e) => sum + e.amount);
-    final double globalSpent = monthlyTransactions.where((e) => e.type == 'expense' && e.category != 'Transfer').fold(0, (sum, e) => sum + e.amount);
+    final double globalIncome = monthlyTransactions.where((e) => e.type == 'income' && e.category != 'Transfer').fold(0.0, (sum, e) => sum + e.amount);
+    final double globalSpent = monthlyTransactions.where((e) => e.type == 'expense' && e.category != 'Transfer').fold(0.0, (sum, e) => sum + e.amount);
 
     final double effectiveBudget = monthlyBudget + globalIncome;
     final double globalRemaining = effectiveBudget - globalSpent;
@@ -605,7 +677,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         e.date.day == now.day &&
         e.date.month == now.month &&
         e.date.year == now.year)
-        .fold(0, (sum, e) => sum + e.amount);
+        .fold(0.0, (sum, e) => sum + e.amount);
 
     var displayExpenses = List<Expense>.from(monthlyTransactions);
 
@@ -633,12 +705,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         title: _isSearching ? TextField(autofocus: true, style: const TextStyle(fontSize: 15), decoration: InputDecoration(border: InputBorder.none, hintText: "Search transactions...", hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14)), onChanged: (v)=>setState(()=>_searchQuery=v)) : Text(_currentView, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         centerTitle: true,
         leading: Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu_rounded, size: 24), onPressed: () => Scaffold.of(context).openDrawer())),
-        actions: [if(_currentView=='Dashboard') IconButton(icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded, size: 22), onPressed: ()=>setState(()=>_isSearching=!_isSearching))],
+        actions: [
+          if (_currentView == 'Dashboard' && !_isSearching)
+            IconButton(
+              tooltip: 'Income Accounts',
+              icon: const Icon(Icons.account_balance_wallet_outlined, size: 22),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const IncomeAccountsScreen(),
+                ),
+              ),
+            ),
+          if (_currentView == 'Dashboard' && !_isSearching)
+            IconButton(
+              tooltip: 'Voice Log',
+              icon: Icon(
+                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                color: _isListening ? Colors.red : null,
+                size: 22,
+              ),
+              onPressed: _listenForExpense,
+            ),
+          if (_currentView == 'Dashboard')
+            IconButton(
+              tooltip: _isSearching ? 'Close search' : 'Search',
+              icon: Icon(
+                _isSearching ? Icons.close_rounded : Icons.search_rounded,
+                size: 22,
+              ),
+              onPressed: () => setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) _searchQuery = '';
+              }),
+            ),
+        ],
       ),
       body: Stack(
         children: [
           Positioned.fill(
-            child: _buildResponsiveBody(isLandscape, isDark, primaryColor, effectiveBudget, globalRemaining, globalSpent, categories, displayExpenses, wallets),
+            child: _buildResponsiveBody(isLandscape, isDark, primaryColor, monthlyBudget, effectiveBudget, globalRemaining, globalSpent, categories, displayExpenses),
           ),
           const AiChatOverlay(),
         ],
@@ -660,14 +765,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildResponsiveBody(bool isLandscape, bool isDark, Color primaryColor, double effectiveBudget, double remaining, double spent, List<String> categories, List<Expense> displayExpenses, List<Wallet> wallets) {
-    if (_currentView != 'Dashboard') return AnimatedSwitcher(duration: const Duration(milliseconds: 300), child: KeyedSubtree(key: ValueKey<String>(_currentView), child: _buildOtherViews()));
+  Widget _buildResponsiveBody(bool isLandscape, bool isDark, Color primaryColor, double baseBudget, double effectiveBudget, double remaining, double spent, List<String> categories, List<Expense> displayExpenses) {
+    if (_currentView != 'Dashboard') return _buildOtherViews();
 
     if (isLandscape && !_isSearching) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(effectiveBudget, remaining, spent, primaryColor), _buildWalletCarousel(wallets, isDark), _buildSmartEntryWidget(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
+          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(baseBudget, effectiveBudget, remaining, spent, primaryColor), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
           Expanded(flex: 1, child: _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: false)),
         ],
       );
@@ -678,24 +783,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(bottom: 12.0), child: _buildMonthSelector(isDark))),
-          SliverAppBar(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor, expandedHeight: 220.0, collapsedHeight: 80.0, pinned: true, elevation: 0, automaticallyImplyLeading: false,
-            flexibleSpace: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                final top = constraints.biggest.height;
-                final double progress = ((top - 80) / (220 - 80)).clamp(0.0, 1.0);
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Opacity(opacity: progress, child: Align(alignment: Alignment.topCenter, child: ClipRect(child: SingleChildScrollView(physics: const NeverScrollableScrollPhysics(), child: Padding(padding: const EdgeInsets.only(top: 4.0), child: _buildHeroCard(effectiveBudget, remaining, spent, primaryColor)))))),
-                    Opacity(opacity: 1.0 - progress, child: Align(alignment: Alignment.bottomCenter, child: ClipRect(child: SingleChildScrollView(physics: const NeverScrollableScrollPhysics(), child: Padding(padding: const EdgeInsets.only(bottom: 8.0), child: _buildMiniHero(remaining, spent, primaryColor)))))),
-                  ],
-                );
-              },
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildHeroCard(
+                baseBudget,
+                effectiveBudget,
+                remaining,
+                spent,
+                primaryColor,
+              ),
             ),
           ),
-          SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(top: 8.0, bottom: 8.0), child: _buildWalletCarousel(wallets, isDark))),
-          SliverPersistentHeader(pinned: true, delegate: _StickyHeaderDelegate(minHeight: 135, maxHeight: 135, child: Container(color: Theme.of(context).scaffoldBackgroundColor, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [_buildSmartEntryWidget(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)])))),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _StickyHeaderDelegate(
+              minHeight: 56,
+              maxHeight: 56,
+              child: ColoredBox(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: _buildCategoryTabsWidget(
+                  categories,
+                  primaryColor,
+                  isDark,
+                ),
+              ),
+            ),
+          ),
 
           // 🚀 FIX: The call to build the list now correctly assigns the sliver wrapper.
           _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: true),
@@ -764,10 +878,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return isSliver ? SliverFillRemaining(hasScrollBody: false, child: emptyState) : emptyState;
     }
 
-    final double todaySpend = expenses.where((e) => e.type == 'expense' && e.date.day == DateTime.now().day && e.date.month == DateTime.now().month).fold(0, (sum, e) => sum + e.amount);
+    final double todaySpend = expenses.where((e) => e.type == 'expense' && e.category != 'Transfer' && e.date.day == DateTime.now().day && e.date.month == DateTime.now().month && e.date.year == DateTime.now().year).fold(0.0, (sum, e) => sum + e.amount);
 
     final listContents = <Widget>[
-      const TrajectoryCard(key: ValueKey('trajectory')), // Assumed TrajectoryCard accepts Key
       if (todaySpend > 0)
         Padding(
           key: const ValueKey('daily_spend_pill'),
@@ -811,14 +924,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       direction: DismissDirection.endToStart,
       background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.delete_outline_rounded, color: Colors.white)),
       confirmDismiss: (direction) async {
-        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), const Text("Delete Transaction?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text("Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
+        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), Text(isTransfer ? "Delete Transfer?" : "Delete Transaction?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(isTransfer ? "Delete this complete transfer? Both linked account entries will be removed." : "Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
       },
-      onDismissed: (direction) {
-        ref.read(expenseProvider.notifier).deleteExpense(e.id);
+      onDismissed: (direction) async {
+        if (isTransfer) {
+          await ref.read(expenseProvider.notifier).deleteTransferPair(e.id);
+        } else {
+          await ref.read(expenseProvider.notifier).deleteExpense(e.id);
+        }
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Deleted '${e.title}'", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.red, duration: const Duration(seconds: 2)));
       },
       child: GestureDetector(
-        onTap: () => _showAddOrEditModal(existing: e),
+        onTap: isTransfer ? null : () => _showAddOrEditModal(existing: e),
         child: Container(
             margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: isDark ? primaryColor.withOpacity(0.2) : Colors.grey.withOpacity(0.12), width: 1.2)),
             child: Row(
@@ -895,8 +1013,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildHeroCard(double b, double r, double s, Color primary) {
-    bool isAlert = b > 0 && s > b;
+  Widget _buildHeroCard(double baseBudget, double effectiveBudget, double r, double s, Color primary) {
+    bool isAlert = effectiveBudget > 0 && s > effectiveBudget;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 500), width: double.infinity, margin: const EdgeInsets.symmetric(horizontal: 20), padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: isAlert ? [Colors.red.shade900, Colors.red] : [primary, primary.withOpacity(0.75)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: (isAlert ? Colors.red : primary).withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 8))]),
       child: Column(
@@ -904,12 +1022,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(isAlert ? "Limit Exceeded!" : "Remaining Balance", style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 13)), Icon(isAlert ? Icons.warning_amber_rounded : Icons.account_balance_wallet_rounded, color: Colors.white70, size: 20)]),
           const SizedBox(height: 6),
-          b == 0 ? GestureDetector(onTap: () => _editBudget(b), child: const Row(children: [Text("Set Limit", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)), SizedBox(width: 6), Icon(Icons.edit_rounded, color: Colors.white, size: 18)])) : FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text("Rs. ${r.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5))),
+          effectiveBudget == 0 ? GestureDetector(onTap: () => _editBudget(baseBudget), child: const Row(children: [Text("Set Limit", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)), SizedBox(width: 6), Icon(Icons.edit_rounded, color: Colors.white, size: 18)])) : FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text("Rs. ${r.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5))),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(onTap: () => _editBudget(b), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text("Effective Limit", style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11)), const SizedBox(width: 4), Icon(Icons.edit_outlined, color: Colors.white.withOpacity(0.65), size: 10)]), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text(b.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
+              GestureDetector(onTap: () => _editBudget(baseBudget), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text("Budget + Income", style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11)), const SizedBox(width: 4), Icon(Icons.edit_outlined, color: Colors.white.withOpacity(0.65), size: 10)]), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text(effectiveBudget.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Total Spent", style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11)), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(s.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
             ],
           )
@@ -922,33 +1040,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16), onPressed: ()=>setState(()=>_focusedMonth=DateTime(_focusedMonth.year, _focusedMonth.month-1, 1))), Text(DateFormat.yMMMM().format(_focusedMonth), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDark?Colors.white:Colors.black87)), IconButton(icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16), onPressed: ()=>setState(()=>_focusedMonth=DateTime(_focusedMonth.year, _focusedMonth.month+1, 1)))]));
   }
 
-  void _listenForExpense() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(onStatus: (val) { if (val == 'done' || val == 'notListening') { setState(() => _isListening = false); if (_smartInputCtrl.text.isNotEmpty) { _processNLP(_smartInputCtrl.text); } } }, onError: (val) => debugPrint('STT Error: $val'));
-      if (available) { setState(() => _isListening = true); _smartInputCtrl.text = "Listening..."; _speech.listen(onResult: (val) => setState(() { _smartInputCtrl.text = val.recognizedWords; })); } else { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Speech recognition denied.", style: TextStyle(fontSize: 13)))); }
-    } else { setState(() => _isListening = false); _speech.stop(); }
+  Future<void> _listenForExpense() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+
+    _voiceResultProcessed = false;
+    _smartInputCtrl.clear();
+    final available = await _speech.initialize(
+      onStatus: _handleSpeechStatus,
+      onError: (error) {
+        debugPrint('STT Error: $error');
+        if (!mounted) return;
+        setState(() => _isListening = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Voice Log stopped. Please try again.')),
+        );
+      },
+    );
+    if (!mounted) return;
+
+    if (!available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Microphone or speech-recognition permission was denied.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isListening = true);
+    await _speech.listen(
+      onResult: (result) async {
+        if (!mounted) return;
+        final words = result.recognizedWords.trim();
+        setState(() => _smartInputCtrl.text = words);
+        if (result.finalResult && words.isNotEmpty && !_voiceResultProcessed) {
+          _voiceResultProcessed = true;
+          setState(() => _isListening = false);
+          await _processNLP(words);
+        }
+      },
+    );
   }
 
-  void _processNLP(String text) {
-    if (text.isEmpty || text == "Listening...") return;
-    final categories = ref.read(categoryProvider);
-    final result = LocalNlpService().parseExpense(text, categories);
+  void _handleSpeechStatus(String status) {
+    if (!mounted || (status != 'done' && status != 'notListening')) return;
+    final words = _smartInputCtrl.text.trim();
+    setState(() => _isListening = false);
+    if (!_voiceResultProcessed && words.isNotEmpty) {
+      _voiceResultProcessed = true;
+      _processNLP(words);
+    }
+  }
 
-    if (result['amount'] > 0) {
+  Future<void> _processNLP(String text) async {
+    final normalized = text.trim();
+    if (normalized.isEmpty) return;
+    final categories = ref.read(categoryProvider);
+    final result = LocalNlpService().parseExpense(normalized, categories);
+
+    final amount = result['amount'];
+    if (amount is num && amount.isFinite && amount > 0) {
       final wallets = ref.read(walletProvider);
+      if (wallets.isEmpty) {
+        _showTransactionError('Create an income account before using Voice Log.');
+        return;
+      }
 
       final activeWallets = wallets.where((w) => !w.isBackup).toList();
       final defaultWalletId = activeWallets.isNotEmpty ? activeWallets.first.id : (wallets.isNotEmpty ? wallets.first.id : '');
 
-      final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: result['amount'], category: result['category'], date: DateTime.now(), colorValue: Colors.purple.value, walletId: defaultWalletId);
-      ref.read(expenseProvider.notifier).addExpense(newExpense);
-      try { NotificationService().cancelAll(); NotificationService().scheduleSmartEntryReminders(); } catch (e) { debugPrint("Notification reset failed: $e"); }
+      final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.value, walletId: defaultWalletId);
+      await ref.read(expenseProvider.notifier).addExpense(newExpense);
+      try {
+        await NotificationService().scheduleSmartEntryReminders();
+      } catch (e) {
+        debugPrint("Notification reset failed: $e");
+      }
+      if (!mounted) return;
       _smartInputCtrl.clear();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Saved: ${result['title']} (Rs. ${result['amount'].toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Saved: ${result['title']} (Rs. ${amount.toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("❌ Could not detect amount. Try: '500 for biryani'.", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red));
     }
-    FocusScope.of(context).unfocus();
+    if (mounted) FocusScope.of(context).unfocus();
   }
 
   void _startReceiptScan() async {

@@ -143,8 +143,10 @@ class _AiChatOverlayState extends ConsumerState<AiChatOverlay> {
         setState(() {
           double newX = _position.dx + details.delta.dx;
           double newY = _position.dy + details.delta.dy;
-          newX = newX.clamp(0.0, screenSize.width - 60);
-          newY = newY.clamp(kToolbarHeight, screenSize.height - 120);
+          newX = newX.clamp(0.0, screenSize.width - 60).toDouble();
+          newY = newY
+              .clamp(kToolbarHeight, screenSize.height - 120)
+              .toDouble();
           _position = Offset(newX, newY);
         });
       },

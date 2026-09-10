@@ -274,7 +274,10 @@ class _RecurringBillsScreenState extends ConsumerState<RecurringBillsScreen> {
     final primaryColor = Color(settings.profileColorValue); // 🛡️ Guaranteed theme color in dark/light mode
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    double totalMonthlyOutflow = bills.fold(0, (sum, b) => sum + (b.frequency == 'Weekly' ? b.amount * 4 : b.amount));
+    double totalMonthlyOutflow = bills.fold(
+      0.0,
+      (sum, b) => sum + (b.frequency == 'Weekly' ? b.amount * 4 : b.amount),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text("Recurring Subscriptions", style: TextStyle(fontWeight: FontWeight.bold)), centerTitle: true),

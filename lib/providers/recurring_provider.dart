@@ -14,6 +14,9 @@ class RecurringNotifier extends StateNotifier<List<RecurringBill>> {
   }
 
   Future<void> addBill(RecurringBill bill) async {
+    if (!bill.amount.isFinite || bill.amount <= 0 || bill.title.trim().isEmpty) {
+      return;
+    }
     final box = Hive.box<RecurringBill>('recurring_bills');
     await box.add(bill);
     loadBills();
@@ -21,8 +24,9 @@ class RecurringNotifier extends StateNotifier<List<RecurringBill>> {
 
   Future<void> deleteBill(String id) async {
     final box = Hive.box<RecurringBill>('recurring_bills');
-    final bill = box.values.firstWhere((b) => b.id == id);
-    await bill.delete();
+    final matches = box.values.where((bill) => bill.id == id);
+    if (matches.isEmpty) return;
+    await matches.first.delete();
     loadBills();
   }
 }

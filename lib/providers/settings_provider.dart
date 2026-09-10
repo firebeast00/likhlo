@@ -44,7 +44,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void _loadSettings() {
     state = SettingsState(
       themeMode: _box.get('themeMode', defaultValue: 'light'),
-      brightnessLevel: _box.get('brightnessLevel', defaultValue: 0.0),
+      brightnessLevel:
+          (_box.get('brightnessLevel', defaultValue: 0.0) as num).toDouble(),
       userName: _box.get('userName', defaultValue: ''),
       userProfession: _box.get('userProfession', defaultValue: ''),
       profileColorValue: _box.get('profileColorValue', defaultValue: 0xFF009688),

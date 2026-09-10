@@ -20,9 +20,16 @@ class NotificationService {
   static const int weekendReviewId = 903;
 
   /// Callback hook for when notification action buttons are tapped
-  Function(String action)? onActionTriggered;
+  void Function(String action)? onActionTriggered;
+  String? _pendingAction;
 
-  Future<void> init({Function(String action)? onAction}) async {
+  String? takePendingAction() {
+    final action = _pendingAction;
+    _pendingAction = null;
+    return action;
+  }
+
+  Future<void> init({void Function(String action)? onAction}) async {
     onActionTriggered = onAction;
     tz.initializeTimeZones();
 
@@ -45,11 +52,23 @@ class NotificationService {
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final actionId = response.actionId ?? response.payload ?? '';
         debugPrint("🔔 Notification Response Received: actionId='$actionId', payload='${response.payload}'");
-        if (actionId.isNotEmpty && onActionTriggered != null) {
-          onActionTriggered!(actionId);
+        if (actionId.isNotEmpty) {
+          if (onActionTriggered != null) {
+            onActionTriggered!(actionId);
+          } else {
+            _pendingAction = actionId;
+          }
         }
       },
     );
+
+    final launchDetails =
+        await _notifications.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      final response = launchDetails?.notificationResponse;
+      final actionId = response?.actionId ?? response?.payload ?? '';
+      if (actionId.isNotEmpty) _pendingAction = actionId;
+    }
 
     // Request Permissions on Android 13+
     final androidImplementation = _notifications
@@ -211,7 +230,7 @@ class NotificationService {
     await _scheduleWeeklyRepeating(
       id: weekendReviewId,
       title: "Weekly Financial Health 📊",
-      body: "Check your velocity forecast and see where your budget is pacing for next week.",
+      body: "Review this week’s spending and plan the next one.",
       dayOfWeek: DateTime.sunday,
       hour: 11,
       minute: 0,

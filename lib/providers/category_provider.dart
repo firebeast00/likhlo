@@ -16,20 +16,26 @@ class CategoryNotifier extends StateNotifier<List<String>> {
       'General', 'Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Education'
     ];
 
-    // Safely cast the list
-    List<String> loaded = box.get('categories', defaultValue: defaults).cast<String>();
-    state = loaded;
+    final saved = box.get('categories', defaultValue: defaults);
+    final loaded =
+        saved is Iterable ? saved.whereType<String>().toList() : defaults;
+    state = loaded.isEmpty ? defaults : loaded;
   }
 
-  void addCategory(String name) {
-    if (!Hive.isBoxOpen('preferences')) return; // Safety
+  bool addCategory(String name) {
+    if (!Hive.isBoxOpen('preferences')) return false; // Safety
 
-    if (name.isNotEmpty && !state.contains(name)) {
-      final updated = [...state, name];
+    final cleaned = name.trim();
+    final isDuplicate =
+        state.any((category) => category.toLowerCase() == cleaned.toLowerCase());
+    if (cleaned.isNotEmpty && !isDuplicate) {
+      final updated = [...state, cleaned];
       final box = Hive.box('preferences');
       box.put('categories', updated);
       state = updated;
+      return true;
     }
+    return false;
   }
 
   void deleteCategory(String name) {
@@ -43,18 +49,26 @@ class CategoryNotifier extends StateNotifier<List<String>> {
     }
   }
 
-  void editCategory(String oldName, String newName) {
-    if (!Hive.isBoxOpen('preferences')) return; // Safety
+  bool editCategory(String oldName, String newName) {
+    if (!Hive.isBoxOpen('preferences')) return false; // Safety
 
-    if (newName.isNotEmpty && state.contains(oldName)) {
+    final cleaned = newName.trim();
+    final isDuplicate = state.any(
+      (category) =>
+          category != oldName &&
+          category.toLowerCase() == cleaned.toLowerCase(),
+    );
+    if (cleaned.isNotEmpty && !isDuplicate && state.contains(oldName)) {
       final index = state.indexOf(oldName);
       final updated = List<String>.from(state);
-      updated[index] = newName;
+      updated[index] = cleaned;
 
       final box = Hive.box('preferences');
       box.put('categories', updated);
       state = updated;
+      return true;
     }
+    return false;
   }
 }
 

@@ -19,7 +19,7 @@ class RecurringBillAdapter extends TypeAdapter<RecurringBill> {
     return RecurringBill(
       id: fields[0] as String,
       title: fields[1] as String,
-      amount: fields[2] as double,
+      amount: (fields[2] as num).toDouble(),
       frequency: fields[3] as String,
       nextDueDate: fields[4] as DateTime,
     );

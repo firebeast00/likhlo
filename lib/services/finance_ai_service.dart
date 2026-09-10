@@ -16,11 +16,11 @@ class FinanceAiService {
   ];
   String _currentModelName = 'gemini-3.7-flash';
 
-  // 1. 🔒 FIX: Look for the variable name 'GEMINI_API_KEY', not the key itself!
-  // I placed your key as the default value so your app won't break if you forget the flag.
+  // Supply with --dart-define=GEMINI_API_KEY=... at build time.
+  // Never keep a production key in source control.
   static const String _apiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
-    defaultValue: 'AQ.Ab8RN6JKUsGq-oi3i7OVF4UaOCQw508fsEeCzS-3aeSl8xRIqg',
+    defaultValue: '',
   );
 
   FinanceAiService(this.ref) {
@@ -65,6 +65,9 @@ class FinanceAiService {
   }
 
   Future<String> askFinancialQuestion(String prompt) async {
+    if (_apiKey.isEmpty) {
+      return "Likhlo AI is not configured in this build.";
+    }
     // 3. 📸 SNAPSHOT: Save the clean history BEFORE we attempt the prompt.
     // This prevents broken history state if a model crashes mid-request.
     final List<Content> safeHistory = _chatSession?.history.toList() ?? [];

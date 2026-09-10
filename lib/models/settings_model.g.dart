@@ -22,7 +22,8 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       userProfession: fields[2] == null ? 'Student' : fields[2] as String,
       profileColorValue: fields[3] == null ? 4278239141 : fields[3] as int,
       profileIconIndex: fields[4] == null ? 0 : fields[4] as int,
-      brightnessLevel: fields[5] == null ? 0.0 : fields[5] as double,
+      brightnessLevel:
+          fields[5] == null ? 0.0 : (fields[5] as num).toDouble(),
       customRingtonePath: fields[6] as String?,
     );
   }

@@ -18,16 +18,24 @@ class DashboardTab extends ConsumerWidget {
     final double monthlyBudget = budgetState[monthKey] ?? 0.0;
 
     // 2. Calculate Spending
-    final currentMonthExpenses = expenseState.allExpenses
+    final currentMonthTransactions = expenseState.allExpenses
         .where((e) => e.date.month == now.month && e.date.year == now.year)
         .toList();
 
-    final double totalSpent = currentMonthExpenses.fold(0, (sum, item) => sum + item.amount);
-    final double remaining = monthlyBudget - totalSpent;
+    final double totalIncome = currentMonthTransactions
+        .where((item) => item.type == 'income' && item.category != 'Transfer')
+        .fold(0.0, (sum, item) => sum + item.amount);
+    final double effectiveBudget = monthlyBudget + totalIncome;
+    final double totalSpent = currentMonthTransactions
+        .where((item) => item.type == 'expense' && item.category != 'Transfer')
+        .fold(0.0, (sum, item) => sum + item.amount);
+    final double remaining = effectiveBudget - totalSpent;
 
     // 3. Health & Progress Math
-    final double progress = monthlyBudget > 0 ? (totalSpent / monthlyBudget).clamp(0.0, 1.0) : 0.0;
-    final bool isOverBudget = totalSpent > monthlyBudget && monthlyBudget > 0;
+    final double progress = effectiveBudget > 0
+        ? (totalSpent / effectiveBudget).clamp(0.0, 1.0).toDouble()
+        : 0.0;
+    final bool isOverBudget = totalSpent > effectiveBudget && effectiveBudget > 0;
 
     final primaryColor = Theme.of(context).primaryColor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -112,7 +120,7 @@ class DashboardTab extends ConsumerWidget {
                 const SizedBox(height: 30),
 
                 // --- VISUAL BURN RATE BAR ---
-                if (monthlyBudget > 0) ...[
+                if (effectiveBudget > 0) ...[
                   Stack(
                     children: [
                       Container(
@@ -143,10 +151,10 @@ class DashboardTab extends ConsumerWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Budget Limit", style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12, fontWeight: FontWeight.w500)),
+                        Text("Budget + Income", style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12, fontWeight: FontWeight.w500)),
                         const SizedBox(height: 6),
                         Text(
-                          monthlyBudget > 0 ? "Rs. ${monthlyBudget.toStringAsFixed(0)}" : "Not Set",
+                          effectiveBudget > 0 ? "Rs. ${effectiveBudget.toStringAsFixed(0)}" : "Not Set",
                           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 17),
                         ),
                       ],
@@ -190,7 +198,7 @@ class DashboardTab extends ConsumerWidget {
                 child: _buildStatCard(
                     context,
                     "Transactions",
-                    "${currentMonthExpenses.length}",
+                    "${currentMonthTransactions.where((item) => item.category != 'Transfer').length}",
                     Icons.receipt_long_rounded,
                     Colors.purple
                 ),

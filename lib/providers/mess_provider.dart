@@ -14,6 +14,7 @@ class MessNotifier extends StateNotifier<List<MessEntry>> {
   }
 
   Future<void> addEntry(MessEntry entry) async {
+    if (!entry.totalAmount.isFinite || entry.totalAmount <= 0) return;
     final box = Hive.box<MessEntry>('mess_khata');
     await box.add(entry);
     loadEntries();
@@ -21,8 +22,9 @@ class MessNotifier extends StateNotifier<List<MessEntry>> {
 
   Future<void> deleteEntry(String id) async {
     final box = Hive.box<MessEntry>('mess_khata');
-    final entry = box.values.firstWhere((e) => e.id == id);
-    await entry.delete();
+    final matches = box.values.where((entry) => entry.id == id);
+    if (matches.isEmpty) return;
+    await matches.first.delete();
     loadEntries();
   }
 }

@@ -19,8 +19,8 @@ class SmartGoalAdapter extends TypeAdapter<SmartGoal> {
     return SmartGoal(
       id: fields[0] as String,
       title: fields[1] as String,
-      targetAmount: fields[2] as double,
-      savedAmount: fields[3] as double,
+      targetAmount: (fields[2] as num).toDouble(),
+      savedAmount: (fields[3] as num).toDouble(),
       targetDate: fields[4] as DateTime,
       categoryToTrim: fields[5] as String,
     );

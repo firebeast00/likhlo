@@ -47,5 +47,13 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Likhlo uses the microphone to turn your spoken expense into a transaction.</string>
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>Likhlo uses speech recognition for Voice Log.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Likhlo uses the camera to scan receipt text.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Likhlo can read a receipt image that you select.</string>
 	</dict>
 </plist>

@@ -26,6 +26,7 @@ import 'providers/settings_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  Object? storageError;
   try {
     await Hive.initFlutter();
 
@@ -51,30 +52,47 @@ void main() async {
       Hive.openBox<Wallet>('wallets'),
     ]);
 
-    await NotificationService().init();
-    await NotificationService().scheduleSmartEntryReminders();
-
   } catch (e) {
-    print("Hive Initialization Error: $e");
+    storageError = e;
+    debugPrint("Hive Initialization Error: $e");
   }
 
-  runApp(const ProviderScope(child: LikhloApp()));
+  if (storageError == null) {
+    try {
+      await NotificationService().init();
+    } catch (e) {
+      debugPrint("Notification Initialization Error: $e");
+    }
+  }
+
+  runApp(
+    ProviderScope(
+      child: LikhloApp(startupError: storageError?.toString()),
+    ),
+  );
 }
 
 class LikhloApp extends ConsumerWidget {
-  const LikhloApp({super.key});
+  final String? startupError;
+
+  const LikhloApp({super.key, this.startupError});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (startupError != null) {
+      return MaterialApp(
+        title: 'Likhlo',
+        debugShowCheckedModeBanner: false,
+        home: StartupRecoveryScreen(details: startupError!),
+      );
+    }
+
     final settings = ref.watch(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
 
     // DYNAMIC THEME TINTING: Mix your active theme color into the dark background and cards
     final Color darkScaffoldBg = Color.lerp(const Color(0xFF05070B), primaryColor, 0.10)!;
     final Color darkCardBg = Color.lerp(const Color(0xFF0E1422), primaryColor, 0.18)!;
-
-    final prefsBox = Hive.box('preferences');
-    final bool hasOnboarded = prefsBox.get('has_onboarded', defaultValue: false);
 
     return MaterialApp(
       title: 'Likhlo',
@@ -126,6 +144,46 @@ class LikhloApp extends ConsumerWidget {
       },
 
       home: const SplashScreen(),
+    );
+  }
+}
+
+class StartupRecoveryScreen extends StatelessWidget {
+  final String details;
+
+  const StartupRecoveryScreen({super.key, required this.details});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.storage_rounded, size: 64, color: Colors.orange),
+              const SizedBox(height: 20),
+              const Text(
+                'Likhlo could not open local storage',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Your data has not been deleted. Close and reopen the app. If the problem continues, back up the app data before reinstalling.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => SystemNavigator.pop(),
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: const Text('Close and restart'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

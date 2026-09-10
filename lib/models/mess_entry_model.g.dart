@@ -19,7 +19,7 @@ class MessEntryAdapter extends TypeAdapter<MessEntry> {
     return MessEntry(
       id: fields[0] as String,
       title: fields[1] as String,
-      totalAmount: fields[2] as double,
+      totalAmount: (fields[2] as num).toDouble(),
       paidBy: fields[3] as String,
       splitCount: fields[4] as int,
       date: fields[5] as DateTime,

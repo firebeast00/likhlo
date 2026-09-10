@@ -33,7 +33,9 @@ class TimeSeriesEngine {
 
     // 1. Group expenses by Day (Only count actual expenses, not income)
     Map<int, double> dailySpends = {};
-    for (var e in monthlyExpenses.where((e) => e.type == 'expense')) {
+    for (var e in monthlyExpenses.where(
+      (e) => e.type == 'expense' && e.category != 'Transfer',
+    )) {
       dailySpends[e.date.day] = (dailySpends[e.date.day] ?? 0) + e.amount;
     }
 
@@ -73,7 +75,9 @@ class TimeSeriesEngine {
     }
 
     // 6. Suggested Correction (How much to reduce daily spend to survive)
-    double optimalRemainingVelocity = remainingBudget > 0 ? (remainingBudget / daysRemaining) : 0;
+    final calculationDays = daysRemaining > 0 ? daysRemaining : 1;
+    double optimalRemainingVelocity =
+        remainingBudget > 0 ? (remainingBudget / calculationDays) : 0;
     double suggestedCorrection = ema > optimalRemainingVelocity ? (ema - optimalRemainingVelocity) : 0;
 
     return VelocityForecast(

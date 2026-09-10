@@ -34,23 +34,36 @@ class GoalsNotifier extends StateNotifier<List<SmartGoal>> {
   }
 
   Future<void> addGoal(SmartGoal goal) async {
+    if (goal.title.trim().isEmpty ||
+        !goal.targetAmount.isFinite ||
+        goal.targetAmount <= 0 ||
+        state.any((item) =>
+            item.title.trim().toLowerCase() ==
+            goal.title.trim().toLowerCase())) {
+      return;
+    }
     final box = Hive.box<SmartGoal>('goals');
     await box.add(goal);
     loadGoals();
   }
 
   Future<void> depositFunds(String id, double amount) async {
+    if (!amount.isFinite || amount <= 0) return;
     final box = Hive.box<SmartGoal>('goals');
-    final goal = box.values.firstWhere((g) => g.id == id);
-    goal.savedAmount = (goal.savedAmount + amount).clamp(0.0, goal.targetAmount);
+    final matches = box.values.where((goal) => goal.id == id);
+    if (matches.isEmpty) return;
+    final goal = matches.first;
+    goal.savedAmount =
+        (goal.savedAmount + amount).clamp(0.0, goal.targetAmount).toDouble();
     await goal.save();
     loadGoals();
   }
 
   Future<void> deleteGoal(String id) async {
     final box = Hive.box<SmartGoal>('goals');
-    final goal = box.values.firstWhere((g) => g.id == id);
-    await goal.delete();
+    final matches = box.values.where((goal) => goal.id == id);
+    if (matches.isEmpty) return;
+    await matches.first.delete();
     loadGoals();
   }
 }
@@ -69,7 +82,10 @@ final goalFeasibilityProvider = Provider.family<GoalFeasibility, SmartGoal>((ref
   final now = DateTime.now();
   final daysLeft = goal.targetDate.difference(now).inDays;
   final double remainingTarget = (goal.targetAmount - goal.savedAmount);
-  final double progress = (goal.savedAmount / (goal.targetAmount > 0 ? goal.targetAmount : 1.0)).clamp(0.0, 1.0);
+  final double progress = (goal.savedAmount /
+          (goal.targetAmount > 0 ? goal.targetAmount : 1.0))
+      .clamp(0.0, 1.0)
+      .toDouble();
 
   if (remainingTarget <= 0) {
     return GoalFeasibility(
