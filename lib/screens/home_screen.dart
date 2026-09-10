@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:quick_actions/quick_actions.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import "../services/notification_service.dart";
 import '../providers/expense_provider.dart';
@@ -14,21 +15,18 @@ import '../providers/settings_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../models/expense_model.dart';
+import '../models/debt_model.dart';
+import '../models/mess_entry_model.dart';
 import '../models/wallet_model.dart';
 import '../widgets/app_drawer.dart';
-import '../widgets/ai_chat_overlay.dart';
 
-import 'todo_screen.dart';
 import 'debt_screen.dart';
-import 'utilities_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
 import 'about_screen.dart';
 import '../services/local_nlp_service.dart';
 import "../services/ocr_scanner_service.dart";
-import "./insights_screen.dart";
 import "./mess_khata_screen.dart";
-import "./recurring_bills_screen.dart";
 import './income_accounts_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -164,8 +162,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
   }
 
-  void _changeView(String view) {
+  Future<void> _changeView(String view) async {
     if (!mounted || view == _currentView) return;
+
+    // Secondary ledgers open only when requested, keeping cold start focused
+    // on the main budget and transaction database.
+    try {
+      if (view == 'Mess Khata' && !Hive.isBoxOpen('mess_khata')) {
+        await Hive.openBox<MessEntry>('mess_khata');
+      } else if (view == 'Udhaar' && !Hive.isBoxOpen('debts')) {
+        await Hive.openBox<DebtEntry>('debts');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showTransactionError('Could not open $view. Please try again.');
+      }
+      return;
+    }
+    if (!mounted) return;
+
     setState(() {
       _currentView = view;
       _isSearching = false;
@@ -740,7 +755,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final ledger = ref.watch(monthlyLedgerProvider(_focusedMonth));
     final categories = ref.watch(categoryProvider);
 
-    final bool isAiChatOpen = ref.watch(isAiChatOpenProvider);
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final monthlyTransactions = ledger.transactions;
@@ -805,16 +819,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: _buildResponsiveBody(isLandscape, isDark, primaryColor, monthlyBudget, effectiveBudget, globalRemaining, globalSpent, categories, displayExpenses),
-          ),
-          const AiChatOverlay(),
-        ],
+      body: _buildResponsiveBody(
+        isLandscape,
+        isDark,
+        primaryColor,
+        monthlyBudget,
+        effectiveBudget,
+        globalRemaining,
+        globalSpent,
+        categories,
+        displayExpenses,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: (_currentView == 'Dashboard' && !isAiChatOpen) ? GestureDetector(
+      floatingActionButton: GestureDetector(
         onTapDown: (_) => _fabController.forward(),
         onTapUp: (_) { _fabController.reverse(); _showAddOrEditModal(); },
         onTapCancel: () => _fabController.reverse(),
@@ -826,7 +843,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text("Add Transaction", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))]),
           ),
         ),
-      ) : null,
+      ),
     );
   }
 
@@ -924,11 +941,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildOtherViews() {
-    if (_currentView == 'Insights') return const InsightsScreen();
-    if (_currentView == 'Tasks') return const ToDoScreen();
     if (_currentView == 'Mess Khata') return const MessKhataScreen();
-    if (_currentView == 'Recurring Bills') return const RecurringBillsScreen();
-    if (_currentView == 'Tools') return const UtilitiesScreen();
     if (_currentView == 'Udhaar') return const DebtScreen();
     if (_currentView == 'Stats') return const StatsScreen();
     if (_currentView == 'Settings') return const SettingsScreen();

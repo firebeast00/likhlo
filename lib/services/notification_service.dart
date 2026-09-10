@@ -99,7 +99,7 @@ class NotificationService {
     String channelName = isPersistent ? 'Quick Ledger Widget' : 'Reminders & Alerts';
     String channelDesc = isPersistent
         ? 'Persistent quick-entry shortcuts in notification bar'
-        : 'Smart habit nudges and velocity warnings';
+        : 'Expense entry and payment reminders';
 
     AndroidNotificationSound? sound;
 
@@ -226,67 +226,11 @@ class NotificationService {
       payload: 'action_add_expense',
     );
 
-    // 3. Weekly Sunday Financial Review (Sundays at 11:00 AM)
-    await _scheduleWeeklyRepeating(
-      id: weekendReviewId,
-      title: "Weekly Financial Health 📊",
-      body: "Review this week’s spending and plan the next one.",
-      dayOfWeek: DateTime.sunday,
-      hour: 11,
-      minute: 0,
-      payload: 'open_insights',
-    );
+    // Clear the legacy Insights notification because that screen no longer
+    // belongs to the streamlined app shell.
+    await cancelNotification(weekendReviewId);
 
     debugPrint("🔔 All smart entry reminders successfully scheduled!");
-  }
-
-  // ==================== ⚡ 3. VELOCITY & BILL DUE ALERTS ====================
-
-  /// Triggered when the Time-Series Engine detects an overspending spike
-  Future<void> showVelocitySpikeAlert({
-    required double currentBurnRate,
-    required double suggestedCut,
-  }) async {
-    try {
-      final details = await _getDetails();
-      await _notifications.show(
-        904,
-        "⚠️ Spending Velocity Alert!",
-        "Your burn rate spiked to Rs. ${currentBurnRate.toStringAsFixed(0)}/day. Cut Rs. ${suggestedCut.toStringAsFixed(0)}/day to stay on track.",
-        details,
-        payload: 'open_insights',
-      );
-    } catch (e) {
-      debugPrint("❌ Error showing velocity alert: $e");
-    }
-  }
-
-  /// Scheduled for recurring bills or debt deadlines
-  Future<void> scheduleBillReminder({
-    required int id,
-    required String title,
-    required double amount,
-    required DateTime dueDate,
-  }) async {
-    try {
-      final scheduledDate = dueDate.subtract(const Duration(days: 1)); // 1 day before
-      if (scheduledDate.isBefore(DateTime.now())) return;
-
-      final details = await _getDetails();
-
-      await _notifications.zonedSchedule(
-        id,
-        "Bill Due Tomorrow 🗓️",
-        "$title (Rs. ${amount.toStringAsFixed(0)}) is due tomorrow. Plan your cash flow!",
-        tz.TZDateTime.from(scheduledDate, tz.local),
-        details,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: 'open_bills',
-      );
-    } catch (e) {
-      debugPrint("❌ Error scheduling bill reminder: $e");
-    }
   }
 
   // ==================== 🔄 4. PERSISTENCE & SYNC ENGINE ====================
@@ -336,36 +280,6 @@ class NotificationService {
     );
   }
 
-  Future<void> _scheduleWeeklyRepeating({
-    required int id,
-    required String title,
-    required String body,
-    required int dayOfWeek,
-    required int hour,
-    required int minute,
-    required String payload,
-  }) async {
-    final details = await _getDetails();
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
-
-    while (scheduledDate.weekday != dayOfWeek || scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
-    }
-
-    await _notifications.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduledDate,
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      payload: payload,
-    );
-  }
-
   Future<void> showInstantNotification(String title, String body) async {
     try {
       final details = await _getDetails();
@@ -374,7 +288,7 @@ class NotificationService {
       debugPrint("❌ Error Showing Instant Notification: $e");
     }
   }
-  // ==================== ⏰ GENERIC SCHEDULING (Used by Tasks & Udhaar) ====================
+  // ==================== ⏰ GENERIC SCHEDULING (Used by Udhaar) ====================
 
   Future<void> scheduleNotification(int id, String title, String body, DateTime scheduledTime) async {
     try {

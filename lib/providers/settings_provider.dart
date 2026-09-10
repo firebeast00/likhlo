@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-// ✅ Renamed to SettingsState to avoid colliding with your settings_model.dart
 class SettingsState {
   final String themeMode;
   final double brightnessLevel;

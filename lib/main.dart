@@ -7,11 +7,7 @@ import 'package:student_expense_manager/screens/onboarding_screen.dart';
 
 // Models
 import 'models/expense_model.dart';
-import 'models/todo_model.dart';
 import 'models/debt_model.dart';
-import 'models/settings_model.dart';
-import 'models/goal_model.dart';
-import 'models/recurring_bill_model.dart';
 import 'models/mess_entry_model.dart';
 import "models/wallet_model.dart";
 
@@ -33,23 +29,14 @@ void main() async {
 
     // Register Adapters
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
-    if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(ToDoItemAdapter());
     if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(DebtEntryAdapter());
-    if (!Hive.isAdapterRegistered(4)) Hive.registerAdapter(AppSettingsAdapter());
-    if (!Hive.isAdapterRegistered(5)) Hive.registerAdapter(SmartGoalAdapter());
-    if (!Hive.isAdapterRegistered(6)) Hive.registerAdapter(RecurringBillAdapter());
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(MessEntryAdapter());
     if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(WalletAdapter()); // 🚀 ADDED (TypeId 8)
 
     await Future.wait([
       Hive.openBox<Expense>('expenses'),
-      Hive.openBox<ToDoItem>('todos'),
-      Hive.openBox<DebtEntry>('debts'),
       Hive.openBox('settings'),
       Hive.openBox('preferences'),
-      Hive.openBox<SmartGoal>('goals'),
-      Hive.openBox<RecurringBill>('recurring_bills'),
-      Hive.openBox<MessEntry>('mess_khata'),
       Hive.openBox<Wallet>('wallets'),
     ]);
 

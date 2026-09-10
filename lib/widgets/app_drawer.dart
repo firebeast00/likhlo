@@ -86,11 +86,7 @@ class AppDrawer extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               children: [
                 _buildDrawerItem(context, 'Dashboard', Icons.dashboard_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'Insights', Icons.insights_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'Tasks', Icons.check_circle_outline_rounded, primaryColor, isDark),
                 _buildDrawerItem(context, 'Mess Khata', Icons.money_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'Recurring Bills', Icons.receipt_long_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'Tools', Icons.calculate_rounded, primaryColor, isDark),
                 _buildDrawerItem(context, 'Udhaar', Icons.handshake_rounded, primaryColor, isDark),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
