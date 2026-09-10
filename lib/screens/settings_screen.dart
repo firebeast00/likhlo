@@ -140,7 +140,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   shape: BoxShape.circle,
                   border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
                   boxShadow: [
-                    BoxShadow(color: Color(colorValue).withOpacity(0.4), blurRadius: isSelected ? 12 : 6, offset: const Offset(0, 4))
+                    BoxShadow(color: Color(colorValue).withValues(alpha: 0.4), blurRadius: isSelected ? 12 : 6, offset: const Offset(0, 4))
                   ],
                 ),
                 child: isSelected ? const Icon(Icons.check_rounded, color: Colors.white, size: 28) : null,
@@ -181,18 +181,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [primaryColor, primaryColor.withOpacity(0.75)],
+                  colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(32),
-                boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 10))],
+                boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 10))],
               ),
               child: Row(
                 children: [
                   Container(
                     width: 65, height: 65,
-                    decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)]),
+                    decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)]),
                     child: Center(
                       child: Text(
                         displayName.isNotEmpty ? displayName[0].toUpperCase() : "?",
@@ -207,13 +207,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5), maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 4),
-                        Text(displayProf, style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(displayProf, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
                     child: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
                   ),
                 ],
@@ -283,7 +283,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             min: 0.0,
                             max: 0.75, // Prevents pitch black screen
                             activeColor: primaryColor,
-                            inactiveColor: primaryColor.withOpacity(0.2),
+                            inactiveColor: primaryColor.withValues(alpha: 0.2),
                             onChanged: (val) => ref.read(settingsProvider.notifier).updateBrightness(val),
                           ),
                         ),
@@ -356,7 +356,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: const Text("Generate a professional statement", style: TextStyle(fontSize: 13, color: Colors.grey)),
                 trailing: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                   child: Icon(Icons.download_rounded, size: 20, color: Colors.red.shade400),
                 ),
                 onTap: () => _generatePdf(context, ref, primaryColor),
@@ -375,21 +375,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 8))],
+        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 20, offset: const Offset(0, 8))],
       ),
       child: Column(children: children),
     );
   }
 
   Widget _buildDivider() {
-    return Divider(height: 1, thickness: 1, color: Colors.grey.withOpacity(0.1), indent: 70, endIndent: 20);
+    return Divider(height: 1, thickness: 1, color: Colors.grey.withValues(alpha: 0.1), indent: 70, endIndent: 20);
   }
 
   Widget _buildIconBox(IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
       child: Icon(icon, color: color, size: 22),
     );
   }
@@ -400,7 +400,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       secondary: _buildIconBox(icon, iconColor),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.grey)),
-      activeColor: Color(ref.read(settingsProvider).profileColorValue),
+      activeThumbColor: Color(ref.read(settingsProvider).profileColorValue),
       value: value,
       onChanged: onChanged,
     );
@@ -415,7 +415,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final totalSpent = expenses.fold(0.0, (sum, item) => sum + item.amount);
     final dateStr = DateFormat.yMMMM().format(DateTime.now());
 
-    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.value);
+    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.toARGB32());
 
     pdf.addPage(
       pw.Page(
@@ -433,7 +433,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         children: [
                           pw.Text("LIKHLO", style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: pdfPrimaryColor)),
                           pw.SizedBox(height: 4),
-                          pw.Text("Financial Statement", style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
+                          pw.Text("Financial Statement", style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
                         ]
                     ),
                     pw.Column(

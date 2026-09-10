@@ -28,13 +28,13 @@ class AppDrawer extends ConsumerWidget {
             padding: const EdgeInsets.only(top: 60, bottom: 24, left: 24, right: 24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [primaryColor, primaryColor.withOpacity(0.75)],
+                colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withOpacity(isDark ? 0.3 : 0.35),
+                  color: primaryColor.withValues(alpha: isDark ? 0.3 : 0.35),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 )
@@ -50,7 +50,7 @@ class AppDrawer extends ConsumerWidget {
                   ),
                   child: CircleAvatar(
                     radius: 30,
-                    backgroundColor: primaryColor.withOpacity(0.1),
+                    backgroundColor: primaryColor.withValues(alpha: 0.1),
                     child: Icon(Icons.person_rounded, size: 36, color: primaryColor),
                   ),
                 ),
@@ -68,7 +68,7 @@ class AppDrawer extends ConsumerWidget {
                       const SizedBox(height: 2),
                       Text(
                         displayProf,
-                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w500),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, fontWeight: FontWeight.w500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -90,7 +90,7 @@ class AppDrawer extends ConsumerWidget {
                 _buildDrawerItem(context, 'Udhaar', Icons.handshake_rounded, primaryColor, isDark),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Divider(height: 20, thickness: 1, color: Colors.grey.withOpacity(0.15)),
+                  child: Divider(height: 20, thickness: 1, color: Colors.grey.withValues(alpha: 0.15)),
                 ),
                 _buildDrawerItem(context, 'Stats', Icons.bar_chart_rounded, primaryColor, isDark),
                 _buildDrawerItem(context, 'Settings', Icons.settings_rounded, primaryColor, isDark),
@@ -103,14 +103,14 @@ class AppDrawer extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? Colors.black26 : Colors.grey.withOpacity(0.04),
-              border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.1))),
+              color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.04),
+              border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.1))),
             ),
             child: SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 8),
               title: const Text("Dark Mode", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               secondary: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, color: primaryColor),
-              activeColor: primaryColor,
+              activeThumbColor: primaryColor,
               value: settings.themeMode == 'dark',
               onChanged: (val) {
                 final notifier = ref.read(settingsProvider.notifier);
@@ -131,7 +131,7 @@ class AppDrawer extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: isSelected ? primaryColor.withOpacity(isDark ? 0.25 : 0.12) : Colors.transparent,
+        color: isSelected ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.12) : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
       ),
       child: ListTile(

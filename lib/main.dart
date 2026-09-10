@@ -115,8 +115,8 @@ class LikhloApp extends ConsumerWidget {
             onSurface: Colors.white),
         scaffoldBackgroundColor: darkScaffoldBg,
         cardColor: darkCardBg,
-        dialogBackgroundColor: darkCardBg,
-        dividerColor: primaryColor.withOpacity(0.15),
+        dialogTheme: DialogThemeData(backgroundColor: darkCardBg),
+        dividerColor: primaryColor.withValues(alpha: 0.15),
       ),
 
       // 🚀 THE BUILDER: Handles Global Overlays (Dimmer & AI Chat)
@@ -153,7 +153,7 @@ class _AppContentWithDimmer extends ConsumerWidget {
           if (brightnessLevel > 0)
             IgnorePointer(
               child: ColoredBox(
-                color: Colors.black.withOpacity(brightnessLevel),
+                color: Colors.black.withValues(alpha: brightnessLevel),
                 child: const SizedBox.expand(),
               ),
             ),

@@ -37,6 +37,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     if (!_isListening) {
       bool available = await _speech.initialize(
         onStatus: (val) {
+          if (!mounted) return;
           if (val == 'done' || val == 'notListening') {
             setState(() => _isListening = false);
             if (_smartInputCtrl.text.isNotEmpty && _smartInputCtrl.text != "Listening...") {
@@ -44,16 +45,21 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             }
           }
         },
-        onError: (val) => setState(() => _isListening = false),
+        onError: (val) {
+          if (mounted) setState(() => _isListening = false);
+        },
       );
+
+      if (!mounted) return;
 
       if (available) {
         setState(() => _isListening = true);
         _smartInputCtrl.text = "Listening...";
         _speech.listen(
-          onResult: (val) => setState(() {
-            _smartInputCtrl.text = val.recognizedWords;
-          }),
+          onResult: (val) {
+            if (!mounted) return;
+            setState(() => _smartInputCtrl.text = val.recognizedWords);
+          },
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Speech recognition unavailable.", style: TextStyle(fontSize: 13))));
@@ -112,7 +118,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     );
 
     final receiptData = await OcrScannerService().scanReceipt();
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    Navigator.pop(context);
 
     if (receiptData != null && receiptData['amount'] > 0) {
       _showAddDialog(initialName: receiptData['title'], initialAmount: receiptData['amount'].toString());
@@ -145,7 +152,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: primaryColor.withOpacity(0.15), shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle),
                     child: Icon(Icons.handshake_rounded, color: primaryColor, size: 22),
                   ),
                   const SizedBox(width: 12),
@@ -178,7 +185,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                   decoration: BoxDecoration(
                                     color: type == 'lent' ? Colors.green : Colors.transparent,
                                     borderRadius: BorderRadius.circular(12),
-                                    boxShadow: type == 'lent' ? [BoxShadow(color: Colors.green.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
+                                    boxShadow: type == 'lent' ? [BoxShadow(color: Colors.green.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
                                   ),
                                   child: Center(
                                     child: Text("I Gave (Lent)", style: TextStyle(color: type == 'lent' ? Colors.white : Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -195,7 +202,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                   decoration: BoxDecoration(
                                     color: type == 'borrowed' ? Colors.red : Colors.transparent,
                                     borderRadius: BorderRadius.circular(12),
-                                    boxShadow: type == 'borrowed' ? [BoxShadow(color: Colors.red.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
+                                    boxShadow: type == 'borrowed' ? [BoxShadow(color: Colors.red.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
                                   ),
                                   child: Center(
                                     child: Text("I Took (Borrowed)", style: TextStyle(color: type == 'borrowed' ? Colors.white : Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -287,7 +294,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                     amount: amt,
                                     category: "Udhaar",
                                     date: selectedDate ?? DateTime.now(),
-                                    colorValue: Colors.red.value,
+                                    colorValue: Colors.red.toARGB32(),
                                   )
                               );
                             }
@@ -301,6 +308,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                               );
                             }
 
+                            if (!ctx.mounted) return;
                             setState(() {});
                             Navigator.pop(ctx);
                           }
@@ -362,13 +370,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [primaryColor, primaryColor.withOpacity(0.75)],
+                  colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
-                  BoxShadow(color: primaryColor.withOpacity(isDark ? 0.25 : 0.35), blurRadius: 18, offset: const Offset(0, 8))
+                  BoxShadow(color: primaryColor.withValues(alpha: isDark ? 0.25 : 0.35), blurRadius: 18, offset: const Offset(0, 8))
                 ]
             ),
             child: Column(
@@ -377,8 +385,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Net Balance", style: TextStyle(color: Colors.white.withOpacity(0.8), fontWeight: FontWeight.w500, fontSize: 13)),
-                    Icon(balance >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: Colors.white.withOpacity(0.8), size: 20),
+                    Text("Net Balance", style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 13)),
+                    Icon(balance >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: Colors.white.withValues(alpha: 0.8), size: 20),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -390,7 +398,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                     Text("Rs. ${balance.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
                   ],
                 ),
-                Text(balance >= 0 ? "Overall you will receive" : "Overall you owe", style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                Text(balance >= 0 ? "Overall you will receive" : "Overall you owe", style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
 
                 const SizedBox(height: 24),
 
@@ -413,7 +421,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isDark ? primaryColor.withOpacity(0.4) : Colors.grey.withOpacity(0.2), width: 1.2),
+                border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.2), width: 1.2),
               ),
               child: Row(
                 children: [
@@ -462,7 +470,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.handshake_rounded, size: 60, color: Colors.grey.withOpacity(0.3)),
+                      Icon(Icons.handshake_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
                       const SizedBox(height: 12),
                       Text("No active records. You're all settled!", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
                     ]
@@ -511,7 +519,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                     color: Theme.of(context).cardColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: isDark ? primaryColor.withOpacity(0.2) : Colors.grey.withOpacity(0.12), width: 1.2),
+                      side: BorderSide(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2),
                     ),
                     margin: const EdgeInsets.only(bottom: 12),
                     child: Padding(
@@ -520,7 +528,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: isLent ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15), shape: BoxShape.circle),
+                            decoration: BoxDecoration(color: isLent ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15), shape: BoxShape.circle),
                             child: Icon(isLent ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: isLent ? Colors.green : Colors.red, size: 20),
                           ),
                           const SizedBox(width: 14),
@@ -581,13 +589,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(16)
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.w500)),
+          Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w500)),
           const SizedBox(height: 2),
           Text(amount.toStringAsFixed(0), style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
         ],

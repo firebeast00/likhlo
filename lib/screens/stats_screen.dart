@@ -47,10 +47,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.12)),
+                  border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.12)),
                   boxShadow: [
                     BoxShadow(
-                        color: isDark ? Colors.black26 : Colors.black.withOpacity(0.03),
+                        color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.03),
                         blurRadius: 15,
                         offset: const Offset(0, 8)
                     )
@@ -113,13 +113,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             barRods: [
                               BarChartRodData(
                                 toY: stats.monthlyTotals[i],
-                                color: isTouched ? primaryColor : (i == 5 ? primaryColor.withOpacity(0.8) : primaryColor.withOpacity(0.25)),
+                                color: isTouched ? primaryColor : (i == 5 ? primaryColor.withValues(alpha: 0.8) : primaryColor.withValues(alpha: 0.25)),
                                 width: 14,
                                 borderRadius: BorderRadius.circular(8),
                                 backDrawRodData: BackgroundBarChartRodData(
                                     show: true,
                                     toY: stats.maxMonthTotal * 1.2,
-                                    color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.08)
+                                    color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.withValues(alpha: 0.08)
                                 ),
                               )
                             ]
@@ -146,7 +146,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Divider(color: Colors.grey.withOpacity(0.15)),
+            Divider(color: Colors.grey.withValues(alpha: 0.15)),
             const SizedBox(height: 24),
 
             if (stats.totalSpentThisMonth == 0)
@@ -155,7 +155,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 40),
                       child: Column(
                         children: [
-                          Icon(Icons.pie_chart_outline_rounded, size: 60, color: Colors.grey.withOpacity(0.3)),
+                          Icon(Icons.pie_chart_outline_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
                           const SizedBox(height: 12),
                           Text("No data for this month", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
                         ],
@@ -231,10 +231,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.12)),
+                      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.12)),
                       boxShadow: [
                         BoxShadow(
-                            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+                            color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.02),
                             blurRadius: 10,
                             offset: const Offset(0, 4)
                         )
@@ -247,7 +247,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           Container(
                               width: 14,
                               height: 14,
-                              decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))])
+                              decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 2))])
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -274,7 +274,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
                           value: percent,
-                          backgroundColor: isDark ? Colors.white.withOpacity(0.05) : color.withOpacity(0.1),
+                          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : color.withValues(alpha: 0.1),
                           valueColor: AlwaysStoppedAnimation(color),
                           minHeight: 6,
                         ),
@@ -298,10 +298,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       decoration: BoxDecoration(
         color: isDark ? Colors.grey.shade800 : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 4)
           )

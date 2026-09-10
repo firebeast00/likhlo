@@ -73,11 +73,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.12),
+                    color: primaryColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: primaryColor.withOpacity(0.15),
+                        color: primaryColor.withValues(alpha: 0.15),
                         blurRadius: 20,
                         spreadRadius: 5,
                       )
@@ -116,7 +116,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                       elevation: 0,
-                      shadowColor: primaryColor.withOpacity(0.4),
+                      shadowColor: primaryColor.withValues(alpha: 0.4),
                     ),
                     onPressed: _finishOnboarding,
                     child: const Text(
@@ -151,14 +151,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-              color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200,
+              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade200,
               width: 1.2
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-              color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200,
+              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade200,
               width: 1.2
           ),
         ),

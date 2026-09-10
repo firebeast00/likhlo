@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -23,7 +24,7 @@ class OcrScannerService {
       return _parseReceiptData(recognizedText);
 
     } catch (e) {
-      print("OCR Error: $e");
+      debugPrint("OCR Error: $e");
       return null;
     } finally {
       textRecognizer.close();

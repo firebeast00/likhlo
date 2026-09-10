@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -34,6 +33,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
     if (!_isListening) {
       bool available = await _speech.initialize(
         onStatus: (val) {
+          if (!mounted) return;
           if (val == 'done' || val == 'notListening') {
             setState(() => _isListening = false);
             if (_smartInputCtrl.text.isNotEmpty && _smartInputCtrl.text != "Listening...") {
@@ -41,16 +41,21 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
             }
           }
         },
-        onError: (val) => setState(() => _isListening = false),
+        onError: (val) {
+          if (mounted) setState(() => _isListening = false);
+        },
       );
+
+      if (!mounted) return;
 
       if (available) {
         setState(() => _isListening = true);
         _smartInputCtrl.text = "Listening...";
         _speech.listen(
-          onResult: (val) => setState(() {
-            _smartInputCtrl.text = val.recognizedWords;
-          }),
+          onResult: (val) {
+            if (!mounted) return;
+            setState(() => _smartInputCtrl.text = val.recognizedWords);
+          },
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Speech recognition unavailable.")));
@@ -97,7 +102,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
     );
 
     final receiptData = await OcrScannerService().scanReceipt();
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    Navigator.pop(context);
 
     if (receiptData != null && receiptData['amount'] > 0) {
       _showAddDialog(context, ref, initialTitle: receiptData['title'], initialAmount: receiptData['amount'].toString());
@@ -133,14 +139,14 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 20),
             const Text("Settlement Matrix", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
             const Text("AI breakdown of shared hostel liability", style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.teal.withOpacity(0.08), borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -199,7 +205,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: primaryColor.withOpacity(0.15), shape: BoxShape.circle),
+                decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle),
                 child: Icon(Icons.group_rounded, color: primaryColor),
               ),
               const SizedBox(width: 12),
@@ -295,10 +301,11 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                             amount: amt,
                             category: "Hostel/Mess",
                             date: DateTime.now(),
-                            colorValue: primaryColor.value,
+                            colorValue: primaryColor.toARGB32(),
                           ),
                         );
 
+                        if (!ctx.mounted) return;
                         Navigator.pop(ctx);
                       }
                     },
@@ -366,13 +373,13 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [primaryColor, primaryColor.withOpacity(0.75)],
+                colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(32),
               boxShadow: [
-                BoxShadow(color: primaryColor.withOpacity(isDark ? 0.3 : 0.4), blurRadius: 20, offset: const Offset(0, 10))
+                BoxShadow(color: primaryColor.withValues(alpha: isDark ? 0.3 : 0.4), blurRadius: 20, offset: const Offset(0, 10))
               ],
             ),
             child: Column(
@@ -384,7 +391,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                     const Text("Total Shared Pool", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 14)),
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
                       child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
                     ),
                   ],
@@ -394,7 +401,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
                   child: const Text("🔗 Automatically synced with monthly budget", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                 ),
               ],
@@ -408,8 +415,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
             decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: isDark ? primaryColor.withOpacity(0.3) : Colors.grey.withOpacity(0.12), width: 1.2),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))]
+                border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.12), width: 1.2),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
             ),
             child: Row(
               children: [
@@ -469,7 +476,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.receipt_long_rounded, size: 60, color: Colors.grey.withOpacity(0.3)),
+                    Icon(Icons.receipt_long_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
                     const SizedBox(height: 12),
                     const Text("No shared expenses logged yet.", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
                   ],
@@ -485,14 +492,14 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isDark ? primaryColor.withOpacity(0.2) : Colors.grey.withOpacity(0.1), width: 1.2),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))]
+                    border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.1), width: 1.2),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: primaryColor.withOpacity(0.15), shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle),
                       child: Icon(Icons.group_rounded, color: primaryColor, size: 20),
                     ),
                     const SizedBox(width: 14),

@@ -134,7 +134,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: walletId,
+                initialValue: walletId,
                 decoration: const InputDecoration(labelText: 'Income account'),
                 items: wallets
                     .map(
@@ -179,7 +179,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                         amount: amount,
                         date: DateTime.now(),
                         category: 'Income / Allowance',
-                        colorValue: Colors.green.value,
+                        colorValue: Colors.green.toARGB32(),
                         type: 'income',
                         walletId: walletId,
                       ),
@@ -312,7 +312,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               leading: CircleAvatar(
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 child: Icon(
                   wallet.isBackup
                       ? Icons.shield_outlined

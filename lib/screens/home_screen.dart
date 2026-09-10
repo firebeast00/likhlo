@@ -25,7 +25,6 @@ import 'settings_screen.dart';
 import 'stats_screen.dart';
 import 'about_screen.dart';
 import '../services/local_nlp_service.dart';
-import "../services/ocr_scanner_service.dart";
 import "./mess_khata_screen.dart";
 import './income_accounts_screen.dart';
 
@@ -99,7 +98,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (action == 'add_expense') {
         Future.delayed(const Duration(milliseconds: 500), () => _showAddOrEditModal());
       }
-    }).catchError((e) => debugPrint("Quick Tile Error: $e"));
+    }).catchError((Object error) {
+      debugPrint("Quick Tile Error: $error");
+      return null;
+    });
 
     platform.setMethodCallHandler((call) async {
       if (call.method == 'triggerAction' && call.arguments == 'add_expense') {
@@ -190,121 +192,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   // ==================== 🧮 INSTANT CALCULATOR BOTTOM SHEET ====================
-  void _showCalculator() {
-    String calcDisplay = '0';
-    double? firstOperand;
-    String? operator;
-    bool shouldClear = false;
-
-    final primaryColor = Color(ref.read(settingsProvider).profileColorValue);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    void onButtonTap(String value, StateSetter setModalState) {
-      setModalState(() {
-        if (value == 'C') {
-          calcDisplay = '0';
-          firstOperand = null;
-          operator = null;
-        } else if (value == '+' || value == '-' || value == '×' || value == '÷') {
-          firstOperand = double.tryParse(calcDisplay);
-          operator = value;
-          shouldClear = true;
-        } else if (value == '=') {
-          if (firstOperand != null && operator != null) {
-            double secondOperand = double.tryParse(calcDisplay) ?? 0;
-            double result = 0;
-            if (operator == '+') result = firstOperand! + secondOperand;
-            if (operator == '-') result = firstOperand! - secondOperand;
-            if (operator == '×') result = firstOperand! * secondOperand;
-            if (operator == '÷') result = secondOperand != 0 ? firstOperand! / secondOperand : 0;
-
-            calcDisplay = result.toStringAsFixed(result.truncateToDouble() == result ? 0 : 2);
-            firstOperand = null;
-            operator = null;
-            shouldClear = true;
-          }
-        } else {
-          if (calcDisplay == '0' || shouldClear) {
-            calcDisplay = value;
-            shouldClear = false;
-          } else {
-            calcDisplay += value;
-          }
-        }
-      });
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 48, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)), margin: const EdgeInsets.only(bottom: 24)),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: primaryColor.withOpacity(0.2))),
-                child: Text(calcDisplay, textAlign: TextAlign.right, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-              ),
-              const SizedBox(height: 20),
-
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.2),
-                itemCount: 16,
-                itemBuilder: (context, index) {
-                  final buttons = ['7','8','9','÷', '4','5','6','×', '1','2','3','-', 'C','0','=','+'];
-                  final btn = buttons[index];
-                  final isOp = ['÷', '×', '-', '+', '='].contains(btn);
-                  final isClear = btn == 'C';
-
-                  return GestureDetector(
-                    onTap: () => onButtonTap(btn, setModalState),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isOp ? primaryColor : (isClear ? Colors.red.withOpacity(0.1) : Theme.of(context).cardColor),
-                        borderRadius: BorderRadius.circular(16),
-                        border: isOp || isClear ? null : Border.all(color: Colors.grey.withOpacity(0.1)),
-                      ),
-                      child: Center(
-                        child: Text(btn, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isOp ? Colors.white : (isClear ? Colors.red : (isDark ? Colors.white : Colors.black87)))),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity, height: 52,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.check_rounded, color: Colors.white),
-                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showAddOrEditModal(prefilledAmount: calcDisplay);
-                  },
-                  label: const Text("Use Result", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-              )
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   // ==================== MISSING DIALOG METHODS ====================
   void _showAddCategoryDialog() {
     final catCtrl = TextEditingController();
@@ -317,7 +204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: primaryColor.withOpacity(0.15), shape: BoxShape.circle), child: Icon(Icons.category_rounded, color: primaryColor, size: 20)),
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(Icons.category_rounded, color: primaryColor, size: 20)),
             const SizedBox(width: 12),
             const Expanded(child: Text("New Category", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
           ],
@@ -359,77 +246,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ],
           )
         ],
-      ),
-    );
-  }
-
-  void _showWalletDialog({Wallet? existing}) {
-    final nameCtrl = TextEditingController(text: existing?.name ?? "");
-    final primaryColor = Color(ref.read(settingsProvider).profileColorValue);
-    bool isBackup = existing?.isBackup ?? false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          insetPadding: const EdgeInsets.all(20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: primaryColor.withOpacity(0.15), shape: BoxShape.circle), child: Icon(Icons.account_balance_wallet_rounded, color: primaryColor, size: 20)),
-              const SizedBox(width: 12),
-              Expanded(child: Text(existing == null ? "New Fund Source" : "Edit Fund Source", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildModernInput(nameCtrl, "Source Name (e.g. JazzCash)", Icons.payment_rounded, primaryColor),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text("Backup / Reserve Stash", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                subtitle: const Text("Isolate from daily safe spend calculations", style: TextStyle(fontSize: 11, color: Colors.grey)),
-                value: isBackup,
-                activeColor: primaryColor,
-                onChanged: (val) => setDialogState(() => isBackup = val),
-              ),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          actions: [
-            Row(
-              children: [
-                Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey)))),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)),
-                    onPressed: () {
-                      if (nameCtrl.text.trim().isNotEmpty) {
-                        if (existing == null) {
-                          final newWallet = Wallet(
-                            id: const Uuid().v4(),
-                            name: nameCtrl.text.trim(),
-                            balance: 0.0,
-                            isBackup: isBackup,
-                            colorValue: primaryColor.value,
-                            walletType: 'custom',
-                          );
-                          ref.read(walletProvider.notifier).addWallet(newWallet);
-                        } else {
-                          final updated = existing.copyWith(name: nameCtrl.text.trim(), isBackup: isBackup);
-                          ref.read(walletProvider.notifier).updateWallet(updated);
-                        }
-                        Navigator.pop(ctx);
-                      }
-                    },
-                    child: const Text("Save"),
-                  ),
-                ),
-              ],
-            )
-          ],
-        ),
       ),
     );
   }
@@ -478,14 +294,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             decoration: BoxDecoration(
                 color: Theme.of(context).scaffoldBackgroundColor,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 30, offset: const Offset(0, -10))]
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, -10))]
             ),
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 24, left: 24, right: 24, top: 12),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(width: 48, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)), margin: const EdgeInsets.only(bottom: 24)),
+                  Container(width: 48, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)), margin: const EdgeInsets.only(bottom: 24)),
 
                   Container(
                     decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
@@ -601,8 +417,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             final transferId = const Uuid().v4();
 
                             await ref.read(expenseProvider.notifier).addExpenses([
-                              Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'expense', walletId: selectedWalletId),
-                              Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.value, type: 'income', walletId: transferToWalletId),
+                              Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
+                              Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
                             ]);
                           } else {
                             String finalTitle = titleCtrl.text.trim();
@@ -617,7 +433,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
                             final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
                             if (existing == null) {
-                              await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.value, type: transactionType, walletId: selectedWalletId));
+                              await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
                             } else {
                               final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
                               if (!updated) {
@@ -654,7 +470,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(color: isActive ? color.withOpacity(0.15) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: isActive ? color.withValues(alpha: 0.15) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
           child: Center(child: Text(label, style: TextStyle(color: isActive ? color : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))),
         ),
       ),
@@ -664,7 +480,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Widget _buildWalletDropdown(List<Wallet> wallets, String value, String hint, Function(String?) onChanged) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.withOpacity(0.1))),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.withValues(alpha: 0.1))),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: wallets.any((w) => w.id == value) ? value : wallets.first.id,
@@ -701,7 +517,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         builder: (ctx) => AlertDialog(
           insetPadding: const EdgeInsets.all(20),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), shape: BoxShape.circle), child: const Icon(Icons.savings_rounded, color: Colors.green, size: 20)), const SizedBox(width: 12), const Expanded(child: Text("Monthly Limit", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))]),
+          title: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), shape: BoxShape.circle), child: const Icon(Icons.savings_rounded, color: Colors.green, size: 20)), const SizedBox(width: 12), const Expanded(child: Text("Monthly Limit", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))]),
           content: _buildModernInput(c, "Enter Budget Limit", Icons.currency_rupee_rounded, primaryColor, isNumber: true),
           actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           actions: [Row(children: [Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)), onPressed: () async { final val = double.tryParse(c.text.trim()); if (val == null || !val.isFinite || val < 0) { _showTransactionError('Enter a valid budget amount.'); return; } await ref.read(budgetProvider.notifier).setBudget(val, _focusedMonth); if (ctx.mounted) Navigator.pop(ctx); }, child: const Text("Save")))])],
@@ -839,7 +655,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           scale: _fabScale,
           child: Container(
             height: 52, padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6))]),
+            decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withValues(alpha: 0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))]),
             child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text("Add Transaction", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))]),
           ),
         ),
@@ -901,45 +717,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return Column(children: [const SizedBox(height: 4), Expanded(child: _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: false))]);
   }
 
-  Widget _buildWalletCarousel(List<Wallet> wallets, bool isDark) {
-    return SizedBox(
-      height: 90,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal, physics: const BouncingScrollPhysics(), padding: const EdgeInsets.symmetric(horizontal: 20), itemCount: wallets.length + 1,
-        itemBuilder: (context, index) {
-          if (index == wallets.length) {
-            return GestureDetector(
-              onTap: () => _showWalletDialog(),
-              child: Container(width: 120, decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.08), borderRadius: BorderRadius.circular(20), border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1.2)), child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.add_rounded, size: 24, color: Colors.grey), SizedBox(height: 4), Text("Add Source", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey))])),
-            );
-          }
-          final wallet = wallets[index];
-          final color = Color(wallet.colorValue);
-          final double dynamicBalance = ref.watch(walletProvider.notifier).getBalanceForWallet(wallet.id);
-
-          return GestureDetector(
-            onTap: () => _showWalletDialog(existing: wallet),
-            onLongPress: () {
-              showDialog(context: context, builder: (ctx) => AlertDialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), title: const Text("Delete Fund Source?"), content: Text("Are you sure you want to delete '${wallet.name}'?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () { ref.read(walletProvider.notifier).deleteWallet(wallet.id); Navigator.pop(ctx); }, child: const Text("Delete"))]));
-            },
-            child: Container(
-              width: 140, margin: const EdgeInsets.only(right: 12), padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withOpacity(0.2), width: 1.5)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(children: [Icon(wallet.isBackup ? Icons.shield_rounded : Icons.account_balance_wallet_rounded, size: 16, color: color), const SizedBox(width: 6), Expanded(child: Text(wallet.name, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis))]),
-                  const Spacer(),
-                  Text("Rs. ${dynamicBalance.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildOtherViews() {
     if (_currentView == 'Mess Khata') return const MessKhataScreen();
     if (_currentView == 'Udhaar') return const DebtScreen();
@@ -952,7 +729,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   // 🚀 FIXED: List Reconciliation Bug - Replaced ListView.builder with explicit Keys
   Widget _buildExpenseList(List<Expense> expenses, Color primaryColor, bool isDark, {required bool isSliver}) {
     if (expenses.isEmpty) {
-      final emptyState = Center(child: Padding(padding: const EdgeInsets.only(top: 40.0), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_rounded, size: 50, color: Colors.grey.withOpacity(0.3)), const SizedBox(height: 12), Text("No transactions here yet.", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))])));
+      final emptyState = Center(child: Padding(padding: const EdgeInsets.only(top: 40.0), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_rounded, size: 50, color: Colors.grey.withValues(alpha: 0.3)), const SizedBox(height: 12), Text("No transactions here yet.", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))])));
       return isSliver ? SliverFillRemaining(hasScrollBody: false, child: emptyState) : emptyState;
     }
 
@@ -1008,9 +785,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.1),
+            color: primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: primaryColor.withOpacity(0.2)),
+            border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
           ),
           child: Text(
             "Today's Spend: Rs. ${todaySpend.toStringAsFixed(0)}",
@@ -1039,7 +816,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       direction: DismissDirection.endToStart,
       background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.delete_outline_rounded, color: Colors.white)),
       confirmDismiss: (direction) async {
-        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), Text(isTransfer ? "Delete Transfer?" : "Delete Transaction?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(isTransfer ? "Delete this complete transfer? Both linked account entries will be removed." : "Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
+        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), Text(isTransfer ? "Delete Transfer?" : "Delete Transaction?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(isTransfer ? "Delete this complete transfer? Both linked account entries will be removed." : "Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
       },
       onDismissed: (direction) async {
         if (isTransfer) {
@@ -1053,10 +830,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       child: GestureDetector(
         onTap: isTransfer ? null : () => _showAddOrEditModal(existing: e),
         child: Container(
-            margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: isDark ? primaryColor.withOpacity(0.2) : Colors.grey.withOpacity(0.12), width: 1.2)),
+            margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2)),
             child: Row(
               children: [
-                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: (isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor)).withOpacity(0.15), shape: BoxShape.circle), child: Icon(displayIcon, color: isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor), size: 20)),
+                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: (isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor)).withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(displayIcon, color: isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor), size: 20)),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -1077,25 +854,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildSmartEntryWidget(Color primaryColor, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: isDark ? primaryColor.withOpacity(0.3) : Colors.grey.withOpacity(0.15), width: 1.2)),
-        child: Row(
-          children: [
-            IconButton(constraints: const BoxConstraints(minWidth: 36, minHeight: 36), padding: EdgeInsets.zero, icon: Icon(_isListening ? Icons.mic : Icons.mic_none_rounded, size: 20, color: _isListening ? Colors.red : (isDark ? Colors.white70 : primaryColor)), onPressed: _listenForExpense),
-            Expanded(child: TextField(controller: _smartInputCtrl, style: const TextStyle(fontSize: 13), decoration: InputDecoration(hintText: _isListening ? 'Listening...' : 'Speak: "1500 for Pizza"', border: InputBorder.none, isDense: true, hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12)), onSubmitted: (val) => _processNLP(val))),
-            IconButton(constraints: const BoxConstraints(minWidth: 32, minHeight: 32), padding: EdgeInsets.zero, icon: const Icon(Icons.calculate_rounded, color: Colors.orange, size: 18), onPressed: _showCalculator),
-            IconButton(constraints: const BoxConstraints(minWidth: 32, minHeight: 32), padding: EdgeInsets.zero, icon: const Icon(Icons.document_scanner_rounded, color: Colors.blueAccent, size: 18), onPressed: _startReceiptScan),
-            IconButton(constraints: const BoxConstraints(minWidth: 36, minHeight: 36), padding: EdgeInsets.zero, icon: Icon(Icons.send_rounded, color: primaryColor, size: 18), onPressed: () => _processNLP(_smartInputCtrl.text)),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildCategoryTabsWidget(List<String> categories, Color primaryColor, bool isDark) {
     return Container(
       height: 40, margin: const EdgeInsets.only(top: 4, bottom: 8),
@@ -1109,7 +867,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Widget _buildAddCategoryBtn(Color primaryColor, bool isDark) {
     return GestureDetector(
       onTap: _showAddCategoryDialog,
-      child: Container(margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.08), borderRadius: BorderRadius.circular(20), border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1.2)), child: Row(children: [Icon(Icons.add_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black87), const SizedBox(width: 4), Text("New", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold, fontSize: 12))])),
+      child: Container(margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(20), border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1.2)), child: Row(children: [Icon(Icons.add_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black87), const SizedBox(width: 4), Text("New", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold, fontSize: 12))])),
     );
   }
 
@@ -1117,21 +875,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     bool isSelected = _selectedCategoryTab == label;
     return GestureDetector(
         onTap: () => _selectCategory(label, index),
-        child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: isSelected ? primaryColor : Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), border: isSelected ? null : Border.all(color: isDark ? primaryColor.withOpacity(0.25) : Colors.grey.withOpacity(0.15), width: 1.2)), child: Center(child: Text(label, style: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87), fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, fontSize: 12))))
-    );
-  }
-
-  Widget _buildMiniHero(double r, double s, Color primary) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14), decoration: BoxDecoration(gradient: LinearGradient(colors: [primary, primary.withOpacity(0.8)]), borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [const Icon(Icons.account_balance_wallet_rounded, color: Colors.white70, size: 18), const SizedBox(width: 8), Text("Rs. ${r.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))]), Text("Spent: ${s.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 12))]),
+        child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: isSelected ? primaryColor : Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20), border: isSelected ? null : Border.all(color: isDark ? primaryColor.withValues(alpha: 0.25) : Colors.grey.withValues(alpha: 0.15), width: 1.2)), child: Center(child: Text(label, style: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87), fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, fontSize: 12))))
     );
   }
 
   Widget _buildHeroCard(double baseBudget, double effectiveBudget, double r, double s, Color primary) {
     bool isAlert = effectiveBudget > 0 && s > effectiveBudget;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 500), width: double.infinity, margin: const EdgeInsets.symmetric(horizontal: 20), padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: isAlert ? [Colors.red.shade900, Colors.red] : [primary, primary.withOpacity(0.75)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: (isAlert ? Colors.red : primary).withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 8))]),
+      duration: const Duration(milliseconds: 500), width: double.infinity, margin: const EdgeInsets.symmetric(horizontal: 20), padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: isAlert ? [Colors.red.shade900, Colors.red] : [primary, primary.withValues(alpha: 0.75)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: (isAlert ? Colors.red : primary).withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
         children: [
@@ -1142,8 +893,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(onTap: () => _editBudget(baseBudget), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text("Budget + Income", style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11)), const SizedBox(width: 4), Icon(Icons.edit_outlined, color: Colors.white.withOpacity(0.65), size: 10)]), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text(effectiveBudget.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Total Spent", style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 11)), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(s.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
+              GestureDetector(onTap: () => _editBudget(baseBudget), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text("Budget + Income", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(width: 4), Icon(Icons.edit_outlined, color: Colors.white.withValues(alpha: 0.65), size: 10)]), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text(effectiveBudget.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Total Spent", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(s.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
             ],
           )
         ],
@@ -1228,7 +979,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       final activeWallets = wallets.where((w) => !w.isBackup).toList();
       final defaultWalletId = activeWallets.isNotEmpty ? activeWallets.first.id : (wallets.isNotEmpty ? wallets.first.id : '');
 
-      final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.value, walletId: defaultWalletId);
+      final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.toARGB32(), walletId: defaultWalletId);
       await ref.read(expenseProvider.notifier).addExpense(newExpense);
       if (!mounted) return;
       _smartInputCtrl.clear();
@@ -1239,21 +990,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (mounted) FocusScope.of(context).unfocus();
   }
 
-  void _startReceiptScan() async {
-    showDialog(context: context, barrierDismissible: false, builder: (ctx) => Center(child: Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20)), child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(color: Theme.of(context).primaryColor), const SizedBox(height: 16), const Text("Processing Receipt...", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))]))));
-    final receiptData = await OcrScannerService().scanReceipt();
-    if (mounted) Navigator.pop(context);
-    if (receiptData != null && receiptData['amount'] > 0) {
-      final wallets = ref.read(walletProvider);
-      final activeWallets = wallets.where((w) => !w.isBackup).toList();
-      final defaultWalletId = activeWallets.isNotEmpty ? activeWallets.first.id : (wallets.isNotEmpty ? wallets.first.id : '');
-
-      ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: receiptData['title'], amount: receiptData['amount'], category: receiptData['category'], date: DateTime.now(), colorValue: Colors.blueAccent.value, walletId: defaultWalletId));
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Saved: ${receiptData['title']} (Rs. ${receiptData['amount'].toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("❌ Could not read receipt clearly. Try manual entry.", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red));
-    }
-  }
 }
 
 class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
