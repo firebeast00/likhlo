@@ -25,6 +25,8 @@ dependencies:
   image_picker: ^1.1.2
   quick_actions: ^1.1.0
   flutter_tts: ^4.2.5
+  cryptography: ^2.7.0
+  file_picker: ^8.1.7
 
 
 dev_dependencies:
