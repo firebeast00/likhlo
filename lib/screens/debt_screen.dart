@@ -22,16 +22,12 @@ class DebtScreen extends ConsumerStatefulWidget {
 }
 
 class _DebtScreenState extends ConsumerState<DebtScreen> {
-  late final Box<DebtEntry> debtBox;
+  final Box<DebtEntry> debtBox = Hive.box<DebtEntry>('debts');
+
+
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    debtBox = Hive.box<DebtEntry>('debts');
-  }
 
   @override
   void dispose() {
@@ -55,7 +51,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           if (mounted) setState(() => _isListening = false);
         },
       );
+
       if (!mounted) return;
+
       if (available) {
         setState(() => _isListening = true);
         _smartInputCtrl.text = "Listening...";
@@ -85,6 +83,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     }
 
     final result = LocalNlpService().parseExpense(text, ["Udhaar", "Debt"]);
+
     if (result['amount'] > 0) {
       // Clean up the name by removing transaction verbs
       String cleanName = result['title'].replaceAll(RegExp(r'(borrowed|lent|took|gave|from|to)', caseSensitive: false), '').trim();
@@ -94,7 +93,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       _smartInputCtrl.clear();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Could not detect amount. Try: 'Lent 500 to Ali'", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red),
+        const SnackBar(content: Text("❌ Could not detect amount. Try: 'Lent 500 to Ali'", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red),
       );
     }
     FocusScope.of(context).unfocus();
@@ -128,7 +127,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       _showAddDialog(initialName: receiptData['title'], initialAmount: receiptData['amount'].toString());
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Could not read amount clearly.", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red),
+        const SnackBar(content: Text("❌ Could not read amount clearly.", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red),
       );
     }
   }
@@ -138,14 +137,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final amountCtrl = TextEditingController(text: initialAmount);
     String type = initialType;
     DateTime? selectedDate;
-
     final wallets = ref.read(walletProvider);
     String selectedWalletId = wallets.isEmpty
         ? ''
         : wallets.firstWhere(
-          (wallet) => !wallet.isBackup,
-      orElse: () => wallets.first,
-    ).id;
+            (wallet) => !wallet.isBackup,
+            orElse: () => wallets.first,
+          ).id;
 
     final settings = ref.read(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
@@ -178,6 +176,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // 🌟 Sleek Segmented Control for Type
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
@@ -227,11 +226,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       _buildModernInput(nameCtrl, "Person Name", Icons.person_rounded, primaryColor, isDark),
                       const SizedBox(height: 12),
                       _buildModernInput(amountCtrl, "Amount (Rs.)", Icons.attach_money_rounded, primaryColor, isDark, isNumber: true),
-
                       if (type == 'lent') ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          isExpanded: true, // 🚀 FIXED: Prevents 41px horizontal overflow
                           value: wallets.any((wallet) => wallet.id == selectedWalletId)
                               ? selectedWalletId
                               : null,
@@ -260,8 +257,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           onChanged: wallets.isEmpty
                               ? null
                               : (value) => setModalState(
-                                () => selectedWalletId = value ?? '',
-                          ),
+                                    () => selectedWalletId = value ?? '',
+                                  ),
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -330,7 +327,6 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                               final available = ref
                                   .read(walletProvider.notifier)
                                   .getBalanceForWallet(selectedWalletId);
-
                               if (amt > available) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -342,8 +338,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                 return;
                               }
                             }
+                            final debtId = const Uuid().v4(); // Generate shared ID
 
-                            final debtId = const Uuid().v4();
                             final newDebt = DebtEntry(
                               id: debtId,
                               borrowerName: nameCtrl.text.trim(),
@@ -354,10 +350,11 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
                             int key = await debtBox.add(newDebt);
 
+                            // 🔗 FIX: Cross-sync "I Gave" (Lent) to deduct from Main Budget
                             if (type == 'lent') {
                               ref.read(expenseProvider.notifier).addExpense(
                                   Expense(
-                                    id: debtId,
+                                    id: debtId, // Link IDs so deletion syncs later
                                     title: "Udhaar: ${nameCtrl.text.trim()}",
                                     amount: amt,
                                     category: "Udhaar",
@@ -371,7 +368,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             if (selectedDate != null && selectedDate!.isAfter(DateTime.now())) {
                               NotificationService().scheduleNotification(
                                   key,
-                                  "Udhaar Due Today! 🔔",
+                                  "Udhaar Due Today! 💰",
                                   "${type == 'lent' ? 'Collect' : 'Pay'} Rs. ${amt.toStringAsFixed(0)} ${type == 'lent' ? 'from' : 'to'} ${nameCtrl.text}",
                                   selectedDate!
                               );
@@ -423,234 +420,224 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     double iGave = debts
         .where((e) => e.type == 'lent')
         .fold(0.0, (sum, e) => sum + e.amount);
-
     double iTook = debts
         .where((e) => e.type == 'borrowed')
         .fold(0.0, (sum, e) => sum + e.amount);
-
     double balance = iGave - iTook;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      // 🚀 FIXED: Wrapped in CustomScrollView to prevent landscape pixel overflow
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
+      body: Column(
+        children: [
+          // 1. 🌟 SUMMARY HERO CARD
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(color: primaryColor.withValues(alpha: isDark ? 0.25 : 0.35), blurRadius: 18, offset: const Offset(0, 8))
+                ]
+            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. SUMMARY HERO CARD
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(color: primaryColor.withValues(alpha: isDark ? 0.25 : 0.35), blurRadius: 18, offset: const Offset(0, 8))
-                      ]
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text("Net Balance", style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 13)),
-                          Icon(balance >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: Colors.white.withValues(alpha: 0.8), size: 20),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(balance < 0 ? "-" : "", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                          Text("Rs. ${balance.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                        ],
-                      ),
-                      Text(balance >= 0 ? "Overall you will receive" : "Overall you owe", style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(child: _summaryBox("I Gave", iGave, Colors.greenAccent)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _summaryBox("I Took", iTook, Colors.redAccent.shade100)),
-                        ],
-                      )
-                    ],
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Net Balance", style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 13)),
+                    Icon(balance >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: Colors.white.withValues(alpha: 0.8), size: 20),
+                  ],
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(balance < 0 ? "-" : "", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                    Text("Rs. ${balance.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                  ],
+                ),
+                Text(balance >= 0 ? "Overall you will receive" : "Overall you owe", style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
 
-                // 2. SMART VOICE & OCR INPUT BAR
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.2), width: 1.2),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                          padding: EdgeInsets.zero,
-                          icon: Icon(_isListening ? Icons.mic : Icons.mic_none_rounded, color: _isListening ? Colors.red : primaryColor, size: 20),
-                          onPressed: _listenForInput,
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: _smartInputCtrl,
-                            style: const TextStyle(fontSize: 13),
-                            decoration: InputDecoration(
-                              hintText: _isListening ? 'Listening...' : 'Speak: "Borrowed 500 from Sara"',
-                              border: InputBorder.none,
-                              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                            ),
-                            onSubmitted: (val) => _processNLP(val),
-                          ),
-                        ),
-                        IconButton(
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.document_scanner_rounded, color: Colors.blueAccent, size: 18),
-                          onPressed: _startReceiptScan,
-                          tooltip: "Scan Receipt",
-                        ),
-                        IconButton(
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          padding: EdgeInsets.zero,
-                          icon: Icon(Icons.send_rounded, color: primaryColor, size: 18),
-                          onPressed: () => _processNLP(_smartInputCtrl.text),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    Expanded(child: _summaryBox("I Gave", iGave, Colors.greenAccent)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _summaryBox("I Took", iTook, Colors.redAccent.shade100)),
+                  ],
+                )
               ],
             ),
           ),
 
-          // 3. UDHAAR LIST SLIVER
-          if (debts.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.handshake_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
-                    const SizedBox(height: 12),
-                    Text("No active records. You're all settled!", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
-                  ],
-                ),
+          // 2. 🎙️ SMART VOICE & OCR INPUT BAR
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.2), width: 1.2),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                      (ctx, i) {
-                    final item = debts[i];
-                    final isLent = item.type == 'lent';
-
-                    return Dismissible(
-                      key: Key(item.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(16)),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Icon(Icons.check_circle_rounded, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text("Mark Settled", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                          ],
-                        ),
+              child: Row(
+                children: [
+                  IconButton(
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    padding: EdgeInsets.zero,
+                    icon: Icon(_isListening ? Icons.mic : Icons.mic_none_rounded, color: _isListening ? Colors.red : primaryColor, size: 20),
+                    onPressed: _listenForInput,
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _smartInputCtrl,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: _isListening ? 'Listening...' : 'Speak: "Borrowed 500 from Sara"',
+                        border: InputBorder.none,
+                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                       ),
-                      onDismissed: (_) {
-                        item.delete();
-                        try {
-                          ref.read(expenseProvider.notifier).deleteExpense(item.id);
-                        } catch (_) {}
-                        setState((){});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Settled Udhaar with ${item.borrowerName} ✅", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green)
-                        );
-                      },
-                      child: Card(
-                        elevation: 0,
-                        color: Theme.of(context).cardColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2),
-                        ),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: isLent ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15), shape: BoxShape.circle),
-                                child: Icon(isLent ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: isLent ? Colors.green : Colors.red, size: 20),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      item.borrowerName,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        Icon(item.dueDate != null ? Icons.calendar_month_rounded : Icons.info_outline_rounded, size: 11, color: Colors.grey.shade500),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          item.dueDate != null ? "Due: ${DateFormat.MMMEd().format(item.dueDate!)}" : (isLent ? "You gave them" : "They gave you"),
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        )
-                                      ],
-                                    )
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                  "Rs. ${item.amount.toStringAsFixed(0)}",
-                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isLent ? Colors.green : Colors.red)
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  childCount: debts.length,
-                ),
+                      onSubmitted: (val) => _processNLP(val),
+                    ),
+                  ),
+                  IconButton(
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.document_scanner_rounded, color: Colors.blueAccent, size: 18),
+                    onPressed: _startReceiptScan,
+                    tooltip: "Scan Receipt",
+                  ),
+                  IconButton(
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    padding: EdgeInsets.zero,
+                    icon: Icon(Icons.send_rounded, color: primaryColor, size: 18),
+                    onPressed: () => _processNLP(_smartInputCtrl.text),
+                  ),
+                ],
               ),
             ),
+          ),
+
+          // 3. 📋 UDHAAR LIST
+          Expanded(
+            child: debts.isEmpty
+                ? Center(
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.handshake_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
+                      const SizedBox(height: 12),
+                      Text("No active records. You're all settled!", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
+                    ]
+                )
+            )
+                : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              itemCount: debts.length,
+              itemBuilder: (ctx, i) {
+                final item = debts[i];
+                final isLent = item.type == 'lent';
+
+                return Dismissible(
+                  key: Key(item.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(16)),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text("Mark Settled", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                      ],
+                    ),
+                  ),
+                  onDismissed: (_) {
+                    // 1. Delete from Udhaar tab
+                    item.delete();
+
+                    // 2. Delete from Main Expenses to restore the budget
+                    try {
+                      ref.read(expenseProvider.notifier).deleteExpense(item.id);
+                    } catch (_) {} // Catch in case it was a "borrowed" record that wasn't synced
+
+                    setState((){});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Settled Udhaar with ${item.borrowerName} 🤝", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green)
+                    );
+                  },
+                  child: Card(
+                    elevation: 0,
+                    color: Theme.of(context).cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: isLent ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15), shape: BoxShape.circle),
+                            child: Icon(isLent ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: isLent ? Colors.green : Colors.red, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  item.borrowerName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(item.dueDate != null ? Icons.calendar_month_rounded : Icons.info_outline_rounded, size: 11, color: Colors.grey.shade500),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      item.dueDate != null ? "Due: ${DateFormat.MMMEd().format(item.dueDate!)}" : (isLent ? "You gave them" : "They gave you"),
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  ],
+                                )
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                              "Rs. ${item.amount.toStringAsFixed(0)}",
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isLent ? Colors.green : Colors.red)
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
