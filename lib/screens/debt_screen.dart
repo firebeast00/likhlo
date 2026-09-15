@@ -154,7 +154,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       builder: (ctx) => StatefulBuilder(
           builder: (context, setModalState) {
             return AlertDialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              scrollable: true,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
               backgroundColor: Theme.of(context).cardColor,
               title: Row(
@@ -171,11 +172,10 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 ],
               ),
               content: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.9,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                       // 🌟 Sleek Segmented Control for Type
                       Container(
                         padding: const EdgeInsets.all(4),
@@ -226,14 +226,16 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       _buildModernInput(nameCtrl, "Person Name", Icons.person_rounded, primaryColor, isDark),
                       const SizedBox(height: 12),
                       _buildModernInput(amountCtrl, "Amount (Rs.)", Icons.attach_money_rounded, primaryColor, isDark, isNumber: true),
-                      if (type == 'lent') ...[
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: wallets.any((wallet) => wallet.id == selectedWalletId)
                               ? selectedWalletId
                               : null,
                           decoration: InputDecoration(
-                            labelText: 'Money sent from',
+                            labelText: type == 'lent'
+                                ? 'Money sent from'
+                                : 'Money received in',
                             prefixIcon: Icon(Icons.account_balance_wallet_rounded, color: primaryColor),
                             filled: true,
                             fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
@@ -260,7 +262,6 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                     () => selectedWalletId = value ?? '',
                                   ),
                         ),
-                      ],
                       const SizedBox(height: 12),
 
                       // DATE PICKER
@@ -289,8 +290,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
               actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -338,7 +338,39 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                 return;
                               }
                             }
-                            final debtId = const Uuid().v4(); // Generate shared ID
+                            if (selectedWalletId.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Create a money account first.')),
+                              );
+                              return;
+                            }
+
+                            final debtId = const Uuid().v4();
+                            final linkedSaved = await ref
+                                .read(expenseProvider.notifier)
+                                .addExpense(
+                                  Expense(
+                                    id: debtId,
+                                    title: type == 'lent'
+                                        ? "Udhaar given: ${nameCtrl.text.trim()}"
+                                        : "Udhaar received: ${nameCtrl.text.trim()}",
+                                    amount: amt,
+                                    category: "Udhaar",
+                                    date: DateTime.now(),
+                                    colorValue: type == 'lent'
+                                        ? Colors.red.toARGB32()
+                                        : Colors.green.toARGB32(),
+                                    type: type == 'lent' ? 'expense' : 'income',
+                                    walletId: selectedWalletId,
+                                  ),
+                                );
+                            if (!linkedSaved) {
+                              if (!ctx.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not save the linked account transaction.')),
+                              );
+                              return;
+                            }
 
                             final newDebt = DebtEntry(
                               id: debtId,
@@ -348,21 +380,18 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                               dueDate: selectedDate,
                             );
 
-                            int key = await debtBox.add(newDebt);
-
-                            // 🔗 FIX: Cross-sync "I Gave" (Lent) to deduct from Main Budget
-                            if (type == 'lent') {
-                              ref.read(expenseProvider.notifier).addExpense(
-                                  Expense(
-                                    id: debtId, // Link IDs so deletion syncs later
-                                    title: "Udhaar: ${nameCtrl.text.trim()}",
-                                    amount: amt,
-                                    category: "Udhaar",
-                                    date: DateTime.now(),
-                                    colorValue: Colors.red.toARGB32(),
-                                    walletId: selectedWalletId,
-                                  )
+                            int key;
+                            try {
+                              key = await debtBox.add(newDebt);
+                            } catch (_) {
+                              await ref
+                                  .read(expenseProvider.notifier)
+                                  .deleteExpense(debtId);
+                              if (!ctx.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not save the Udhar record.')),
                               );
+                              return;
                             }
 
                             if (selectedDate != null && selectedDate!.isAfter(DateTime.now())) {
@@ -416,6 +445,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final settings = ref.watch(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCompactHeight = MediaQuery.sizeOf(context).height < 500;
 
     double iGave = debts
         .where((e) => e.type == 'lent')
@@ -432,8 +462,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           // 1. 🌟 SUMMARY HERO CARD
           Container(
             width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-            padding: const EdgeInsets.all(24),
+            margin: EdgeInsets.fromLTRB(
+              20,
+              isCompactHeight ? 4 : 16,
+              20,
+              isCompactHeight ? 4 : 10,
+            ),
+            padding: EdgeInsets.all(isCompactHeight ? 12 : 24),
             decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
@@ -460,13 +495,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(balance < 0 ? "-" : "", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                    Text("Rs. ${balance.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                    Text(balance < 0 ? "-" : "", style: TextStyle(color: Colors.white, fontSize: isCompactHeight ? 24 : 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                    Text("Rs. ${balance.abs().toStringAsFixed(0)}", style: TextStyle(color: Colors.white, fontSize: isCompactHeight ? 24 : 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
                   ],
                 ),
                 Text(balance >= 0 ? "Overall you will receive" : "Overall you owe", style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
 
-                const SizedBox(height: 24),
+                SizedBox(height: isCompactHeight ? 8 : 24),
 
                 Row(
                   children: [
@@ -481,7 +516,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
           // 2. 🎙️ SMART VOICE & OCR INPUT BAR
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              isCompactHeight ? 2 : 6,
+              20,
+              isCompactHeight ? 4 : 10,
+            ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               decoration: BoxDecoration(
@@ -566,18 +606,100 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       ],
                     ),
                   ),
-                  onDismissed: (_) {
-                    // 1. Delete from Udhaar tab
-                    item.delete();
+                  confirmDismiss: (_) async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        title: const Text('Mark Udhar as settled?'),
+                        content: Text(
+                          isLent
+                              ? 'Confirm that Rs. ${item.amount.toStringAsFixed(0)} was received from ${item.borrowerName}.'
+                              : 'Confirm that Rs. ${item.amount.toStringAsFixed(0)} was paid to ${item.borrowerName}.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext, false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(dialogContext, true),
+                            child: const Text('Confirm'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true || !mounted) return false;
 
-                    // 2. Delete from Main Expenses to restore the budget
-                    try {
-                      ref.read(expenseProvider.notifier).deleteExpense(item.id);
-                    } catch (_) {} // Catch in case it was a "borrowed" record that wasn't synced
+                    Expense? linked;
+                    for (final entry
+                        in ref.read(expenseProvider).allExpenses) {
+                      if (entry.id == item.id) {
+                        linked = entry;
+                        break;
+                      }
+                    }
+                    if (linked == null) return true;
 
-                    setState((){});
+                    final settlementId = '${item.id}_settled';
+                    final alreadySettled = ref
+                        .read(expenseProvider)
+                        .allExpenses
+                        .any((entry) => entry.id == settlementId);
+                    if (alreadySettled) return true;
+
+                    if (!isLent) {
+                      final available = ref
+                          .read(walletProvider.notifier)
+                          .getBalanceForWallet(linked.walletId);
+                      if (item.amount > available) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Insufficient balance to settle. Available: Rs. ${available.toStringAsFixed(0)}',
+                            ),
+                          ),
+                        );
+                        return false;
+                      }
+                    }
+
+                    final saved = await ref
+                        .read(expenseProvider.notifier)
+                        .addExpense(
+                          Expense(
+                            id: settlementId,
+                            title: isLent
+                                ? 'Udhaar returned: ${item.borrowerName}'
+                                : 'Udhaar repaid: ${item.borrowerName}',
+                            amount: item.amount,
+                            category: 'Udhaar',
+                            date: DateTime.now(),
+                            colorValue: isLent
+                                ? Colors.green.toARGB32()
+                                : Colors.red.toARGB32(),
+                            type: isLent ? 'income' : 'expense',
+                            walletId: linked.walletId,
+                          ),
+                        );
+                    if (!saved && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not record the settlement.')),
+                      );
+                    }
+                    return saved;
+                  },
+                  onDismissed: (_) async {
+                    await item.delete();
+                    if (!mounted) return;
+                    setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Settled Udhaar with ${item.borrowerName} 🤝", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green)
+                      SnackBar(
+                        content: Text(
+                          'Settled Udhaar with ${item.borrowerName}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
                     );
                   },
                   child: Card(
