@@ -43,6 +43,8 @@ flutter:
   assets:
     - assets/app_logo.png
     - assets/logo2.png
+    - assets/fonts/DejaVuSans.ttf
+    - assets/fonts/DejaVuSans-Bold.ttf
 
   # Correct Indentation for Assets
 flutter_launcher_icons:

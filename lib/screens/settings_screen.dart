@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pdf/pdf.dart';
@@ -24,6 +25,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _prefBox = Hive.box('preferences');
+  }
+
+  Future<void> _setPersistentQuickLog(bool enabled) async {
+    await _prefBox.put('persistent_bar_enabled', enabled);
+    if (!enabled) {
+      await NotificationService().cancelNotification(
+        NotificationService.persistentBarId,
+      );
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setSmartReminders(bool enabled) async {
+    await _prefBox.put('daily_reminder_enabled', enabled);
+    if (enabled) {
+      await NotificationService().scheduleSmartEntryReminders();
+    } else {
+      await Future.wait([
+        NotificationService().cancelNotification(
+          NotificationService.middayReminderId,
+        ),
+        NotificationService().cancelNotification(
+          NotificationService.eveningReminderId,
+        ),
+        NotificationService().cancelNotification(
+          NotificationService.weekendReviewId,
+        ),
+      ]);
+    }
+    if (mounted) setState(() {});
   }
 
   // --- PROFILE EDIT DIALOG ---
@@ -311,13 +342,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 icon: Icons.space_dashboard_rounded,
                 iconColor: Colors.teal,
                 value: persistentEnabled,
-                onChanged: (val) {
-                  setState(() => _prefBox.put('persistent_bar_enabled', val));
-                  if (!val) {
-                    NotificationService().cancelNotification(NotificationService.persistentBarId);
-                  }
-                  // Will auto-rebuild on home screen next load
-                },
+                onChanged: (val) => _setPersistentQuickLog(val),
               ),
               _buildDivider(),
               _buildSwitchTile(
@@ -326,16 +351,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 icon: Icons.notifications_active_rounded,
                 iconColor: Colors.amber.shade600,
                 value: remindersEnabled,
-                onChanged: (val) {
-                  setState(() => _prefBox.put('daily_reminder_enabled', val));
-                  if (val) {
-                    NotificationService().scheduleSmartEntryReminders();
-                  } else {
-                    NotificationService().cancelNotification(NotificationService.middayReminderId);
-                    NotificationService().cancelNotification(NotificationService.eveningReminderId);
-                    NotificationService().cancelNotification(NotificationService.weekendReviewId);
-                  }
-                },
+                onChanged: (val) => _setSmartReminders(val),
               ),
             ],
           ),
@@ -412,7 +428,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final records = List.of(ref.read(expenseProvider).allExpenses);
     final expenses = visibleTransactions(records);
     final settings = ref.read(settingsProvider);
-    final pdf = pw.Document();
+    final regularFont = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/DejaVuSans.ttf'),
+    );
+    final boldFont = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'),
+    );
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+    );
 
     final totalSpent = records.where((e) => e.type == 'expense' && e.category != 'Transfer')
         .fold(0.0, (sum, item) => sum + item.amount);
