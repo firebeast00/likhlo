@@ -37,6 +37,18 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
+    await Hive.box<Wallet>('wallets').put(
+      'very_long_wallet',
+      Wallet(
+        id: 'very_long_wallet',
+        name: 'A very long mobile banking account name',
+        balance: 25000,
+        isBackup: false,
+        colorValue: 0xFF1565C0,
+        walletType: 'bank',
+      ),
+    );
+
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(home: DebtScreen()),

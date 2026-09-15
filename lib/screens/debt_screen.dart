@@ -153,6 +153,15 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
           builder: (context, setModalState) {
+            final selectedWallets =
+                wallets.where((wallet) => wallet.id == selectedWalletId);
+            final selectedWallet =
+                selectedWallets.isEmpty ? null : selectedWallets.first;
+            final selectedBalance = selectedWallet == null
+                ? 0.0
+                : ref
+                    .read(walletProvider.notifier)
+                    .getBalanceForWallet(selectedWallet.id);
             return AlertDialog(
               scrollable: true,
               insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -227,41 +236,107 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       const SizedBox(height: 12),
                       _buildModernInput(amountCtrl, "Amount (Rs.)", Icons.attach_money_rounded, primaryColor, isDark, isNumber: true),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: wallets.any((wallet) => wallet.id == selectedWalletId)
-                              ? selectedWalletId
-                              : null,
-                          decoration: InputDecoration(
-                            labelText: type == 'lent'
-                                ? 'Money sent from'
-                                : 'Money received in',
-                            prefixIcon: Icon(Icons.account_balance_wallet_rounded, color: primaryColor),
-                            filled: true,
-                            fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                          items: wallets.map((wallet) {
-                            final balance = ref
-                                .read(walletProvider.notifier)
-                                .getBalanceForWallet(wallet.id);
-                            return DropdownMenuItem<String>(
-                              value: wallet.id,
-                              child: Text(
-                                '${wallet.name} — Rs. ${balance.toStringAsFixed(0)}',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: wallets.isEmpty
-                              ? null
-                              : (value) => setModalState(
-                                    () => selectedWalletId = value ?? '',
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: wallets.isEmpty
+                            ? null
+                            : () async {
+                                final selected = await showModalBottomSheet<String>(
+                                  context: ctx,
+                                  showDragHandle: true,
+                                  builder: (sheetContext) => SafeArea(
+                                    child: ListView.separated(
+                                      shrinkWrap: true,
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      itemCount: wallets.length,
+                                      separatorBuilder: (_, __) =>
+                                          const Divider(height: 1),
+                                      itemBuilder: (context, index) {
+                                        final wallet = wallets[index];
+                                        final balance = ref
+                                            .read(walletProvider.notifier)
+                                            .getBalanceForWallet(wallet.id);
+                                        return ListTile(
+                                          leading: Icon(
+                                            Icons.account_balance_wallet_rounded,
+                                            color: Color(wallet.colorValue),
+                                          ),
+                                          title: Text(
+                                            wallet.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          subtitle: Text(
+                                            'Available: Rs. ${balance.toStringAsFixed(0)}',
+                                          ),
+                                          trailing: wallet.id == selectedWalletId
+                                              ? Icon(Icons.check_circle_rounded,
+                                                  color: primaryColor)
+                                              : null,
+                                          onTap: () =>
+                                              Navigator.pop(sheetContext, wallet.id),
+                                        );
+                                      },
+                                    ),
                                   ),
+                                );
+                                if (selected != null && ctx.mounted) {
+                                  setModalState(
+                                    () => selectedWalletId = selected,
+                                  );
+                                }
+                              },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.black26 : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet_rounded,
+                                color: primaryColor,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      type == 'lent'
+                                          ? 'Money sent from'
+                                          : 'Money received in',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade500,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      selectedWallet == null
+                                          ? 'Select account'
+                                          : '${selectedWallet.name} • Rs. ${selectedBalance.toStringAsFixed(0)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.keyboard_arrow_down_rounded),
+                            ],
+                          ),
                         ),
+                      ),
                       const SizedBox(height: 12),
 
                       // DATE PICKER
