@@ -1,102 +1,410 @@
+import 'dart:math';
+
 class LocalNlpService {
-  // Singleton Pattern
+  // Singleton pattern
   static final LocalNlpService _instance = LocalNlpService._internal();
   factory LocalNlpService() => _instance;
-  LocalNlpService._internal();
 
-  // Expanded lexicon for South Asian context
-  final Map<String, String> _lexicon = {
-    // Food & Dining
-    'biryani': 'Food', 'burger': 'Food', 'burgers': 'Food', 'kfc': 'Food', 'mcdonalds': 'Food',
-    'lunch': 'Food', 'dinner': 'Food', 'breakfast': 'Food', 'chai': 'Food', 'tea': 'Food',
-    'coffee': 'Food', 'pizza': 'Food', 'ice cream': 'Food', 'groceries': 'Food', 'water': 'Food',
-    'snack': 'Food', 'snacks': 'Food', 'roti': 'Food', 'karahi': 'Food',
+  final Map<String, String> _optimizedLexicon = {};
+  final Map<String, String> _normalizedLexicon = {};
+  late final List<String> _sortedLexiconKeys;
 
-    // Transport
-    'petrol': 'Transport', 'fuel': 'Transport', 'uber': 'Transport', 'careem': 'Transport',
-    'rickshaw': 'Transport', 'bike': 'Transport', 'bus': 'Transport', 'fare': 'Transport',
-    'ticket': 'Transport', 'train': 'Transport', 'auto': 'Transport',
+  late final Map<String, int> _numberWordIndex;
+  late final Map<String, int> _normalizedUnitsOnly;
+  late final Map<String, int> _normalizedMultipliers;
+  late final Map<String, double> _normalizedFusedOverrides;
 
-    // Shopping & Lifestyle
-    'shirt': 'Shopping', 'shoes': 'Shopping', 'clothes': 'Shopping', 'shopping': 'Shopping',
-    'jacket': 'Shopping', 'pant': 'Shopping', 'gift': 'Shopping', 'watch': 'Shopping',
+  List<String> _lastUnmatchedTokens = [];
 
-    // Bills & Utilities
-    'bill': 'Bills', 'bijli': 'Bills', 'electric': 'Bills', 'electricity': 'Bills',
-    'gas': 'Bills', 'recharge': 'Bills', 'easyload': 'Bills', 'data plan': 'Bills',
-    'wifi': 'Bills', 'internet': 'Bills', 'k-electric': 'Bills', 'k electric': 'Bills',
+  List<String> get lastUnmatchedTokens => _lastUnmatchedTokens;
 
-    // Health
-    'medicine': 'Health', 'doctor': 'Health', 'clinic': 'Health', 'hospital': 'Health',
-    'pharmacy': 'Health', 'pills': 'Health',
+  LocalNlpService._internal() {
+    _groupedLexicon.forEach((category, words) {
+      for (var word in words) {
+        final w = word.toLowerCase();
+        _optimizedLexicon[w] = category;
+        _normalizedLexicon[_normalize(w)] = category;
+      }
+    });
 
-    // Education
-    'fees': 'Education', 'book': 'Education', 'books': 'Education', 'pen': 'Education',
-    'stationery': 'Education', 'copy': 'Education', 'register': 'Education', 'tuition': 'Education'
+    _sortedLexiconKeys = _optimizedLexicon.keys.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+
+    _normalizedUnitsOnly = {
+      for (final e in _units.entries) _normalize(e.key): e.value,
+    };
+    final teensTens = {..._units, ..._teens, ..._tens};
+    _numberWordIndex = {
+      for (final e in teensTens.entries) _normalize(e.key): e.value,
+    };
+    _normalizedMultipliers = {
+      for (final e in _multipliers.entries) _normalize(e.key): e.value,
+    };
+    _normalizedFusedOverrides = {
+      for (final e in _fusedOverrides.entries) _normalize(e.key): e.value,
+    };
+  }
+
+  // ==========================================
+  // 📚 EXPANDED ROMAN URDU DATASET
+  // ==========================================
+  final Map<String, List<String>> _groupedLexicon = {
+    'Food': [
+      'biryani', 'burger', 'burgers', 'kfc', 'mcdonalds', 'shawarma', 'roll', 'pizza',
+      'fries', 'chips', 'samosa', 'pakora', 'nimko', 'biscuit', 'cake', 'ice cream',
+      'zinger', 'broast', 'sandwich', 'patties', 'gol gappay', 'chaat', 'kachori',
+      'lunch', 'dinner', 'breakfast', 'nashta', 'khana', 'roti', 'naan', 'salan',
+      'karahi', 'daal', 'chawal', 'sabzi', 'gosht', 'mutton', 'beef', 'chicken', 'anda',
+      'chai', 'tea', 'coffee', 'water', 'pani', 'juice', 'shake', 'cold drink',
+      'pepsi', 'coke', 'sting', 'redbull', 'bottle', 'doodh', 'milk', 'lassi',
+      'groceries', 'rashan', 'fruit', 'phal', 'dahi', 'mithai', 'baking', 'masala'
+    ],
+    'Transport': [
+      'uber', 'careem', 'indrive', 'bykea', 'yango', 'rickshaw', 'auto', 'bike',
+      'bus', 'wagon', 'train', 'car', 'taxi', 'qinqi', 'chingchi',
+      'petrol', 'fuel', 'cng', 'diesel', 'fare', 'ticket', 'rent', 'kiraya',
+      'parking', 'toll', 'challan', 'mechanic', 'puncture', 'oil change', 'tuning'
+    ],
+    'Shopping': [
+      'shirt', 'shoes', 'clothes', 'shopping', 'jacket', 'pant', 'watch', 'glasses',
+      'bag', 'perfume', 'gift', 'tohfa', 'kapre', 'suit', 'kurta', 'shalwar',
+      'jootay', 'chappal', 'sneakers', 'wallet', 'belt', 'makeup', 'jewelry'
+    ],
+    'Bills': [
+      'bill', 'bijli', 'electric', 'electricity', 'gas', 'water bill', 'wapda',
+      'k-electric', 'k electric', 'ptcl', 'sui gas', 'maintenance', 'trash', 'kachra',
+      'recharge', 'easyload', 'balance', 'data plan', 'package', 'wifi', 'internet',
+      'cable', 'jazz', 'zong', 'telenor', 'ufone', 'card'
+    ],
+    'Health': [
+      'medicine', 'doctor', 'clinic', 'hospital', 'pharmacy', 'pills', 'dawa',
+      'dawai', 'test', 'lab', 'xray', 'blood', 'panadol', 'bandage', 'medical',
+      'checkup', 'dentist', 'fee', 'emergency'
+    ],
+    'Education': [
+      'fees', 'fee', 'book', 'books', 'pen', 'stationery', 'copy', 'register',
+      'tuition', 'print', 'photostat', 'assignment', 'project', 'notes',
+      'calculator', 'pencil', 'marker', 'paper', 'hostel', 'mess', 'canteen'
+    ]
   };
 
+  // 🚀 FIXED: Removed 'kal' and 'aaj' from here so we can parse them as dates
   final List<String> _stopWords = [
-    'ki', 'ka', 'ke', 'liye', 'for', 'spent', 'on', 'rs', 'rupees', 'rupee',
-    'aur', 'the', 'a', 'an', 'paid', 'gave', 'to', 'mein', 'pe', 'khaye', 'diye',
-    'bought', 'purchased', 'bill', 'amount'
+    'ki', 'ka', 'ke', 'liye', 'for', 'on', 'aur', 'the', 'a', 'an', 'to', 'mein',
+    'pe', 'jo', 'k', 'se', 'tak', 'par', 'wala', 'wali', 'wale',
+    'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchased', 'khaan',
+    'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya', 'liye',
+    'kha', 'pee', 'diya', 'kharida',
+    'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
+    'paisa', 'mani', 'money', 'subah', 'shaam', 'raat', 'rupay', 'pkr'
   ];
 
+  // ==========================================
+  // 🔢 ROMAN URDU NUMBER WORDS
+  // ==========================================
+  static const Map<String, int> _units = {
+    'ek': 1, 'aik': 1, 'do': 2, 'teen': 3, 'tin': 3, 'char': 4, 'chaar': 4,
+    'panch': 5, 'paanch': 5, 'che': 6, 'choh': 6, 'chhay': 6, 'saat': 7,
+    'aath': 8, 'ath': 8, 'nau': 9,
+  };
+
+  static const Map<String, int> _teens = {
+    'das': 10, 'dus': 10, 'gyarah': 11, 'barah': 12, 'terah': 13, 'chaudah': 14,
+    'pandrah': 15, 'solah': 16, 'satrah': 17, 'atharah': 18, 'unnees': 19,
+  };
+
+  static const Map<String, int> _tens = {
+    'bees': 20, 'tees': 30, 'chalees': 40, 'pachas': 50,
+    'saath': 60, 'sattar': 70, 'assi': 80, 'nabbe': 90,
+  };
+
+  static const Map<String, int> _multipliers = {
+    'sau': 100, 'so': 100, 'sou': 100, 'saw': 100,
+    'hazar': 1000, 'hazaar': 1000, 'k': 1000,
+    'lakh': 100000, 'lac': 100000,
+    'crore': 10000000,
+  };
+
+  static const Map<String, double> _fusedOverrides = {
+    'sou': 100, 'sow': 100, 'dosou': 200, 'doso': 200, 'tinsou': 300, 'teenso': 300,
+    'charsou': 400, 'chaarso': 400, 'panso': 500, 'paanso': 500, 'passo': 500, 'pansou': 500,
+    'chesou': 600, 'chhesou': 600, 'saatsou': 700, 'saatso': 700, 'aathsou': 800, 'aathso': 800,
+    'nosou': 900, 'nauso': 900,
+  };
+
+  // ==========================================
+  // 🧠 NORMALIZATION + FUZZY MATCHING
+  // ==========================================
+
+  String _normalize(String input) {
+    var s = input.toLowerCase().trim();
+    s = s.replaceAll('ee', 'i');
+    s = s.replaceAll('oo', 'u');
+    s = s.replaceAll('aa', 'a');
+    s = s.replaceAllMapped(RegExp(r'(.)\1+'), (m) => m.group(1)!);
+    return s;
+  }
+
+  // 🚀 FIXED: Highly optimized 1D Array Levenshtein for 10k+ word scaling
+  int _levenshtein(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+
+    List<int> v0 = List.generate(b.length + 1, (i) => i);
+    List<int> v1 = List.filled(b.length + 1, 0);
+
+    for (int i = 0; i < a.length; i++) {
+      v1[0] = i + 1;
+      for (int j = 0; j < b.length; j++) {
+        final cost = (a[i] == b[j]) ? 0 : 1;
+        v1[j + 1] = min(v1[j] + 1, min(v0[j + 1] + 1, v0[j] + cost));
+      }
+      for (int j = 0; j <= b.length; j++) v0[j] = v1[j];
+    }
+    return v1[b.length];
+  }
+
+  T? _fuzzyLookup<T>(
+      String normalizedToken,
+      Map<String, T> index, {
+        int? forceBudget,
+      }) {
+    final exact = index[normalizedToken];
+    if (exact != null) return exact;
+
+    final budget = forceBudget ?? (normalizedToken.length <= 4 ? 1 : 2);
+    String? best;
+    int bestDist = budget + 1;
+    for (final key in index.keys) {
+      if ((key.length - normalizedToken.length).abs() > budget) continue;
+      final d = _levenshtein(normalizedToken, key);
+      if (d < bestDist) {
+        bestDist = d;
+        best = key;
+      }
+    }
+    return (best != null && bestDist <= budget) ? index[best] : null;
+  }
+
+  double? _trySuffixSplitHundred(String normToken) {
+    const suffixes = ['sau', 'sou', 'so'];
+    for (final suf in suffixes) {
+      if (normToken.length > suf.length && normToken.endsWith(suf)) {
+        final prefix = normToken.substring(0, normToken.length - suf.length);
+        final unitVal = _normalizedUnitsOnly[prefix];
+        if (unitVal != null) return unitVal * 100.0;
+      }
+    }
+    return null;
+  }
+
+  // ==========================================
+  // 🔢 WORD-AMOUNT PARSER
+  // ==========================================
+
+  _WordAmountResult? _parseWordAmount(List<String> tokens) {
+    final consumed = <String>[];
+    double amount = 0;
+    int? pendingUnit;
+    String? pendingUnitToken;
+    bool matchedAnyScale = false;
+
+    int i = 0;
+    while (i < tokens.length) {
+      final raw = tokens[i];
+      final norm = _normalize(raw);
+
+      if ((norm == 'dhai' || norm == 'adhai') && i + 1 < tokens.length) {
+        final mult = _normalizedMultipliers[_normalize(tokens[i + 1])];
+        if (mult != null) {
+          amount += 2.5 * mult;
+          consumed.addAll([raw, tokens[i + 1]]);
+          matchedAnyScale = true;
+          i += 2;
+          continue;
+        }
+      }
+
+      if (norm == 'sawa' && i + 1 < tokens.length) {
+        final nextNorm = _normalize(tokens[i + 1]);
+        final directMult = _normalizedMultipliers[nextNorm];
+        if (directMult != null) {
+          amount += 1.25 * directMult;
+          consumed.addAll([raw, tokens[i + 1]]);
+          matchedAnyScale = true;
+          i += 2;
+          continue;
+        }
+        final unitVal = _numberWordIndex[nextNorm];
+        if (unitVal != null && i + 2 < tokens.length) {
+          final mult = _normalizedMultipliers[_normalize(tokens[i + 2])];
+          if (mult != null) {
+            amount += (unitVal + 0.25) * mult;
+            consumed.addAll([raw, tokens[i + 1], tokens[i + 2]]);
+            matchedAnyScale = true;
+            i += 3;
+            continue;
+          }
+        }
+      }
+
+      if (norm == 'paune' && i + 2 < tokens.length) {
+        final unitVal = _normalizedUnitsOnly[_normalize(tokens[i + 1])];
+        final mult = _normalizedMultipliers[_normalize(tokens[i + 2])];
+        if (unitVal != null && mult != null) {
+          amount += (unitVal - 0.25) * mult;
+          consumed.addAll([raw, tokens[i + 1], tokens[i + 2]]);
+          matchedAnyScale = true;
+          i += 3;
+          continue;
+        }
+      }
+
+      final overrideVal = _fuzzyLookup(norm, _normalizedFusedOverrides, forceBudget: 1);
+      if (overrideVal != null) {
+        amount += overrideVal;
+        consumed.add(raw);
+        matchedAnyScale = true;
+        i++;
+        continue;
+      }
+
+      final multVal = _normalizedMultipliers[norm];
+      if (multVal != null) {
+        amount += (pendingUnit ?? 1) * multVal;
+        if (pendingUnitToken != null) consumed.add(pendingUnitToken);
+        consumed.add(raw);
+        pendingUnit = null;
+        pendingUnitToken = null;
+        matchedAnyScale = true;
+        i++;
+        continue;
+      }
+
+      final splitVal = _trySuffixSplitHundred(norm);
+      if (splitVal != null) {
+        amount += splitVal;
+        consumed.add(raw);
+        matchedAnyScale = true;
+        i++;
+        continue;
+      }
+
+      final numVal = _numberWordIndex[norm];
+      if (numVal != null) {
+        if (numVal >= 10) matchedAnyScale = true;
+        pendingUnit = numVal;
+        pendingUnitToken = raw;
+        i++;
+        continue;
+      }
+
+      i++;
+    }
+
+    if (pendingUnit != null) {
+      amount += pendingUnit;
+      if (pendingUnitToken != null) consumed.add(pendingUnitToken);
+    }
+
+    if (!matchedAnyScale || amount <= 0) return null;
+    return _WordAmountResult(amount, consumed);
+  }
+
+  // ==========================================
+  // 🧠 MAIN PARSING ENGINE
+  // ==========================================
   Map<String, dynamic> parseExpense(String input, List<String> activeCategories) {
     String lowerInput = input.toLowerCase();
     double amount = 0.0;
     String category = 'General';
+    DateTime transactionDate = DateTime.now(); // 🚀 NEW: Temporal Intelligence
+    List<String> consumedTokens = [];
 
-    // 1. Extract Amount (Handles decimals and integers accurately)
-    final amountRegExp = RegExp(r'\b\d+(\.\d+)?\b');
-    final match = amountRegExp.firstMatch(lowerInput);
-    if (match != null) {
-      amount = double.tryParse(match.group(0)!) ?? 0.0;
+    // 1. Extract Temporal Elements (Dates)
+    if (RegExp(r'\b(kal|yesterday)\b').hasMatch(lowerInput)) {
+      transactionDate = transactionDate.subtract(const Duration(days: 1));
+      consumedTokens.addAll(['kal', 'yesterday']);
+    } else if (RegExp(r'\b(parso|parson)\b').hasMatch(lowerInput)) {
+      transactionDate = transactionDate.subtract(const Duration(days: 2));
+      consumedTokens.addAll(['parso', 'parson']);
     }
 
-    // Convert active categories to lowercase for safe matching
-    final lowerActiveCategories = activeCategories.map((c) => c.toLowerCase()).toList();
-
-    // 2. Extract Category (Fixed Substring Bug using Word Boundaries)
-    bool categoryFound = false;
-    for (var entry in _lexicon.entries) {
-      // \b ensures we match the exact word (e.g., 'pen' won't match inside 'spent')
-      final regex = RegExp(r'\b' + entry.key + r'\b');
-
-      if (regex.hasMatch(lowerInput)) {
-        if (lowerActiveCategories.contains(entry.value.toLowerCase())) {
-          category = activeCategories.firstWhere((c) => c.toLowerCase() == entry.value.toLowerCase());
-          categoryFound = true;
-          break;
-        }
+    // 2. Extract Amount
+    final amountRegExp = RegExp(r'\b\d+(\.\d+)?\b');
+    final digitMatch = amountRegExp.firstMatch(lowerInput);
+    if (digitMatch != null) {
+      amount = double.tryParse(digitMatch.group(0)!) ?? 0.0;
+    } else {
+      final tokens = lowerInput.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+      final wordResult = _parseWordAmount(tokens);
+      if (wordResult != null) {
+        amount = wordResult.amount;
+        consumedTokens.addAll(wordResult.consumedTokens);
       }
     }
 
-    // 3. Fallback: Direct Category Matching
-    // If the user says "500 for Travel" and "Travel" is a category, catch it directly
+    final lowerActiveCategories = activeCategories.map((c) => c.toLowerCase()).toList();
+
+    // 3. Extract Category
+    bool categoryFound = false;
+    List<String> matchedCategoryTokens = [];
+    final words = lowerInput.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+
+    final candidates = <String>[];
+    for (var i = 0; i < words.length - 1; i++) {
+      candidates.add('${words[i]} ${words[i + 1]}');
+    }
+    candidates.addAll(words);
+
+    for (final candidate in candidates) {
+      final norm = _normalize(candidate);
+      String? mappedCategory = _normalizedLexicon[norm];
+      mappedCategory ??= candidate.length >= 4 ? _fuzzyLookup(norm, _normalizedLexicon) : null;
+
+      if (mappedCategory != null && lowerActiveCategories.contains(mappedCategory.toLowerCase())) {
+        category = activeCategories.firstWhere((c) => c.toLowerCase() == mappedCategory!.toLowerCase());
+        categoryFound = true;
+        matchedCategoryTokens = candidate.split(' ');
+        break;
+      }
+    }
+
     if (!categoryFound) {
       for (var cat in activeCategories) {
-        if (RegExp(r'\b' + cat.toLowerCase() + r'\b').hasMatch(lowerInput)) {
+        if (RegExp(r'\b' + RegExp.escape(cat.toLowerCase()) + r'\b').hasMatch(lowerInput)) {
           category = cat;
           break;
         }
       }
     }
 
-    // 4. Clean the Title for the UI
-    String cleanTitle = lowerInput.replaceAll(amountRegExp, ''); // Strip the number
+    // 4. Clean Title
+    String cleanTitle = lowerInput.replaceAll(amountRegExp, '');
 
-    // Strip exactly matched stop words
+    // 🚀 FIXED: Strict word boundary replacement to prevent mutilation
+    for (final token in consumedTokens) {
+      cleanTitle = cleanTitle.replaceFirst(RegExp(r'\b' + RegExp.escape(token) + r'\b'), ' ');
+    }
     for (String stopWord in _stopWords) {
-      cleanTitle = cleanTitle.replaceAll(RegExp(r'\b' + stopWord + r'\b'), '');
+      cleanTitle = cleanTitle.replaceAll(RegExp(r'\b' + RegExp.escape(stopWord) + r'\b'), '');
     }
 
-    // Strip punctuation, remove double spaces, and trim
     cleanTitle = cleanTitle.replaceAll(RegExp(r'[^\w\s]'), '').trim();
     cleanTitle = cleanTitle.replaceAll(RegExp(r'\s+'), ' ');
 
-    // 5. Format to Title Case (e.g., "Chicken Biryani" instead of "CHICKEN BIRYANI")
+    cleanTitle = cleanTitle.split(' ').where((w) => w.length > 1).join(' ').trim();
+
+    _lastUnmatchedTokens = words.where((w) {
+      return !_stopWords.contains(w) &&
+          !consumedTokens.contains(w) &&
+          !matchedCategoryTokens.contains(w) &&
+          w.length > 1;
+    }).toList();
+
     if (cleanTitle.isEmpty) {
-      cleanTitle = "Quick Expense";
+      cleanTitle = categoryFound ? category : 'Quick Expense';
     } else {
       cleanTitle = cleanTitle.split(' ').map((word) {
         if (word.isEmpty) return '';
@@ -108,6 +416,13 @@ class LocalNlpService {
       'amount': amount,
       'category': category,
       'title': cleanTitle,
+      'date': transactionDate, // 🚀 NEW: Temporal routing
     };
   }
+}
+
+class _WordAmountResult {
+  final double amount;
+  final List<String> consumedTokens;
+  _WordAmountResult(this.amount, this.consumedTokens);
 }

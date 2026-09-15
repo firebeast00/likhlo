@@ -23,6 +23,7 @@ class DebtScreen extends ConsumerStatefulWidget {
 class _DebtScreenState extends ConsumerState<DebtScreen> {
   final Box<DebtEntry> debtBox = Hive.box<DebtEntry>('debts');
 
+
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   final TextEditingController _smartInputCtrl = TextEditingController();

@@ -18,7 +18,6 @@ import '../models/debt_model.dart';
 import '../models/mess_entry_model.dart';
 import '../models/wallet_model.dart';
 import '../widgets/app_drawer.dart';
-
 import 'debt_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
@@ -30,6 +29,7 @@ import './income_accounts_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
@@ -75,10 +75,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       const ShortcutItem(type: 'action_add_expense', localizedTitle: 'Add Transaction', icon: 'ic_add'),
     ]);
     _setupNativeQuickTile();
+
     NotificationService().onActionTriggered = _handleNotificationAction;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final pendingAction = NotificationService().takePendingAction();
       if (pendingAction != null) _handleNotificationAction(pendingAction);
+
       _queuePersistentNotificationUpdate(
         delay: const Duration(seconds: 2),
       );
@@ -128,17 +131,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _notificationUpdateTimer?.cancel();
     _notificationUpdateTimer = Timer(delay, () {
       if (!mounted) return;
-
       final now = DateTime.now();
       final expenses = ref.read(expenseProvider).allExpenses;
       final wallets = ref.read(walletProvider);
       final walletNotifier = ref.read(walletProvider.notifier);
+
       final totalAvailable = wallets.fold<double>(
         0,
-        (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+            (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
       );
-      double spentToday = 0;
 
+      double spentToday = 0;
       for (final entry in expenses) {
         if (entry.category == 'Transfer') continue;
         if (entry.type == 'expense' &&
@@ -168,8 +171,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Future<void> _changeView(String view) async {
     if (!mounted || view == _currentView) return;
 
-    // Secondary ledgers open only when requested, keeping cold start focused
-    // on the main budget and transaction database.
     try {
       if (view == 'Mess Khata' && !Hive.isBoxOpen('mess_khata')) {
         await Hive.openBox<MessEntry>('mess_khata');
@@ -182,18 +183,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
       return;
     }
-    if (!mounted) return;
 
+    if (!mounted) return;
     setState(() {
       _currentView = view;
       _isSearching = false;
       _searchQuery = '';
     });
+
     if (view == 'Dashboard') _queuePersistentNotificationUpdate();
   }
 
-  // ==================== 🧮 INSTANT CALCULATOR BOTTOM SHEET ====================
-  // ==================== MISSING DIALOG METHODS ====================
   void _showAddCategoryDialog() {
     final catCtrl = TextEditingController();
     final primaryColor = Color(ref.read(settingsProvider).profileColorValue);
@@ -253,8 +253,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   Future<void> _confirmDeleteCategory(String category) async {
     if (category == 'All') return;
-
     final categories = ref.read(categoryProvider);
+
     if (categories.length <= 1) {
       _showTransactionError('Keep at least one expense category.');
       return;
@@ -291,6 +291,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (confirmed != true || !mounted) return;
     ref.read(categoryProvider.notifier).deleteCategory(category);
+
     if (_selectedCategoryTab == category) {
       setState(() => _selectedCategoryTab = 'All');
     }
@@ -309,6 +310,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
       return;
     }
+
     final titleCtrl = TextEditingController(text: existing?.title ?? "");
     final amountCtrl = TextEditingController(text: prefilledAmount ?? (existing?.amount.toString() ?? ""));
     String selectedCategory = existing?.category ?? "General";
@@ -328,8 +330,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final primaryColor = Color(ref.read(settingsProvider).profileColorValue);
 
     if (!wallets.any((w) => w.id == selectedWalletId) && wallets.isNotEmpty) {
-      selectedWalletId = wallets.firstWhere((w) => !w.isBackup, orElse: () => wallets.first).id;
+      final cashWallet = wallets.cast<Wallet?>().firstWhere(
+            (w) => w != null && !w.isBackup && (w.walletType == 'cash' || w.name.toLowerCase().contains('cash')),
+        orElse: () => null,
+      );
+
+      if (cashWallet != null) {
+        selectedWalletId = cashWallet.id;
+      } else {
+        selectedWalletId = wallets.firstWhere((w) => !w.isBackup, orElse: () => wallets.first).id;
+      }
     }
+
     if (wallets.length > 1) {
       transferToWalletId = wallets.firstWhere((w) => w.id != selectedWalletId, orElse: () => wallets.last).id;
     }
@@ -444,54 +456,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         }
 
                         if (transactionType == 'transfer') {
-                            if (wallets.length < 2) {
-                              _showTransactionError('Create at least two accounts to transfer money.');
-                              return;
-                            }
-                            if (selectedWalletId == transferToWalletId) {
-                              _showTransactionError('Choose two different accounts.');
-                              return;
-                            }
-                            final available = ref
-                                .read(walletProvider.notifier)
-                                .getBalanceForWallet(selectedWalletId);
-                            if (amt > available) {
-                              _showTransactionError(
-                                'Insufficient balance. Available: Rs. ${available.toStringAsFixed(0)}',
-                              );
-                              return;
-                            }
-                            final fromName = wallets.firstWhere((w) => w.id == selectedWalletId).name;
-                            final toName = wallets.firstWhere((w) => w.id == transferToWalletId).name;
-                            final transferId = const Uuid().v4();
+                          if (wallets.length < 2) {
+                            _showTransactionError('Create at least two accounts to transfer money.');
+                            return;
+                          }
+                          if (selectedWalletId == transferToWalletId) {
+                            _showTransactionError('Choose two different accounts.');
+                            return;
+                          }
+                          final available = ref
+                              .read(walletProvider.notifier)
+                              .getBalanceForWallet(selectedWalletId);
+                          if (amt > available) {
+                            _showTransactionError(
+                              'Insufficient balance. Available: Rs. ${available.toStringAsFixed(0)}',
+                            );
+                            return;
+                          }
+                          final fromName = wallets.firstWhere((w) => w.id == selectedWalletId).name;
+                          final toName = wallets.firstWhere((w) => w.id == transferToWalletId).name;
+                          final transferId = const Uuid().v4();
 
-                            await ref.read(expenseProvider.notifier).addExpenses([
-                              Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
-                              Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
-                            ]);
-                          } else {
-                            String finalTitle = titleCtrl.text.trim();
-                            if (finalTitle.isEmpty) {
-                              if (transactionType == 'income') {
-                                finalTitle = 'Income / Allowance';
-                              } else {
-                                _showTransactionError('Enter a transaction title.');
-                                return;
-                              }
-                            }
-
-                            final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
-                            if (existing == null) {
-                              await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
+                          await ref.read(expenseProvider.notifier).addExpenses([
+                            Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
+                            Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
+                          ]);
+                        } else {
+                          String finalTitle = titleCtrl.text.trim();
+                          if (finalTitle.isEmpty) {
+                            if (transactionType == 'income') {
+                              finalTitle = 'Income / Allowance';
                             } else {
-                              final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
-                              if (!updated) {
-                                _showTransactionError('This transaction no longer exists.');
-                                return;
-                              }
+                              _showTransactionError('Enter a transaction title.');
+                              return;
                             }
                           }
-                          if (ctx.mounted) Navigator.pop(ctx);
+
+                          final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
+                          if (existing == null) {
+                            await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
+                          } else {
+                            final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
+                            if (!updated) {
+                              _showTransactionError('This transaction no longer exists.');
+                              return;
+                            }
+                          }
+                        }
+                        try {
+                          await NotificationService().scheduleSmartEntryReminders();
+                        } catch (e) {
+                          debugPrint("Notification reset failed: $e");
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx);
                       },
                       child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
@@ -546,7 +563,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  // ==================== REST OF THE UI ====================
   Widget _buildModernInput(TextEditingController ctrl, String label, IconData icon, Color primaryColor, {bool isNumber = false}) {
     return TextField(
       controller: ctrl,
@@ -576,8 +592,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
-    // Secondary screens do not subscribe to or process the dashboard ledger.
-    // This keeps drawer navigation and settings interactions lightweight.
     if (_currentView != 'Dashboard') {
       return Scaffold(
         drawer: AppDrawer(
@@ -611,10 +625,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     final monthlyTransactions = ledger.transactions;
     final globalSpent = ledger.spent;
+
     final walletNotifier = ref.read(walletProvider.notifier);
     final totalAvailable = wallets.fold<double>(
       0,
-      (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+          (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
     );
 
     var displayExpenses = List<Expense>.from(monthlyTransactions);
@@ -625,6 +640,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (_selectedCategoryTab != 'All') displayExpenses = displayExpenses.where((e) => e.category == _selectedCategoryTab).toList();
     if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+    displayExpenses.sort((a,b) => b.date.compareTo(a.date));
 
     return Scaffold(
       drawer: AppDrawer(
@@ -664,12 +681,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         primaryColor,
         totalAvailable,
         globalSpent,
-        wallets.length,
+        wallets,
         categories,
         displayExpenses,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: GestureDetector(
+      floatingActionButton: (_currentView == 'Dashboard') ? GestureDetector(
         onTapDown: (_) => _fabController.forward(),
         onTapUp: (_) { _fabController.reverse(); _showAddOrEditModal(); },
         onTapCancel: () => _fabController.reverse(),
@@ -681,18 +698,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text("Add Transaction", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))]),
           ),
         ),
-      ),
+      ) : null,
     );
   }
 
-  Widget _buildResponsiveBody(bool isLandscape, bool isDark, Color primaryColor, double totalAvailable, double spent, int accountCount, List<String> categories, List<Expense> displayExpenses) {
+  Widget _buildResponsiveBody(bool isLandscape, bool isDark, Color primaryColor, double totalAvailable, double spent, List<Wallet> wallets, List<String> categories, List<Expense> displayExpenses) {
     if (_currentView != 'Dashboard') return _buildOtherViews();
 
     if (isLandscape && !_isSearching) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(totalAvailable, spent, accountCount, primaryColor), const SizedBox(height: 10), _buildSmartInputBar(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
+          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(totalAvailable, spent, wallets, primaryColor), const SizedBox(height: 35), _buildSmartInputBar(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
           Expanded(flex: 1, child: _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: false)),
         ],
       );
@@ -703,20 +720,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(bottom: 12.0), child: _buildMonthSelector(isDark))),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildHeroCard(
-                totalAvailable,
-                spent,
-                accountCount,
-                primaryColor,
-              ),
+
+          SliverAppBar(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            expandedHeight: 300.0,
+            collapsedHeight: 70.0,
+            pinned: true,
+            elevation: 0,
+            automaticallyImplyLeading: false,
+            flexibleSpace: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                final top = constraints.biggest.height;
+                final bool isCollapsed = top <= 100.0;
+
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: isCollapsed
+                      ? Align(
+                    key: const ValueKey('mini'),
+                    alignment: Alignment.bottomCenter,
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: _buildMiniHero(totalAvailable, primaryColor),
+                      ),
+                    ),
+                  )
+                      : Align(
+                    key: const ValueKey('full'),
+                    alignment: Alignment.topCenter,
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: _buildHeroCard(totalAvailable, spent, wallets, primaryColor),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
+
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
               child: _buildSmartInputBar(primaryColor, isDark),
             ),
           ),
@@ -735,8 +786,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               ),
             ),
           ),
-
-          // 🚀 FIX: The call to build the list now correctly assigns the sliver wrapper.
           _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: true),
         ],
       );
@@ -753,7 +802,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return const SizedBox.shrink();
   }
 
-  // 🚀 FIXED: List Reconciliation Bug - Replaced ListView.builder with explicit Keys
   Widget _buildExpenseList(List<Expense> expenses, Color primaryColor, bool isDark, {required bool isSliver}) {
     if (expenses.isEmpty) {
       final emptyState = Center(child: Padding(padding: const EdgeInsets.only(top: 40.0), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_rounded, size: 50, color: Colors.grey.withValues(alpha: 0.3)), const SizedBox(height: 12), Text("No transactions here yet.", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))])));
@@ -763,12 +811,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final now = DateTime.now();
     final double todaySpend = expenses
         .where((e) =>
-            e.type == 'expense' &&
-            e.category != 'Transfer' &&
-            e.date.day == now.day &&
-            e.date.month == now.month &&
-            e.date.year == now.year)
+    e.type == 'expense' &&
+        e.category != 'Transfer' &&
+        e.date.day == now.day &&
+        e.date.month == now.month &&
+        e.date.year == now.year)
         .fold(0.0, (sum, e) => sum + e.amount);
+
     final hasTodaySummary = todaySpend > 0;
     final itemCount = expenses.length + (hasTodaySummary ? 1 : 0);
 
@@ -954,7 +1003,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         onSubmitted: _processNLP,
         decoration: InputDecoration(
-          hintText: _isListening ? 'Listening…' : 'e.g. 500 for groceries',
+          hintText: _isListening ? 'Listening ' : 'e.g. 500 for groceries',
           hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(left: 16, top: 16, bottom: 16),
@@ -968,13 +1017,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 onPressed: _isScanningReceipt ? null : _scanReceiptIntoInput,
                 icon: _isScanningReceipt
                     ? SizedBox(
-                        width: 17,
-                        height: 17,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: primaryColor,
-                        ),
-                      )
+                  width: 17,
+                  height: 17,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: primaryColor,
+                  ),
+                )
                     : Icon(Icons.document_scanner_outlined, size: 20, color: primaryColor),
               ),
               IconButton(
@@ -1001,16 +1050,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildHeroCard(double totalAvailable, double spent, int accountCount, Color primary) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300), width: double.infinity, margin: const EdgeInsets.symmetric(horizontal: 20), padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: [primary, primary.withValues(alpha: 0.75)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(28), boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))]),
+  Widget _buildMiniHero(double totalAvailable, Color primary) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [primary, primary.withValues(alpha: 0.8)]),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))]
+      ),
+      child: Center(
+        child: Text("Total: Rs. ${totalAvailable.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+      ),
+    );
+  }
+
+  Widget _buildHeroCard(double totalAvailable, double spent, List<Wallet> wallets, Color primary) {
+    final activeWallets = wallets.where((w) => !w.isBackup).take(3).toList();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [primary, primary.withValues(alpha: 0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))]
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Total Available", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500, fontSize: 13)),
+              const Text("Total Available", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
               IconButton(
                 tooltip: 'Manage money accounts',
                 padding: EdgeInsets.zero,
@@ -1020,14 +1094,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text("Rs. ${totalAvailable.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5))),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text("Rs. ${totalAvailable.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -1.0)),
+          ),
+          const SizedBox(height: 16),
+
+          if (activeWallets.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: List.generate(activeWallets.length, (index) {
+                  final w = activeWallets[index];
+                  final balance = ref.read(walletProvider.notifier).getBalanceForWallet(w.id);
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: index == activeWallets.length - 1 ? 0 : 6.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet_rounded, size: 12, color: Colors.white.withValues(alpha: 0.7)),
+                            const SizedBox(width: 6),
+                            Text(w.name, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                        Text("Rs. ${balance.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
+
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(onTap: _openIncomeAccounts, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text("Money Accounts", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(width: 4), Icon(Icons.edit_outlined, color: Colors.white.withValues(alpha: 0.65), size: 11)]), const SizedBox(height: 2), Text("$accountCount ${accountCount == 1 ? 'account' : 'accounts'}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))])),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text("Spent This Month", style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)), const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: Text(spent.toStringAsFixed(0), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)))])),
+              Text("Spent This Month", style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w500)),
+              Text("Rs. ${spent.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
             ],
           )
         ],
@@ -1045,7 +1156,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (mounted) setState(() => _isListening = false);
       return;
     }
-
     _voiceResultProcessed = false;
     _smartInputCtrl.clear();
     final available = await _speech.initialize(
@@ -1060,7 +1170,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       },
     );
     if (!mounted) return;
-
     if (!available) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1069,7 +1178,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
       return;
     }
-
     setState(() => _isListening = true);
     await _speech.listen(
       onResult: (result) async {
@@ -1089,18 +1197,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_isScanningReceipt) return;
     FocusScope.of(context).unfocus();
     setState(() => _isScanningReceipt = true);
-
     try {
       final receiptData = await OcrScannerService().scanReceipt();
       if (!mounted) return;
-
       final amount = receiptData?['amount'];
       final title = receiptData?['title']?.toString().trim() ?? '';
       if (amount is! num || !amount.isFinite || amount <= 0) {
         _showTransactionError('Could not read a valid amount from the receipt.');
         return;
       }
-
       final amountText = amount.toDouble() == amount.toDouble().truncateToDouble()
           ? amount.toStringAsFixed(0)
           : amount.toStringAsFixed(2);
@@ -1133,7 +1238,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (normalized.isEmpty) return;
     final categories = ref.read(categoryProvider);
     final result = LocalNlpService().parseExpense(normalized, categories);
-
     final amount = result['amount'];
     if (amount is num && amount.isFinite && amount > 0) {
       final wallets = ref.read(walletProvider);
@@ -1141,21 +1245,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         _showTransactionError('Create an income account before saving this entry.');
         return;
       }
-
       final activeWallets = wallets.where((w) => !w.isBackup).toList();
       final defaultWalletId = activeWallets.isNotEmpty ? activeWallets.first.id : (wallets.isNotEmpty ? wallets.first.id : '');
-
-      final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.toARGB32(), walletId: defaultWalletId);
+      final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.toARGB32(), type: 'expense', walletId: defaultWalletId);
       await ref.read(expenseProvider.notifier).addExpense(newExpense);
       if (!mounted) return;
       _smartInputCtrl.clear();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Saved: ${result['title']} (Rs. ${amount.toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("  Saved: ${result['title']} (Rs. ${amount.toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("❌ Could not detect amount. Try: '500 for biryani'.", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("  Could not detect amount. Try: '500 for biryani'.", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red));
     }
     if (mounted) FocusScope.of(context).unfocus();
   }
-
 }
 
 class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {

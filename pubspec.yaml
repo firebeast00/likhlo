@@ -24,6 +24,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.16.0
   image_picker: ^1.1.2
   quick_actions: ^1.1.0
+  flutter_tts: ^4.2.5
 
 
 dev_dependencies:
