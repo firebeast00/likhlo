@@ -520,321 +520,324 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final settings = ref.watch(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isCompactHeight = MediaQuery.sizeOf(context).height < 500;
 
     double iGave = debts
         .where((e) => e.type == 'lent')
         .fold(0.0, (sum, e) => sum + e.amount);
+
     double iTook = debts
         .where((e) => e.type == 'borrowed')
         .fold(0.0, (sum, e) => sum + e.amount);
+
     double balance = iGave - iTook;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Column(
-        children: [
-          // 1. 🌟 SUMMARY HERO CARD
-          Container(
-            width: double.infinity,
-            margin: EdgeInsets.fromLTRB(
-              20,
-              isCompactHeight ? 4 : 16,
-              20,
-              isCompactHeight ? 4 : 10,
-            ),
-            padding: EdgeInsets.all(isCompactHeight ? 12 : 24),
-            decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(color: primaryColor.withValues(alpha: isDark ? 0.25 : 0.35), blurRadius: 18, offset: const Offset(0, 8))
-                ]
-            ),
+      // 🚀 FIXED: Wrapped in CustomScrollView to prevent landscape pixel overflow
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("Net Balance", style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 13)),
-                    Icon(balance >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: Colors.white.withValues(alpha: 0.8), size: 20),
-                  ],
+                // 1. SUMMARY HERO CARD
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(color: primaryColor.withValues(alpha: isDark ? 0.25 : 0.35), blurRadius: 18, offset: const Offset(0, 8))
+                      ]
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Net Balance", style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w500, fontSize: 13)),
+                          Icon(balance >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: Colors.white.withValues(alpha: 0.8), size: 20),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(balance < 0 ? "-" : "", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                          Text("Rs. ${balance.abs().toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                        ],
+                      ),
+                      Text(balance >= 0 ? "Overall you will receive" : "Overall you owe", style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(child: _summaryBox("I Gave", iGave, Colors.greenAccent)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _summaryBox("I Took", iTook, Colors.redAccent.shade100)),
+                        ],
+                      )
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(balance < 0 ? "-" : "", style: TextStyle(color: Colors.white, fontSize: isCompactHeight ? 24 : 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                    Text("Rs. ${balance.abs().toStringAsFixed(0)}", style: TextStyle(color: Colors.white, fontSize: isCompactHeight ? 24 : 32, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                  ],
+
+                // 2. SMART VOICE & OCR INPUT BAR
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.2), width: 1.2),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          padding: EdgeInsets.zero,
+                          icon: Icon(_isListening ? Icons.mic : Icons.mic_none_rounded, color: _isListening ? Colors.red : primaryColor, size: 20),
+                          onPressed: _listenForInput,
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _smartInputCtrl,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: _isListening ? 'Listening...' : 'Speak: "Borrowed 500 from Sara"',
+                              border: InputBorder.none,
+                              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                            ),
+                            onSubmitted: (val) => _processNLP(val),
+                          ),
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.document_scanner_rounded, color: Colors.blueAccent, size: 18),
+                          onPressed: _startReceiptScan,
+                          tooltip: "Scan Receipt",
+                        ),
+                        IconButton(
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          padding: EdgeInsets.zero,
+                          icon: Icon(Icons.send_rounded, color: primaryColor, size: 18),
+                          onPressed: () => _processNLP(_smartInputCtrl.text),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                Text(balance >= 0 ? "Overall you will receive" : "Overall you owe", style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
-
-                SizedBox(height: isCompactHeight ? 8 : 24),
-
-                Row(
-                  children: [
-                    Expanded(child: _summaryBox("I Gave", iGave, Colors.greenAccent)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _summaryBox("I Took", iTook, Colors.redAccent.shade100)),
-                  ],
-                )
               ],
             ),
           ),
 
-          // 2. 🎙️ SMART VOICE & OCR INPUT BAR
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              isCompactHeight ? 2 : 6,
-              20,
-              isCompactHeight ? 4 : 10,
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.2), width: 1.2),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    padding: EdgeInsets.zero,
-                    icon: Icon(_isListening ? Icons.mic : Icons.mic_none_rounded, color: _isListening ? Colors.red : primaryColor, size: 20),
-                    onPressed: _listenForInput,
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _smartInputCtrl,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: _isListening ? 'Listening...' : 'Speak: "Borrowed 500 from Sara"',
-                        border: InputBorder.none,
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      ),
-                      onSubmitted: (val) => _processNLP(val),
-                    ),
-                  ),
-                  IconButton(
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.document_scanner_rounded, color: Colors.blueAccent, size: 18),
-                    onPressed: _startReceiptScan,
-                    tooltip: "Scan Receipt",
-                  ),
-                  IconButton(
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.send_rounded, color: primaryColor, size: 18),
-                    onPressed: () => _processNLP(_smartInputCtrl.text),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 3. 📋 UDHAAR LIST
-          Expanded(
-            child: debts.isEmpty
-                ? Center(
+          // 3. UDHAAR LIST SLIVER
+          if (debts.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
                 child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.handshake_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
-                      const SizedBox(height: 12),
-                      Text("No active records. You're all settled!", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
-                    ]
-                )
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.handshake_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
+                    const SizedBox(height: 12),
+                    Text("No active records. You're all settled!", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
+                  ],
+                ),
+              ),
             )
-                : ListView.builder(
+          else
+            SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              itemCount: debts.length,
-              itemBuilder: (ctx, i) {
-                final item = debts[i];
-                final isLent = item.type == 'lent';
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) {
+                    final item = debts[i];
+                    final isLent = item.type == 'lent';
 
-                return Dismissible(
-                  key: Key(item.id),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(16)),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text("Mark Settled", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                      ],
-                    ),
-                  ),
-                  confirmDismiss: (_) async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (dialogContext) => AlertDialog(
-                        title: const Text('Mark Udhar as settled?'),
-                        content: Text(
-                          isLent
-                              ? 'Confirm that Rs. ${item.amount.toStringAsFixed(0)} was received from ${item.borrowerName}.'
-                              : 'Confirm that Rs. ${item.amount.toStringAsFixed(0)} was paid to ${item.borrowerName}.',
+                    return Dismissible(
+                      key: Key(item.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(16)),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text("Mark Settled", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                          ],
                         ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(dialogContext, false),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(dialogContext, true),
-                            child: const Text('Confirm'),
-                          ),
-                        ],
                       ),
-                    );
-                    if (confirmed != true || !mounted) return false;
+                      confirmDismiss: (_) async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (dialogContext) => AlertDialog(
+                            title: const Text('Mark Udhar as settled?'),
+                            content: Text(
+                              isLent
+                                  ? 'Confirm that Rs. ${item.amount.toStringAsFixed(0)} was received from ${item.borrowerName}.'
+                                  : 'Confirm that Rs. ${item.amount.toStringAsFixed(0)} was paid to ${item.borrowerName}.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialogContext, false),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(dialogContext, true),
+                                child: const Text('Confirm'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true || !mounted) return false;
 
-                    Expense? linked;
-                    for (final entry
-                        in ref.read(expenseProvider).allExpenses) {
-                      if (entry.id == item.id) {
-                        linked = entry;
-                        break;
-                      }
-                    }
-                    if (linked == null) return true;
+                        Expense? linked;
+                        for (final entry
+                            in ref.read(expenseProvider).allExpenses) {
+                          if (entry.id == item.id) {
+                            linked = entry;
+                            break;
+                          }
+                        }
+                        if (linked == null) return true;
 
-                    final settlementId = '${item.id}_settled';
-                    final alreadySettled = ref
-                        .read(expenseProvider)
-                        .allExpenses
-                        .any((entry) => entry.id == settlementId);
-                    if (alreadySettled) return true;
+                        final settlementId = '${item.id}_settled';
+                        final alreadySettled = ref
+                            .read(expenseProvider)
+                            .allExpenses
+                            .any((entry) => entry.id == settlementId);
+                        if (alreadySettled) return true;
 
-                    if (!isLent) {
-                      final available = ref
-                          .read(walletProvider.notifier)
-                          .getBalanceForWallet(linked.walletId);
-                      if (item.amount > available) {
+                        if (!isLent) {
+                          final available = ref
+                              .read(walletProvider.notifier)
+                              .getBalanceForWallet(linked.walletId);
+                          if (item.amount > available) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Insufficient balance to settle. Available: Rs. ${available.toStringAsFixed(0)}',
+                                ),
+                              ),
+                            );
+                            return false;
+                          }
+                        }
+
+                        final saved = await ref
+                            .read(expenseProvider.notifier)
+                            .addExpense(
+                              Expense(
+                                id: settlementId,
+                                title: isLent
+                                    ? 'Udhaar returned: ${item.borrowerName}'
+                                    : 'Udhaar repaid: ${item.borrowerName}',
+                                amount: item.amount,
+                                category: 'Udhaar',
+                                date: DateTime.now(),
+                                colorValue: isLent
+                                    ? Colors.green.toARGB32()
+                                    : Colors.red.toARGB32(),
+                                type: isLent ? 'income' : 'expense',
+                                walletId: linked.walletId,
+                              ),
+                            );
+                        if (!saved && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not record the settlement.')),
+                          );
+                        }
+                        return saved;
+                      },
+                      onDismissed: (_) async {
+                        await item.delete();
+                        if (!mounted) return;
+                        setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Insufficient balance to settle. Available: Rs. ${available.toStringAsFixed(0)}',
+                              'Settled Udhaar with ${item.borrowerName}',
+                              style: const TextStyle(fontSize: 13),
                             ),
+                            backgroundColor: Colors.green,
                           ),
                         );
-                        return false;
-                      }
-                    }
-
-                    final saved = await ref
-                        .read(expenseProvider.notifier)
-                        .addExpense(
-                          Expense(
-                            id: settlementId,
-                            title: isLent
-                                ? 'Udhaar returned: ${item.borrowerName}'
-                                : 'Udhaar repaid: ${item.borrowerName}',
-                            amount: item.amount,
-                            category: 'Udhaar',
-                            date: DateTime.now(),
-                            colorValue: isLent
-                                ? Colors.green.toARGB32()
-                                : Colors.red.toARGB32(),
-                            type: isLent ? 'income' : 'expense',
-                            walletId: linked.walletId,
-                          ),
-                        );
-                    if (!saved && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Could not record the settlement.')),
-                      );
-                    }
-                    return saved;
-                  },
-                  onDismissed: (_) async {
-                    await item.delete();
-                    if (!mounted) return;
-                    setState(() {});
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Settled Udhaar with ${item.borrowerName}',
-                          style: const TextStyle(fontSize: 13),
+                      },
+                      child: Card(
+                        elevation: 0,
+                        color: Theme.of(context).cardColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2),
                         ),
-                        backgroundColor: Colors.green,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(color: isLent ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15), shape: BoxShape.circle),
+                                child: Icon(isLent ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: isLent ? Colors.green : Colors.red, size: 20),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      item.borrowerName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Icon(item.dueDate != null ? Icons.calendar_month_rounded : Icons.info_outline_rounded, size: 11, color: Colors.grey.shade500),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          item.dueDate != null ? "Due: ${DateFormat.MMMEd().format(item.dueDate!)}" : (isLent ? "You gave them" : "They gave you"),
+                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        )
+                                      ],
+                                    )
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                  "Rs. ${item.amount.toStringAsFixed(0)}",
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isLent ? Colors.green : Colors.red)
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },
-                  child: Card(
-                    elevation: 0,
-                    color: Theme.of(context).cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2),
-                    ),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: isLent ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15), shape: BoxShape.circle),
-                            child: Icon(isLent ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: isLent ? Colors.green : Colors.red, size: 20),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  item.borrowerName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Icon(item.dueDate != null ? Icons.calendar_month_rounded : Icons.info_outline_rounded, size: 11, color: Colors.grey.shade500),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      item.dueDate != null ? "Due: ${DateFormat.MMMEd().format(item.dueDate!)}" : (isLent ? "You gave them" : "They gave you"),
-                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    )
-                                  ],
-                                )
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                              "Rs. ${item.amount.toStringAsFixed(0)}",
-                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isLent ? Colors.green : Colors.red)
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+                  childCount: debts.length,
+                ),
+              ),
             ),
-          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
