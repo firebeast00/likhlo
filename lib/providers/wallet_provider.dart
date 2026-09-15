@@ -77,17 +77,8 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
   double getBalanceForWallet(String walletId) {
     final wallet = _box.get(walletId);
     if (wallet == null) return 0.0;
-    final expenses = _ref.read(expenseProvider).allExpenses;
-
-    double totalIncome = expenses
-        .where((e) => e.walletId == walletId && e.type == 'income')
-        .fold(0.0, (sum, e) => sum + e.amount);
-
-    double totalExpense = expenses
-        .where((e) => e.walletId == walletId && e.type == 'expense')
-        .fold(0.0, (sum, e) => sum + e.amount);
-
-    return wallet.balance + totalIncome - totalExpense;
+    return wallet.balance +
+        (_ref.read(walletMovementsProvider)[walletId] ?? 0.0);
   }
 
   Future<void> clearBalance(String walletId) async {

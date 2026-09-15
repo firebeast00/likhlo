@@ -30,7 +30,7 @@ class NotificationService {
   }
 
   Future<void> init({void Function(String action)? onAction}) async {
-    onActionTriggered = onAction;
+    if (onAction != null) onActionTriggered = onAction;
     tz.initializeTimeZones();
 
     // Android Initialization Settings
@@ -50,7 +50,8 @@ class NotificationService {
     await _notifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
-        final actionId = response.actionId ?? response.payload ?? '';
+        final actionId = (response.actionId?.isNotEmpty ?? false)
+            ? response.actionId! : response.payload ?? '';
         debugPrint("🔔 Notification Response Received: actionId='$actionId', payload='${response.payload}'");
         if (actionId.isNotEmpty) {
           if (onActionTriggered != null) {
@@ -66,8 +67,16 @@ class NotificationService {
         await _notifications.getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp ?? false) {
       final response = launchDetails?.notificationResponse;
-      final actionId = response?.actionId ?? response?.payload ?? '';
-      if (actionId.isNotEmpty) _pendingAction = actionId;
+      final actionId = (response?.actionId?.isNotEmpty ?? false)
+          ? response!.actionId! : response?.payload ?? '';
+      if (actionId.isNotEmpty) {
+        final handler = onActionTriggered;
+        if (handler != null) {
+          handler(actionId);
+        } else {
+          _pendingAction = actionId;
+        }
+      }
     }
 
     // Request Permissions on Android 13+

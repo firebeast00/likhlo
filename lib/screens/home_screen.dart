@@ -834,7 +834,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final isIncome = e.type == 'income';
     final isTransfer = e.category == 'Transfer';
 
-    final amountSign = isTransfer ? (isIncome ? "+" : "-") : (isIncome ? "+" : "-");
+    final amountSign = isTransfer ? "" : (isIncome ? "+" : "-");
     final amountColor = isTransfer ? Colors.blue : (isIncome ? Colors.green : (isDark ? Colors.white : Colors.black87));
     final displayIcon = isTransfer ? Icons.swap_horiz_rounded : (isIncome ? Icons.south_west_rounded : Icons.category_rounded);
 

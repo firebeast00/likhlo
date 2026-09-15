@@ -89,10 +89,12 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           bottomTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
+                                reservedSize: 40,
+                                interval: 1,
                                 getTitlesWidget: (val, meta) {
-                                  if (val.toInt() >= 0 && val.toInt() < stats.monthLabels.length) {
+                                  if (val == val.roundToDouble() && val.toInt() >= 0 && val.toInt() < stats.monthLabels.length) {
                                     return Padding(
-                                      padding: const EdgeInsets.only(top: 12.0),
+                                      padding: const EdgeInsets.only(top: 8.0),
                                       child: Text(
                                           stats.monthLabels[val.toInt()],
                                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500)

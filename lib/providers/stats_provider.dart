@@ -24,38 +24,26 @@ final statsProvider = Provider<ExpenseStats>((ref) {
   final allExpenses = ref.watch(expenseProvider).allExpenses;
   final now = DateTime.now();
 
-  // 1. Calculate 6-Month Trend
-  List<double> monthlyTotals = [];
-  List<String> monthLabels = [];
-  double maxMonthTotal = 0;
-
-  for (int i = 5; i >= 0; i--) {
-    final monthDate = DateTime(now.year, now.month - i, 1);
-    final monthExpenses = allExpenses.where((e) =>
-        e.date.month == monthDate.month &&
-        e.date.year == monthDate.year &&
-        e.type == 'expense' &&
-        e.category != 'Transfer');
-    final total = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
-
-    monthlyTotals.add(total);
-    monthLabels.add(DateFormat.MMM().format(monthDate));
-
-    if (total > maxMonthTotal) maxMonthTotal = total;
-  }
-
-  // 2. Calculate Current Month Category Breakdown
-  final currentMonthExpenses = allExpenses.where((e) =>
-      e.date.month == now.month &&
-      e.date.year == now.year &&
-      e.type == 'expense' &&
-      e.category != 'Transfer').toList();
-  final Map<String, double> categoryTotals = {};
+  final monthlyTotals = List<double>.filled(6, 0);
+  final monthLabels = List<String>.generate(6, (i) =>
+      DateFormat.MMM().format(DateTime(now.year, now.month - 5 + i, 1)));
+  final categoryTotals = <String, double>{};
   double totalSpentThisMonth = 0;
-
-  for (var e in currentMonthExpenses) {
-    categoryTotals[e.category] = (categoryTotals[e.category] ?? 0) + e.amount;
-    totalSpentThisMonth += e.amount;
+  double maxMonthTotal = 0;
+  final currentMonth = now.year * 12 + now.month;
+  for (final e in allExpenses) {
+    if (e.type != 'expense' || e.category == 'Transfer') continue;
+    final age = currentMonth - (e.date.year * 12 + e.date.month);
+    if (age < 0 || age > 5) continue;
+    monthlyTotals[5 - age] += e.amount;
+    if (age == 0) {
+      categoryTotals.update(e.category, (v) => v + e.amount,
+          ifAbsent: () => e.amount);
+      totalSpentThisMonth += e.amount;
+    }
+  }
+  for (final total in monthlyTotals) {
+    if (total > maxMonthTotal) maxMonthTotal = total;
   }
 
   final sortedCategories = categoryTotals.entries.toList()

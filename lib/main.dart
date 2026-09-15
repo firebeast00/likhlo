@@ -96,6 +96,7 @@ class LikhloApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Likhlo',
       debugShowCheckedModeBanner: false,
+      themeAnimationDuration: Duration.zero,
       themeMode: themeMode == 'system'
           ? ThemeMode.system
           : (themeMode == 'dark' ? ThemeMode.dark : ThemeMode.light),

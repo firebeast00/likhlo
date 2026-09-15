@@ -171,8 +171,34 @@ final monthlyLedgerProvider =
   }
 
   return MonthlyLedgerSummary(
-    transactions: transactions,
+    transactions: visibleTransactions(transactions),
     income: income,
     spent: spent,
   );
+});
+
+/// Collapse only verified transfer pairs for global history; retain both in storage.
+List<Expense> visibleTransactions(Iterable<Expense> entries) {
+  final records = entries.toList(growable: false);
+  final outgoing = {
+    for (final e in records)
+      if (e.category == 'Transfer' && e.id.endsWith('_out'))
+        e.id.substring(0, e.id.length - 4): e,
+  };
+  return records.where((e) {
+    if (e.category != 'Transfer' || !e.id.endsWith('_in')) return true;
+    final source = outgoing[e.id.substring(0, e.id.length - 3)];
+    return source == null || source.amount != e.amount ||
+        source.date != e.date || source.type != 'expense' || e.type != 'income';
+  }).toList(growable: false);
+}
+
+final walletMovementsProvider = Provider<Map<String, double>>((ref) {
+  final totals = <String, double>{};
+  for (final e in ref.watch(expenseProvider).allExpenses) {
+    final delta = e.type == 'income' ? e.amount :
+        e.type == 'expense' ? -e.amount : 0.0;
+    totals.update(e.walletId, (v) => v + delta, ifAbsent: () => delta);
+  }
+  return totals;
 });

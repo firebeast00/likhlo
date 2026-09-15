@@ -359,7 +359,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                   child: Icon(Icons.download_rounded, size: 20, color: Colors.red.shade400),
                 ),
-                onTap: () => _generatePdf(context, ref, primaryColor),
+                onTap: () => _generatePdf(context, ref),
               ),
             ],
           ),
@@ -407,24 +407,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   // --- PROFESSIONAL PDF GENERATOR ---
-  Future<void> _generatePdf(BuildContext context, WidgetRef ref, Color primaryColor) async {
-    final expenses = ref.read(expenseProvider).allExpenses;
+  Future<void> _generatePdf(BuildContext context, WidgetRef ref) async {
+    try {
+    final records = List.of(ref.read(expenseProvider).allExpenses);
+    final expenses = visibleTransactions(records);
     final settings = ref.read(settingsProvider);
     final pdf = pw.Document();
 
-    final totalSpent = expenses.fold(0.0, (sum, item) => sum + item.amount);
+    final totalSpent = records.where((e) => e.type == 'expense' && e.category != 'Transfer')
+        .fold(0.0, (sum, item) => sum + item.amount);
     final dateStr = DateFormat.yMMMM().format(DateTime.now());
 
-    final pdfPrimaryColor = PdfColor.fromInt(primaryColor.toARGB32());
+    const pdfPrimaryColor = PdfColor.fromInt(0xFF1E3A8A);
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
+        maxPages: 1000,
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(40),
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
+          return [
               pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -456,8 +458,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text("Total Outflow:", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                        pw.Text("Rs. ${totalSpent.toStringAsFixed(0)}", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: pdfPrimaryColor)),
+                        pw.Text("Total Spending (all records):", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                        pw.Text("Rs. ${totalSpent.toStringAsFixed(2)}", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: pdfPrimaryColor)),
                       ]
                   )
               ),
@@ -474,29 +476,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
                 rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
                 cellPadding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                headers: ['Date', 'Title', 'Category', 'Amount (Rs)'],
+                headers: ['Date', 'Title', 'Type', 'Category', 'Amount (Rs)'],
                 data: expenses.map((e) => [
                   DateFormat('dd MMM yyyy').format(e.date),
                   e.title,
+                  e.category == 'Transfer' ? 'Transfer' : e.type,
                   e.category,
-                  e.amount.toStringAsFixed(0)
+                  e.amount.toStringAsFixed(2)
                 ]).toList(),
               ),
-              pw.Spacer(),
+              pw.SizedBox(height: 16),
               pw.Divider(color: PdfColors.grey400),
               pw.SizedBox(height: 8),
               pw.Center(
                   child: pw.Text("Generated securely via Likhlo Expense Manager.", style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600))
               )
-            ],
-          );
+          ];
         },
       ),
     );
 
+    final bytes = await pdf.save();
     await Printing.layoutPdf(
-        onLayout: (format) async => pdf.save(),
+        onLayout: (format) async => bytes,
         name: 'Likhlo_Statement_$dateStr.pdf'
     );
+    } catch (error) {
+      debugPrint('PDF export failed: $error');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not export the report. Please try again.')),
+      );
+    }
   }
 }
