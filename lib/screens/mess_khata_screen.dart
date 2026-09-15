@@ -277,33 +277,51 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       final amt = double.tryParse(amountCtrl.text) ?? 0;
                       final count = int.tryParse(countCtrl.text) ?? 1;
                       if (titleCtrl.text.isNotEmpty && amt > 0 && count > 0) {
                         final expenseId = const Uuid().v4();
 
-                        ref.read(messProvider.notifier).addEntry(
-                          MessEntry(
-                            id: expenseId,
-                            title: titleCtrl.text,
-                            totalAmount: amt,
-                            paidBy: payerCtrl.text,
-                            splitCount: count,
-                            date: DateTime.now(),
-                          ),
+                        final messEntry = MessEntry(
+                          id: expenseId,
+                          title: titleCtrl.text.trim(),
+                          totalAmount: amt,
+                          paidBy: payerCtrl.text.trim(),
+                          splitCount: count,
+                          date: DateTime.now(),
                         );
-
-                        ref.read(expenseProvider.notifier).addExpense(
-                          Expense(
-                            id: expenseId,
-                            title: "Mess: ${titleCtrl.text} (${payerCtrl.text})",
-                            amount: amt,
-                            category: "Hostel/Mess",
-                            date: DateTime.now(),
-                            colorValue: primaryColor.toARGB32(),
-                          ),
-                        );
+                        final messSaved =
+                            await ref.read(messProvider.notifier).addEntry(messEntry);
+                        if (!messSaved) {
+                          if (!ctx.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not save the Mess Khata record.')),
+                          );
+                          return;
+                        }
+                        final linkedSaved = await ref
+                            .read(expenseProvider.notifier)
+                            .addExpense(
+                              Expense(
+                                id: expenseId,
+                                title: "Mess: ${titleCtrl.text.trim()} (${payerCtrl.text.trim()})",
+                                amount: amt,
+                                category: "Hostel/Mess",
+                                date: DateTime.now(),
+                                colorValue: primaryColor.toARGB32(),
+                              ),
+                            );
+                        if (!linkedSaved) {
+                          await ref
+                              .read(messProvider.notifier)
+                              .deleteEntry(expenseId);
+                          if (!ctx.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not save the linked expense.')),
+                          );
+                          return;
+                        }
 
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);

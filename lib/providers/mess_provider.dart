@@ -13,11 +13,17 @@ class MessNotifier extends StateNotifier<List<MessEntry>> {
     state = box.values.toList();
   }
 
-  Future<void> addEntry(MessEntry entry) async {
-    if (!entry.totalAmount.isFinite || entry.totalAmount <= 0) return;
+  Future<bool> addEntry(MessEntry entry) async {
+    if (entry.id.trim().isEmpty ||
+        !entry.totalAmount.isFinite ||
+        entry.totalAmount <= 0) {
+      return false;
+    }
     final box = Hive.box<MessEntry>('mess_khata');
-    await box.add(entry);
+    if (box.values.any((existing) => existing.id == entry.id)) return false;
+    await box.put(entry.id, entry);
     loadEntries();
+    return true;
   }
 
   Future<void> deleteEntry(String id) async {

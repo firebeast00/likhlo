@@ -44,9 +44,10 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   /// use this path so the dashboard never renders a half-complete pair.
   Future<bool> addExpenses(Iterable<Expense> expenses) async {
     final additions = expenses.toList(growable: false);
-    if (additions.isEmpty ||
-        additions.any((entry) =>
-            !entry.amount.isFinite || entry.amount <= 0)) {
+    if (!isValidTransactionBatch(
+      additions,
+      existingIds: state.allExpenses.map((entry) => entry.id).toSet(),
+    )) {
       return false;
     }
 
@@ -146,6 +147,23 @@ final expenseProvider = StateNotifierProvider<ExpenseNotifier, ExpenseState>((re
   return ExpenseNotifier();
 });
 
+bool isValidTransactionBatch(
+  Iterable<Expense> entries, {
+  Set<String> existingIds = const {},
+}) {
+  final transactions = entries.toList(growable: false);
+  if (transactions.isEmpty ||
+      transactions.any((entry) =>
+          entry.id.trim().isEmpty ||
+          !entry.amount.isFinite ||
+          entry.amount <= 0 ||
+          existingIds.contains(entry.id))) {
+    return false;
+  }
+  final ids = transactions.map((entry) => entry.id).toSet();
+  return ids.length == transactions.length;
+}
+
 /// Cached, single-pass monthly projection. Recomputed only when transaction
 /// data changes or a different month is selected.
 final monthlyLedgerProvider =
@@ -193,12 +211,25 @@ List<Expense> visibleTransactions(Iterable<Expense> entries) {
   }).toList(growable: false);
 }
 
-final walletMovementsProvider = Provider<Map<String, double>>((ref) {
+Map<String, double> calculateWalletMovements(Iterable<Expense> entries) {
   final totals = <String, double>{};
-  for (final e in ref.watch(expenseProvider).allExpenses) {
-    final delta = e.type == 'income' ? e.amount :
-        e.type == 'expense' ? -e.amount : 0.0;
-    totals.update(e.walletId, (v) => v + delta, ifAbsent: () => delta);
+  for (final entry in entries) {
+    final delta = entry.type == 'income'
+        ? entry.amount
+        : entry.type == 'expense'
+            ? -entry.amount
+            : 0.0;
+    totals.update(
+      entry.walletId,
+      (value) => value + delta,
+      ifAbsent: () => delta,
+    );
   }
   return totals;
+}
+
+final walletMovementsProvider = Provider<Map<String, double>>((ref) {
+  return calculateWalletMovements(
+    ref.watch(expenseProvider).allExpenses,
+  );
 });
