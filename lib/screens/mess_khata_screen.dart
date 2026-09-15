@@ -534,12 +534,36 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                         const SizedBox(height: 4),
                         InkWell(
                           borderRadius: BorderRadius.circular(6),
-                          onTap: () {
-                            ref.read(messProvider.notifier).deleteEntry(item.id);
-                            ref.read(expenseProvider.notifier).deleteExpense(item.id);
-
+                          onTap: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                title: const Text('Delete Mess Khata record?'),
+                                content: Text(
+                                  "Delete '${item.title}'? This will also remove the linked expense from your records.",
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dialogContext, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                    onPressed: () => Navigator.pop(dialogContext, true),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true || !mounted) return;
+                            await ref.read(messProvider.notifier).deleteEntry(item.id);
+                            await ref.read(expenseProvider.notifier).deleteExpense(item.id);
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Deleted split expense & synced budget"), backgroundColor: Colors.red),
+                              const SnackBar(
+                                content: Text('Deleted split expense and updated records'),
+                                backgroundColor: Colors.red,
+                              ),
                             );
                           },
                           child: Padding(

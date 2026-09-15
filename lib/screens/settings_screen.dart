@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
+import '../providers/wallet_provider.dart';
 import '../services/notification_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -29,7 +30,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _setPersistentQuickLog(bool enabled) async {
     await _prefBox.put('persistent_bar_enabled', enabled);
-    if (!enabled) {
+    if (enabled) {
+      final now = DateTime.now();
+      final entries = ref.read(expenseProvider).allExpenses;
+      final wallets = ref.read(walletProvider);
+      final walletNotifier = ref.read(walletProvider.notifier);
+      final available = wallets.fold<double>(
+        0,
+        (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+      );
+      final spentToday = entries
+          .where((entry) =>
+              entry.type == 'expense' &&
+              entry.category != 'Transfer' &&
+              entry.date.year == now.year &&
+              entry.date.month == now.month &&
+              entry.date.day == now.day)
+          .fold<double>(0, (sum, entry) => sum + entry.amount);
+      await NotificationService().updatePersistentStatusBarWidget(
+        remainingToday: available,
+        spentToday: spentToday,
+      );
+    } else {
       await NotificationService().cancelNotification(
         NotificationService.persistentBarId,
       );

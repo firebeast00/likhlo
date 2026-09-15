@@ -985,68 +985,112 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildSmartInputBar(Color primaryColor, bool isDark) {
-    return Container(
-      height: 52,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _isListening
-              ? Colors.red.withValues(alpha: 0.55)
-              : primaryColor.withValues(alpha: isDark ? 0.28 : 0.16),
-        ),
-      ),
-      child: TextField(
-        controller: _smartInputCtrl,
-        textInputAction: TextInputAction.done,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-        onSubmitted: _processNLP,
-        decoration: InputDecoration(
-          hintText: _isListening ? 'Listening ' : 'e.g. 500 for groceries',
-          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.only(left: 16, top: 16, bottom: 16),
-          suffixIconConstraints: const BoxConstraints(minHeight: 40),
-          suffixIcon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: 'Scan receipt',
-                visualDensity: VisualDensity.compact,
-                onPressed: _isScanningReceipt ? null : _scanReceiptIntoInput,
-                icon: _isScanningReceipt
-                    ? SizedBox(
-                  width: 17,
-                  height: 17,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: primaryColor,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          child: _isListening
+              ? Container(
+                  key: const ValueKey('voice-listening'),
+                  margin: const EdgeInsets.only(left: 24, right: 24, bottom: 7),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: isDark ? 0.16 : 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 8,
+                        height: 8,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Voice NLP is listening — speak now',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 )
-                    : Icon(Icons.document_scanner_outlined, size: 20, color: primaryColor),
+              : const SizedBox.shrink(key: ValueKey('voice-idle')),
+        ),
+        Container(
+          height: 52,
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              width: _isListening ? 1.5 : 1,
+              color: _isListening
+                  ? Colors.red
+                  : primaryColor.withValues(alpha: isDark ? 0.28 : 0.16),
+            ),
+          ),
+          child: TextField(
+            controller: _smartInputCtrl,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            onSubmitted: _processNLP,
+            decoration: InputDecoration(
+              hintText: _isListening ? 'Listening…' : 'e.g. 500 for groceries',
+              hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.only(left: 16, top: 16, bottom: 16),
+              suffixIconConstraints: const BoxConstraints(minHeight: 40),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Scan receipt',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _isScanningReceipt ? null : _scanReceiptIntoInput,
+                    icon: _isScanningReceipt
+                        ? SizedBox(
+                            width: 17,
+                            height: 17,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: primaryColor,
+                            ),
+                          )
+                        : Icon(Icons.document_scanner_outlined, size: 20, color: primaryColor),
+                  ),
+                  IconButton(
+                    tooltip: _isListening ? 'Stop listening' : 'Voice input',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _listenForExpense,
+                    icon: Icon(
+                      _isListening ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+                      size: 21,
+                      color: _isListening ? Colors.red : primaryColor,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Save quick expense',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _processNLP(_smartInputCtrl.text),
+                    icon: Icon(Icons.arrow_upward_rounded, size: 20, color: primaryColor),
+                  ),
+                  const SizedBox(width: 4),
+                ],
               ),
-              IconButton(
-                tooltip: _isListening ? 'Stop listening' : 'Voice input',
-                visualDensity: VisualDensity.compact,
-                onPressed: _listenForExpense,
-                icon: Icon(
-                  _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                  size: 20,
-                  color: _isListening ? Colors.red : primaryColor,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Save quick expense',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _processNLP(_smartInputCtrl.text),
-                icon: Icon(Icons.arrow_upward_rounded, size: 20, color: primaryColor),
-              ),
-              const SizedBox(width: 4),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1146,13 +1190,119 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
+  Future<void> _pickBudgetMonth() async {
+    var selectedYear = _focusedMonth.year;
+    final selected = await showDialog<DateTime>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Select month and year'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  value: selectedYear,
+                  decoration: const InputDecoration(
+                    labelText: 'Year',
+                    prefixIcon: Icon(Icons.calendar_today_rounded),
+                  ),
+                  items: [
+                    for (var year = 2000; year <= 2100; year++)
+                      DropdownMenuItem(value: year, child: Text('$year')),
+                  ],
+                  onChanged: (year) {
+                    if (year != null) {
+                      setDialogState(() => selectedYear = year);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 2.2,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: 12,
+                  itemBuilder: (context, index) {
+                    final month = index + 1;
+                    final isSelected = selectedYear == _focusedMonth.year &&
+                        month == _focusedMonth.month;
+                    return FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                        foregroundColor: isSelected ? Colors.white : null,
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: () => Navigator.pop(
+                        dialogContext,
+                        DateTime(selectedYear, month, 1),
+                      ),
+                      child: Text(DateFormat.MMM().format(DateTime(2000, month))),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() => _focusedMonth = selected);
+    }
+  }
+
   Widget _buildMonthSelector(bool isDark) {
-    return Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16), onPressed: ()=>setState(()=>_focusedMonth=DateTime(_focusedMonth.year, _focusedMonth.month-1, 1))), Text(DateFormat.yMMMM().format(_focusedMonth), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDark?Colors.white:Colors.black87)), IconButton(icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16), onPressed: ()=>setState(()=>_focusedMonth=DateTime(_focusedMonth.year, _focusedMonth.month+1, 1)))]));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+            onPressed: () => setState(() => _focusedMonth =
+                DateTime(_focusedMonth.year, _focusedMonth.month - 1, 1)),
+          ),
+          TextButton.icon(
+            onPressed: _pickBudgetMonth,
+            icon: const Icon(Icons.calendar_month_rounded, size: 18),
+            label: Text(
+              DateFormat.yMMMM().format(_focusedMonth),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+            onPressed: () => setState(() => _focusedMonth =
+                DateTime(_focusedMonth.year, _focusedMonth.month + 1, 1)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _listenForExpense() async {
     if (_isListening) {
       await _speech.stop();
+      await HapticFeedback.selectionClick();
       if (mounted) setState(() => _isListening = false);
       return;
     }
@@ -1179,6 +1329,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
     setState(() => _isListening = true);
+    await HapticFeedback.mediumImpact();
     await _speech.listen(
       onResult: (result) async {
         if (!mounted) return;

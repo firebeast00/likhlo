@@ -12,6 +12,7 @@ import '../services/ocr_scanner_service.dart';
 import '../providers/settings_provider.dart';
 import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
+import '../providers/wallet_provider.dart';
 
 class DebtScreen extends ConsumerStatefulWidget {
   const DebtScreen({super.key});
@@ -136,6 +137,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final amountCtrl = TextEditingController(text: initialAmount);
     String type = initialType;
     DateTime? selectedDate;
+    final wallets = ref.read(walletProvider);
+    String selectedWalletId = wallets.isEmpty
+        ? ''
+        : wallets.firstWhere(
+            (wallet) => !wallet.isBackup,
+            orElse: () => wallets.first,
+          ).id;
 
     final settings = ref.read(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
@@ -218,6 +226,41 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       _buildModernInput(nameCtrl, "Person Name", Icons.person_rounded, primaryColor, isDark),
                       const SizedBox(height: 12),
                       _buildModernInput(amountCtrl, "Amount (Rs.)", Icons.attach_money_rounded, primaryColor, isDark, isNumber: true),
+                      if (type == 'lent') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: wallets.any((wallet) => wallet.id == selectedWalletId)
+                              ? selectedWalletId
+                              : null,
+                          decoration: InputDecoration(
+                            labelText: 'Money sent from',
+                            prefixIcon: Icon(Icons.account_balance_wallet_rounded, color: primaryColor),
+                            filled: true,
+                            fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          items: wallets.map((wallet) {
+                            final balance = ref
+                                .read(walletProvider.notifier)
+                                .getBalanceForWallet(wallet.id);
+                            return DropdownMenuItem<String>(
+                              value: wallet.id,
+                              child: Text(
+                                '${wallet.name} — Rs. ${balance.toStringAsFixed(0)}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: wallets.isEmpty
+                              ? null
+                              : (value) => setModalState(
+                                    () => selectedWalletId = value ?? '',
+                                  ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
 
                       // DATE PICKER
@@ -274,6 +317,27 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         onPressed: () async {
                           final amt = double.tryParse(amountCtrl.text) ?? 0;
                           if (nameCtrl.text.isNotEmpty && amt > 0) {
+                            if (type == 'lent') {
+                              if (selectedWalletId.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Create a money account before lending money.')),
+                                );
+                                return;
+                              }
+                              final available = ref
+                                  .read(walletProvider.notifier)
+                                  .getBalanceForWallet(selectedWalletId);
+                              if (amt > available) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Insufficient account balance. Available: Rs. ${available.toStringAsFixed(0)}',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
                             final debtId = const Uuid().v4(); // Generate shared ID
 
                             final newDebt = DebtEntry(
@@ -294,8 +358,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                     title: "Udhaar: ${nameCtrl.text.trim()}",
                                     amount: amt,
                                     category: "Udhaar",
-                                    date: selectedDate ?? DateTime.now(),
+                                    date: DateTime.now(),
                                     colorValue: Colors.red.toARGB32(),
+                                    walletId: selectedWalletId,
                                   )
                               );
                             }
