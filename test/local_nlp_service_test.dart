@@ -305,5 +305,100 @@ void main() {
     });
 
 
+    test('returns a typed command with per-field confidence', () {
+      final command =
+          LocalNlpService().parseCommand('500 burger cash', categories);
+
+      expect(command.intent, SmartEntryIntent.addExpense);
+      expect(command.amount, 500);
+      expect(command.category, 'Food');
+      expect(command.confidenceByField.keys, containsAll(
+        ['intent', 'amount', 'title', 'category', 'date'],
+      ));
+      expect(command.clarificationReasons, isEmpty);
+    });
+
+    test('recognizes critical commands without auto-saving them', () {
+      final service = LocalNlpService();
+      final delete = service.parseCommand('delete burger', categories);
+      final edit =
+          service.parseCommand('change burger amount to 600', categories);
+      final transfer =
+          service.parseCommand('transfer 500 cash to JazzCash', categories);
+      final query =
+          service.parseCommand('show food spending this month', categories);
+
+      expect(delete.intent, SmartEntryIntent.deleteEntry);
+      expect(edit.intent, SmartEntryIntent.editEntry);
+      expect(transfer.intent, SmartEntryIntent.transfer);
+      expect(query.intent, SmartEntryIntent.query);
+      expect(
+        shouldAutoSaveSmartEntry(
+          delete.toLegacyMap(),
+          hasResolvedWallet: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('parses English and Roman Urdu number phrases', () {
+      final english = LocalNlpService()
+          .parseCommand('fifty thousand salary received', categories);
+      final romanUrdu = LocalNlpService()
+          .parseCommand('pachaas hazar salary aayi', categories);
+
+      expect(english.amount, 50000);
+      expect(english.intent, SmartEntryIntent.addIncome);
+      expect(romanUrdu.amount, 50000);
+      expect(romanUrdu.intent, SmartEntryIntent.addIncome);
+    });
+
+    test('removes command filler words from transaction titles', () {
+      final command =
+          LocalNlpService().parseCommand('please add 500 burger', categories);
+
+      expect(command.title, 'Burger');
+      expect(command.category, 'Food');
+    });
+
+    test('rejects negative NLP amounts', () {
+      final command =
+          LocalNlpService().parseCommand('-500 burger', categories);
+
+      expect(command.amount, 0);
+      expect(command.needsClarification, isTrue);
+      expect(command.clarificationReasons, contains(
+        'Amount must be greater than zero.',
+      ));
+    });
+
+    test('does not resolve when multiple wallets are mentioned', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 1000,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 1000,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: '500 burger cash JazzCash',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 500,
+        ),
+        isNull,
+      );
+    });
+
+
   });
 }
