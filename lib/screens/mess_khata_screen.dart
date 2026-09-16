@@ -306,7 +306,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       final wallets = ref.read(walletProvider);
                       if (wallets.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Create a money account before adding an expense.')),
+                          const SnackBar(content: Text('Create a wallet before adding an expense.')),
                         );
                         return;
                       }
