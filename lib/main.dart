@@ -16,6 +16,7 @@ import "./services/notification_service.dart";
 
 // Providers
 import 'providers/settings_provider.dart';
+import 'widgets/app_lock_gate.dart';
 
 
 
@@ -122,8 +123,10 @@ class LikhloApp extends ConsumerWidget {
 
       // 🚀 THE BUILDER: Handles Global Overlays (Dimmer & AI Chat)
       builder: (context, child) {
-        return _AppContentWithDimmer(
-          child: child ?? const SizedBox.shrink(),
+        return AppLockGate(
+          child: _AppContentWithDimmer(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
 

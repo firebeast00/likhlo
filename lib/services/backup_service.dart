@@ -7,6 +7,7 @@ import '../models/expense_model.dart';
 import '../models/mess_entry_model.dart';
 import '../models/wallet_model.dart';
 import 'backup_codec.dart';
+import 'biometric_service.dart';
 
 class BackupPreview {
   final DateTime createdAt;
@@ -176,6 +177,13 @@ class BackupService {
 
   Future<void> _writeValidated(ValidatedBackup backup) async {
     final boxes = await _openBoxes();
+    // App Lock belongs to this physical device. Never import another phone's
+    // lock preference, because its enrolled biometrics are not transferable.
+    final localAppLockEnabled = boxes.preferences.get(
+          BiometricService.preferenceKey,
+          defaultValue: false,
+        ) ==
+        true;
     await boxes.expenses.clear();
     await boxes.expenses.putAll({for (final e in backup.expenses) e.id: e});
     await boxes.wallets.clear();
@@ -188,6 +196,10 @@ class BackupService {
     await boxes.settings.putAll(backup.settings);
     await boxes.preferences.clear();
     await boxes.preferences.putAll(backup.preferences);
+    await boxes.preferences.put(
+      BiometricService.preferenceKey,
+      localAppLockEnabled,
+    );
   }
 
   Future<_BackupBoxes> _openBoxes() async {

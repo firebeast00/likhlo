@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/wallet_provider.dart';
+import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
 import 'backup_screen.dart';
 
@@ -22,11 +23,63 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late Box _prefBox;
+  final DeviceAuthenticator _deviceAuthenticator = BiometricService();
+  bool _changingAppLock = false;
 
   @override
   void initState() {
     super.initState();
     _prefBox = Hive.box('preferences');
+  }
+
+  void _showSecurityMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _setAppLock(bool enabled) async {
+    if (_changingAppLock) return;
+    setState(() => _changingAppLock = true);
+
+    try {
+      if (enabled && !await _deviceAuthenticator.canUseBiometrics()) {
+        _showSecurityMessage(
+          'Set up a fingerprint or Face ID in your phone settings before enabling App Lock.',
+        );
+        return;
+      }
+
+      final result = await _deviceAuthenticator.authenticate(
+        reason: enabled
+            ? 'Confirm your fingerprint or Face ID to enable Likhlo App Lock.'
+            : 'Authenticate to turn off Likhlo App Lock.',
+        biometricOnly: enabled,
+      );
+      if (!mounted) return;
+
+      if (!result.authenticated) {
+        _showSecurityMessage(result.message);
+        return;
+      }
+
+      await _prefBox.put(BiometricService.preferenceKey, enabled);
+      if (!mounted) return;
+      setState(() {});
+      _showSecurityMessage(
+        enabled
+            ? 'App Lock is on. Likhlo will lock when you leave the app.'
+            : 'App Lock is off.',
+      );
+    } catch (error) {
+      debugPrint('App Lock setting failed: $error');
+      _showSecurityMessage(
+        'App Lock could not be changed. Please try again.',
+      );
+    } finally {
+      if (mounted) setState(() => _changingAppLock = false);
+    }
   }
 
   Future<void> _setPersistentQuickLog(bool enabled) async {
@@ -218,6 +271,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Read Hive states for Notification toggles
     final bool persistentEnabled = _prefBox.get('persistent_bar_enabled', defaultValue: true);
     final bool remindersEnabled = _prefBox.get('daily_reminder_enabled', defaultValue: true);
+    final bool appLockEnabled = _prefBox.get(
+      BiometricService.preferenceKey,
+      defaultValue: false,
+    ) as bool;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -346,6 +403,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ],
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
+          const Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 12),
+            child: Text("Security", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
+          ),
+          _buildSettingsGroup(
+            isDark: isDark,
+            children: [
+              _buildSwitchTile(
+                title: "App Lock",
+                subtitle: appLockEnabled
+                    ? "Protect Likhlo when it opens or resumes"
+                    : "Use fingerprint, Face ID, or device passcode",
+                icon: Icons.fingerprint_rounded,
+                iconColor: Colors.blue,
+                value: appLockEnabled,
+                onChanged: _changingAppLock ? (_) {} : _setAppLock,
               ),
             ],
           ),
