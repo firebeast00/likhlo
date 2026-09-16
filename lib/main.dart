@@ -56,7 +56,7 @@ void main() async {
   // native splash remains visible only while essential local storage opens.
   if (storageError == null) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 300), () async {
+      Future<void>.delayed(const Duration(milliseconds: 1200), () async {
         try {
           await NotificationService().init();
         } catch (e) {
