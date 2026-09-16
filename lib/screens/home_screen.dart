@@ -735,7 +735,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _activeMessageEntry = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
     _messageTimer = Timer(
-      Duration(seconds: actionLabel == null ? 5 : 7),
+      Duration(seconds: actionLabel == null ? 5 : 10),
       dismiss,
     );
   }
@@ -2389,6 +2389,370 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
   }
 
+  Future<Expense?> _showSmartEntryMatchPicker(
+    List<SmartEntryTransaction> matches, {
+    required bool deleting,
+  }) async {
+    final allEntries = ref.read(expenseProvider).allExpenses;
+    final entriesById = {
+      for (final entry in allEntries) entry.id: entry,
+    };
+    final wallets = ref.read(walletProvider);
+    final walletNames = {
+      for (final wallet in wallets) wallet.id: wallet.name,
+    };
+    final candidates = matches
+        .map((match) => entriesById[match.id])
+        .whereType<Expense>()
+        .toList(growable: false);
+    if (candidates.isEmpty) return null;
+
+    return showModalBottomSheet<Expense>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.68,
+            ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        deleting
+                            ? Icons.delete_outline_rounded
+                            : Icons.edit_outlined,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              deleting
+                                  ? 'Choose entry to delete'
+                                  : 'Choose entry to edit',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Several entries match your command.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: candidates.length,
+                    separatorBuilder: (_, __) => const Divider(
+                      height: 1,
+                      indent: 72,
+                    ),
+                    itemBuilder: (context, index) {
+                      final entry = candidates[index];
+                      final isIncome = entry.type == 'income';
+                      final walletName =
+                          walletNames[entry.walletId] ?? 'Unknown wallet';
+                      final dateLabel =
+                          DateFormat('dd MMM, h:mm a').format(entry.date);
+                      final amountLabel = entry.amount.toStringAsFixed(
+                        entry.amount == entry.amount.truncateToDouble()
+                            ? 0
+                            : 2,
+                      );
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: (isIncome
+                                  ? Colors.green
+                                  : Colors.red)
+                              .withValues(alpha: 0.12),
+                          child: Icon(
+                            isIncome
+                                ? Icons.south_west_rounded
+                                : Icons.north_east_rounded,
+                            color: isIncome ? Colors.green : Colors.red,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          walletName + ' · ' + dateLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          'Rs. ' + amountLabel,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onTap: () =>
+                            Navigator.of(sheetContext).pop(entry),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleSmartEntryMutationCommand(
+    ParsedSmartEntryCommand command,
+  ) async {
+    final deleting = command.intent == SmartEntryIntent.deleteEntry;
+    if (!deleting && command.amount <= 0) {
+      _showTransactionError(
+        "Include the new amount, for example: 'change burger amount to 600'.",
+        title: 'New amount required',
+      );
+      return;
+    }
+
+    final wallets = ref.read(walletProvider);
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final smartAccounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+            id: wallet.id,
+            name: wallet.name,
+            type: wallet.walletType,
+            availableBalance:
+                walletNotifier.getBalanceForWallet(wallet.id),
+            isBackup: wallet.isBackup,
+          ),
+        )
+        .toList(growable: false);
+    final mentionedWalletIds = findMentionedSmartEntryAccountIds(
+      command.rawInput,
+      smartAccounts,
+    );
+    if (mentionedWalletIds.length > 1) {
+      _showTransactionError(
+        'Mention only one wallet so the correct entry can be identified.',
+        title: 'Multiple wallets detected',
+      );
+      return;
+    }
+
+    final mentionedWalletId = mentionedWalletIds.isEmpty
+        ? null
+        : mentionedWalletIds.single;
+    SmartEntryAccount? mentionedAccount;
+    if (mentionedWalletId != null) {
+      for (final account in smartAccounts) {
+        if (account.id == mentionedWalletId) {
+          mentionedAccount = account;
+          break;
+        }
+      }
+    }
+
+    final allEntries = ref.read(expenseProvider).allExpenses;
+    final match = matchSmartEntryTransaction(
+      command: command,
+      entries: allEntries.map(
+        (entry) => SmartEntryTransaction(
+          id: entry.id,
+          title: entry.title,
+          amount: entry.amount,
+          category: entry.category,
+          type: entry.type,
+          date: entry.date,
+          walletId: entry.walletId,
+        ),
+      ),
+      walletId: mentionedWalletId,
+      ignoredTitlePhrases: mentionedAccount == null
+          ? const []
+          : [
+              mentionedAccount.name,
+              mentionedAccount.type,
+              'cash in hand',
+              'jazz cash',
+              'jazzcash',
+            ],
+    );
+
+    if (match.status == SmartEntryMatchStatus.notFound) {
+      _showTransactionError(
+        deleting
+            ? 'No safe matching entry was found. Add a title, amount, date, or wallet.'
+            : 'No safe matching entry was found. Name the entry you want to edit.',
+        title: 'Entry not found',
+      );
+      return;
+    }
+
+    Expense? target;
+    if (match.status == SmartEntryMatchStatus.unique) {
+      final targetId = match.matches.single.id;
+      for (final entry in allEntries) {
+        if (entry.id == targetId) {
+          target = entry;
+          break;
+        }
+      }
+    } else {
+      target = await _showSmartEntryMatchPicker(
+        match.matches,
+        deleting: deleting,
+      );
+    }
+    if (target == null || !mounted) return;
+
+    if (deleting) {
+      if (target.type == 'income') {
+        final available =
+            walletNotifier.getBalanceForWallet(target.walletId);
+        if (available + 0.000001 < target.amount) {
+          _showTransactionError(
+            'Deleting this income would make the wallet balance negative.',
+            title: 'Income cannot be deleted',
+          );
+          return;
+        }
+      }
+
+      final deleted = await ref
+          .read(expenseProvider.notifier)
+          .deleteExpense(target.id);
+      if (!mounted) return;
+      if (!deleted) {
+        _showTransactionError(
+          'The entry changed before it could be deleted. Try again.',
+          title: 'Entry not deleted',
+        );
+        return;
+      }
+
+      _smartInputCtrl.clear();
+      await HapticFeedback.lightImpact();
+      if (!mounted) return;
+      final deletedEntry = target;
+      final deletedAmount =
+          deletedEntry.amount.toStringAsFixed(0);
+      _showTransactionSuccess(
+        deletedEntry.title + ' — Rs. ' + deletedAmount,
+        title: 'Entry deleted',
+        actionLabel: 'Undo',
+        onAction: () async {
+          final restored = await ref
+              .read(expenseProvider.notifier)
+              .addExpense(deletedEntry);
+          if (!mounted) return;
+          if (restored) {
+            _showTransactionInfo(
+              'The deleted entry was restored.',
+              title: 'Deletion undone',
+            );
+          } else {
+            _showTransactionError(
+              'The entry could not be restored because the wallet changed.',
+              title: 'Undo failed',
+            );
+          }
+        },
+      );
+      return;
+    }
+
+    final originalEntry = target;
+    final updatedEntry = originalEntry.copyWith(amount: command.amount);
+    if ((updatedEntry.amount - originalEntry.amount).abs() < 0.005) {
+      _showTransactionInfo(
+        'The entry already has this amount.',
+        title: 'No change needed',
+      );
+      return;
+    }
+
+    final updated = await ref
+        .read(expenseProvider.notifier)
+        .editExpense(originalEntry.id, updatedEntry);
+    if (!mounted) return;
+    if (!updated) {
+      _showTransactionError(
+        'The wallet cannot support this change, or the entry changed. Review its balance and try again.',
+        title: 'Entry not updated',
+      );
+      return;
+    }
+
+    _smartInputCtrl.clear();
+    await HapticFeedback.lightImpact();
+    if (!mounted) return;
+    final oldAmount = originalEntry.amount.toStringAsFixed(0);
+    final newAmount = updatedEntry.amount.toStringAsFixed(0);
+    _showTransactionSuccess(
+      originalEntry.title +
+          ' · Rs. ' +
+          oldAmount +
+          ' → Rs. ' +
+          newAmount,
+      title: 'Entry updated',
+      actionLabel: 'Undo',
+      onAction: () async {
+        final restored = await ref
+            .read(expenseProvider.notifier)
+            .editExpense(originalEntry.id, originalEntry);
+        if (!mounted) return;
+        if (restored) {
+          _showTransactionInfo(
+            'The previous amount was restored.',
+            title: 'Edit undone',
+          );
+        } else {
+          _showTransactionError(
+            'The previous amount could not be restored because the wallet changed.',
+            title: 'Undo failed',
+          );
+        }
+      },
+    );
+  }
+
   Future<void> _processNLP(String text) async {
     _dismissKeyboard();
     final normalized = text.trim();
@@ -2398,19 +2762,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final command =
         LocalNlpService().parseCommand(normalized, categories);
     if (!command.intent.isTransactionAddition) {
+      if (command.intent == SmartEntryIntent.deleteEntry ||
+          command.intent == SmartEntryIntent.editEntry) {
+        await _handleSmartEntryMutationCommand(command);
+        return;
+      }
+
       String message;
       String title;
       switch (command.intent) {
-        case SmartEntryIntent.deleteEntry:
-          title = 'Delete command recognized';
-          message =
-              'Automatic deletion is waiting for your approval of the safety rules.';
-          break;
-        case SmartEntryIntent.editEntry:
-          title = 'Edit command recognized';
-          message =
-              'Automatic editing is waiting for your approval of the safety rules.';
-          break;
         case SmartEntryIntent.transfer:
           title = 'Transfer command recognized';
           message =
@@ -2425,6 +2785,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           title = 'Command not recognized';
           message = 'Try an expense or income command with an amount.';
           break;
+        case SmartEntryIntent.deleteEntry:
+        case SmartEntryIntent.editEntry:
         case SmartEntryIntent.addExpense:
         case SmartEntryIntent.addIncome:
           return;
