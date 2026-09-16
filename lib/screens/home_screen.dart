@@ -2395,7 +2395,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (normalized.isEmpty) return;
 
     final categories = ref.read(categoryProvider);
-    final result = LocalNlpService().parseExpense(normalized, categories);
+    final command =
+        LocalNlpService().parseCommand(normalized, categories);
+    if (!command.intent.isTransactionAddition) {
+      String message;
+      String title;
+      switch (command.intent) {
+        case SmartEntryIntent.deleteEntry:
+          title = 'Delete command recognized';
+          message =
+              'Automatic deletion is waiting for your approval of the safety rules.';
+          break;
+        case SmartEntryIntent.editEntry:
+          title = 'Edit command recognized';
+          message =
+              'Automatic editing is waiting for your approval of the safety rules.';
+          break;
+        case SmartEntryIntent.transfer:
+          title = 'Transfer command recognized';
+          message =
+              'Natural-language transfers are not enabled until their confirmation rules are approved.';
+          break;
+        case SmartEntryIntent.query:
+          title = 'Question recognized';
+          message =
+              'Financial questions will be enabled in a later Smart Entry phase.';
+          break;
+        case SmartEntryIntent.unknown:
+          title = 'Command not recognized';
+          message = 'Try an expense or income command with an amount.';
+          break;
+        case SmartEntryIntent.addExpense:
+        case SmartEntryIntent.addIncome:
+          return;
+      }
+      _showTransactionInfo(message, title: title);
+      return;
+    }
+
+    final result = command.toLegacyMap();
     final amount = result['amount'];
     if (amount is! num || !amount.isFinite || amount <= 0) {
       _showTransactionError(
