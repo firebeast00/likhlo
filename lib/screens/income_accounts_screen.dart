@@ -39,7 +39,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
         child: StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
           scrollable: true,
-          title: Text(existing == null ? 'New money account' : 'Update account'),
+          title: Text(existing == null ? 'New wallet' : 'Update wallet'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -48,7 +48,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                 autofocus: true,
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
-                  labelText: 'Account name',
+                  labelText: 'Wallet name',
                   errorText: nameError,
                   prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                 ),
@@ -88,7 +88,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Reserve account'),
+                title: const Text('Reserve wallet'),
                 subtitle: const Text('Mark money that you prefer to keep aside.'),
                 value: isBackup,
                 onChanged: (value) => setDialogState(() => isBackup = value),
@@ -105,7 +105,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                 final name = controller.text.trim();
                 final balance = double.tryParse(balanceController.text.trim());
                 if (name.isEmpty) {
-                  setDialogState(() => nameError = 'Enter an account name.');
+                  setDialogState(() => nameError = 'Enter a wallet name.');
                   return;
                 }
                 if (balance == null || !balance.isFinite || balance < 0) {
@@ -134,7 +134,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                 if (!dialogContext.mounted) return;
                 if (!saved) {
                   setDialogState(
-                    () => nameError = 'An account with this name already exists.',
+                    () => nameError = 'A wallet with this name already exists.',
                   );
                   return;
                 }
@@ -196,7 +196,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: walletId,
-                decoration: const InputDecoration(labelText: 'Income account'),
+                decoration: const InputDecoration(labelText: 'Wallet'),
                 items: wallets
                     .map(
                       (wallet) => DropdownMenuItem(
@@ -213,7 +213,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'This income increases the selected account and the total available balance.',
+                'This income increases the selected wallet and the total available balance.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
@@ -269,7 +269,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Clear account balance?'),
+            title: const Text('Clear wallet balance?'),
             content: Text(
               'Set ${wallet.name} to Rs. 0? Transaction history will remain available.',
             ),
@@ -300,7 +300,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
     final wallets = ref.read(walletProvider);
     if (wallets.length <= 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('At least one income account is required.')),
+        const SnackBar(content: Text('At least one wallet is required.')),
       );
       return;
     }
@@ -312,7 +312,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Delete income account?'),
+            title: const Text('Delete wallet?'),
             content: Text(
               'Delete ${wallet.name}? Its transaction history and opening adjustment will move to ${fallback.name}.',
             ),
@@ -352,10 +352,10 @@ class IncomeAccountsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Money Accounts'),
+        title: const Text('Wallets'),
         actions: [
           IconButton(
-            tooltip: 'Create account',
+            tooltip: 'Create wallet',
             onPressed: () => _showAccountDialog(context, ref),
             icon: const Icon(Icons.add_rounded),
           ),
@@ -388,7 +388,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                 wallet.name,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-              subtitle: Text(wallet.isBackup ? 'Reserve account' : 'Income source'),
+              subtitle: Text(wallet.isBackup ? 'Reserve wallet' : 'Wallet'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
