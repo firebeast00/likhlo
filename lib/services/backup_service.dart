@@ -100,16 +100,16 @@ class BackupService {
     final preferences = _entriesFromJson(_requiredList(data['preferences']));
 
     _requireUnique(expenses.map((e) => e.id), 'transaction');
-    _requireUnique(wallets.map((e) => e.id), 'money account');
+    _requireUnique(wallets.map((e) => e.id), 'wallet');
     _requireUnique(debts.map((e) => e.id), 'Udhar');
     _requireUnique(messEntries.map((e) => e.id), 'Mess Khata');
     if (wallets.isEmpty) {
-      throw const BackupException('A backup must contain a money account.');
+      throw const BackupException('A backup must contain a wallet.');
     }
     final walletIds = wallets.map((wallet) => wallet.id).toSet();
     if (expenses.any((entry) => !walletIds.contains(entry.walletId))) {
       throw const BackupException(
-        'A transaction refers to a missing money account.',
+        'A transaction refers to a missing wallet.',
       );
     }
     final categories = preferences['categories'];
@@ -327,7 +327,7 @@ class BackupService {
       };
 
   static Wallet _walletFromJson(Map<String, dynamic> value) {
-    final balance = _finiteDouble(value['balance'], 'money account balance');
+    final balance = _finiteDouble(value['balance'], 'wallet balance');
     return Wallet(
       id: _requiredString(value['id']),
       name: _requiredString(value['name']),
