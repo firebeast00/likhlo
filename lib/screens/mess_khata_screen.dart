@@ -32,6 +32,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   }
 
   void _listenForInput() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (!_isListening) {
       bool available = await _speech.initialize(
         onStatus: (val) {
@@ -84,6 +85,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   }
 
   void _startReceiptScan() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -188,6 +190,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   }
 
   void _showAddDialog(BuildContext context, WidgetRef ref, {String initialTitle = "", String initialAmount = ""}) {
+    FocusManager.instance.primaryFocus?.unfocus();
     final titleCtrl = TextEditingController(text: initialTitle);
     final amountCtrl = TextEditingController(text: initialAmount);
     final payerCtrl = TextEditingController(text: "Me");
