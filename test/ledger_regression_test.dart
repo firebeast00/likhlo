@@ -132,4 +132,42 @@ void main() {
     ), isTrue);
   });
 
+  test('PDF report totals count transfer pairs once and exclude them from income', () {
+    final records = [
+      entry('move_out', 'expense', 'cash', amount: 350),
+      entry('move_in', 'income', 'bank', amount: 350),
+      Expense(
+        id: 'salary',
+        title: 'Salary',
+        amount: 5000,
+        date: DateTime(2026, 9, 15),
+        category: 'Income / Allowance',
+        colorValue: 0,
+        type: 'income',
+        walletId: 'bank',
+      ),
+      Expense(
+        id: 'food',
+        title: 'Food',
+        amount: 250,
+        date: DateTime(2026, 9, 15),
+        category: 'Food',
+        colorValue: 0,
+        type: 'expense',
+        walletId: 'cash',
+      ),
+    ];
+
+    final report = calculateLedgerReportSummary(records);
+
+    expect(report.transactions.length, 3);
+    expect(report.transferCount, 1);
+    expect(report.transferTotal, 350);
+    expect(report.incomeCount, 1);
+    expect(report.incomeTotal, 5000);
+    expect(report.expenseCount, 1);
+    expect(report.expenseTotal, 250);
+  });
+
+
 }

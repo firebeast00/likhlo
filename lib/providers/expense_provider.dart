@@ -285,6 +285,62 @@ List<Expense> visibleTransactions(Iterable<Expense> entries) {
   }).toList(growable: false);
 }
 
+
+class LedgerReportSummary {
+  final List<Expense> transactions;
+  final int expenseCount;
+  final double expenseTotal;
+  final int incomeCount;
+  final double incomeTotal;
+  final int transferCount;
+  final double transferTotal;
+
+  const LedgerReportSummary({
+    required this.transactions,
+    required this.expenseCount,
+    required this.expenseTotal,
+    required this.incomeCount,
+    required this.incomeTotal,
+    required this.transferCount,
+    required this.transferTotal,
+  });
+}
+
+LedgerReportSummary calculateLedgerReportSummary(Iterable<Expense> entries) {
+  final transactions = visibleTransactions(entries);
+  var expenseCount = 0;
+  var expenseTotal = 0.0;
+  var incomeCount = 0;
+  var incomeTotal = 0.0;
+  var transferCount = 0;
+  var transferTotal = 0.0;
+
+  for (final entry in transactions) {
+    final isTransfer =
+        entry.category.trim().toLowerCase() == 'transfer';
+    if (isTransfer) {
+      transferCount++;
+      transferTotal += entry.amount;
+    } else if (entry.type == 'income') {
+      incomeCount++;
+      incomeTotal += entry.amount;
+    } else if (entry.type == 'expense') {
+      expenseCount++;
+      expenseTotal += entry.amount;
+    }
+  }
+
+  return LedgerReportSummary(
+    transactions: transactions,
+    expenseCount: expenseCount,
+    expenseTotal: expenseTotal,
+    incomeCount: incomeCount,
+    incomeTotal: incomeTotal,
+    transferCount: transferCount,
+    transferTotal: transferTotal,
+  );
+}
+
 Map<String, double> calculateWalletMovements(Iterable<Expense> entries) {
   final totals = <String, double>{};
   for (final entry in entries) {
