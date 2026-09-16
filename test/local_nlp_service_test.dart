@@ -75,7 +75,7 @@ void main() {
       expect(result['needsReview'], isA<bool>());
     });
 
-    test('allows instant save only for a confident complete entry', () {
+    test('allows instant save for a valid entry with a resolved account', () {
       final parsed =
           LocalNlpService().parseExpense('500 for biryani', categories);
 
@@ -89,13 +89,140 @@ void main() {
       );
     });
 
-    test('requires review for an unknown expense category', () {
+    test('unknown categories still save instantly when an account is resolved', () {
       final parsed =
           LocalNlpService().parseExpense('500 something', categories);
 
+      expect(parsed['category'], 'General');
       expect(
         shouldAutoSaveSmartEntry(parsed, hasResolvedWallet: true),
-        isFalse,
+        isTrue,
+      );
+    });
+
+    test('uses funded Cash first and JazzCash as fallback', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 100,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 1000,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: '50 biryani',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 50,
+        ),
+        'cash',
+      );
+      expect(
+        resolveSmartEntryAccount(
+          input: '500 petrol',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 500,
+        ),
+        'jazz',
+      );
+    });
+
+    test('explicit JazzCash mention overrides the Cash default', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 1000,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 1000,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: '500 petrol from jazz cash',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 500,
+        ),
+        'jazz',
+      );
+    });
+
+    test('empty Cash and JazzCash require account review', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 0,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 0,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: 'salary 5000 aayi',
+          accounts: accounts,
+          transactionType: 'income',
+          amount: 5000,
+        ),
+        isNull,
+      );
+      expect(
+        resolveSmartEntryAccount(
+          input: '500 biryani',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 500,
+        ),
+        isNull,
+      );
+    });
+
+    test('an explicitly named empty account can receive income', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 0,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 0,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: 'salary 5000 cash mein aayi',
+          accounts: accounts,
+          transactionType: 'income',
+          amount: 5000,
+        ),
+        'cash',
       );
     });
   });

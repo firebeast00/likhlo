@@ -887,95 +887,121 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildResponsiveBody(bool isLandscape, bool isDark, Color primaryColor, double totalAvailable, double spent, List<Wallet> wallets, List<String> categories, List<Expense> displayExpenses) {
+  Widget _buildResponsiveBody(
+    bool isLandscape,
+    bool isDark,
+    Color primaryColor,
+    double totalAvailable,
+    double spent,
+    List<Wallet> wallets,
+    List<String> categories,
+    List<Expense> displayExpenses,
+  ) {
     if (_currentView != 'Dashboard') return _buildOtherViews();
 
     if (isLandscape && !_isSearching) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(flex: 1, child: SingleChildScrollView(padding: const EdgeInsets.only(bottom: 80), child: Column(children: [_buildMonthSelector(isDark), const SizedBox(height: 8), _buildHeroCard(totalAvailable, spent, wallets, primaryColor), const SizedBox(height: 35), _buildSmartInputBar(primaryColor, isDark), _buildCategoryTabsWidget(categories, primaryColor, isDark)]))),
-          Expanded(flex: 1, child: _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: false)),
-        ],
-      );
-    }
-
-    if (!_isSearching) {
-      return CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.only(bottom: 12.0), child: _buildMonthSelector(isDark))),
-
-          SliverAppBar(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            expandedHeight: 300.0,
-            collapsedHeight: 70.0,
-            pinned: true,
-            elevation: 0,
-            automaticallyImplyLeading: false,
-            flexibleSpace: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                final top = constraints.biggest.height;
-                final bool isCollapsed = top <= 100.0;
-
-                return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 150),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  child: isCollapsed
-                      ? Align(
-                    key: const ValueKey('mini'),
-                    alignment: Alignment.bottomCenter,
-                    child: SingleChildScrollView(
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: _buildMiniHero(totalAvailable, primaryColor),
-                      ),
-                    ),
-                  )
-                      : Align(
-                    key: const ValueKey('full'),
-                    alignment: Alignment.topCenter,
-                    child: SingleChildScrollView(
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: _buildHeroCard(totalAvailable, spent, wallets, primaryColor),
-                      ),
-                    ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 80),
+              child: Column(
+                children: [
+                  _buildMonthSelector(isDark),
+                  const SizedBox(height: 8),
+                  _buildHeroCard(
+                    totalAvailable,
+                    spent,
+                    wallets,
+                    primaryColor,
                   ),
-                );
-              },
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
-              child: _buildSmartInputBar(primaryColor, isDark),
-            ),
-          ),
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _StickyHeaderDelegate(
-              minHeight: 56,
-              maxHeight: 56,
-              child: ColoredBox(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                child: _buildCategoryTabsWidget(
-                  categories,
-                  primaryColor,
-                  isDark,
-                ),
+                  const SizedBox(height: 14),
+                  _buildSmartInputBar(primaryColor, isDark),
+                  const SizedBox(height: 8),
+                  _buildCategoryTabsWidget(
+                    categories,
+                    primaryColor,
+                    isDark,
+                  ),
+                ],
               ),
             ),
           ),
-          _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: true),
+          Expanded(
+            child: _buildExpenseList(
+              displayExpenses,
+              primaryColor,
+              isDark,
+              isSliver: false,
+            ),
+          ),
         ],
       );
     }
-    return Column(children: [const SizedBox(height: 4), Expanded(child: _buildExpenseList(displayExpenses, primaryColor, isDark, isSliver: false))]);
+
+    if (_isSearching) {
+      return Column(
+        children: [
+          const SizedBox(height: 4),
+          Expanded(
+            child: _buildExpenseList(
+              displayExpenses,
+              primaryColor,
+              isDark,
+              isSliver: false,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: _buildMonthSelector(isDark),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: _buildHeroCard(
+              totalAvailable,
+              spent,
+              wallets,
+              primaryColor,
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 14, bottom: 8),
+            child: _buildSmartInputBar(primaryColor, isDark),
+          ),
+        ),
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _StickyHeaderDelegate(
+            minHeight: 56,
+            maxHeight: 56,
+            child: ColoredBox(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: _buildCategoryTabsWidget(
+                categories,
+                primaryColor,
+                isDark,
+              ),
+            ),
+          ),
+        ),
+        _buildExpenseList(
+          displayExpenses,
+          primaryColor,
+          isDark,
+          isSliver: true,
+        ),
+      ],
+    );
   }
 
   Widget _buildOtherViews() {
@@ -1173,156 +1199,253 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildSmartInputBar(Color primaryColor, bool isDark) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 160),
-          child: _isListening
-              ? Container(
-                  key: const ValueKey('voice-listening'),
-                  margin: const EdgeInsets.only(left: 24, right: 24, bottom: 7),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: isDark ? 0.16 : 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 8,
-                        height: 8,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Voice NLP is listening — speak now',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : const SizedBox.shrink(key: ValueKey('voice-idle')),
+    final cardColor = Theme.of(context).cardColor;
+    final inputColor = isDark
+        ? Colors.white.withValues(alpha: 0.055)
+        : primaryColor.withValues(alpha: 0.045);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: _isListening
+              ? Colors.red.withValues(alpha: 0.7)
+              : primaryColor.withValues(alpha: isDark ? 0.24 : 0.12),
         ),
-        Container(
-          height: 52,
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              width: _isListening ? 1.5 : 1,
-              color: _isListening
-                  ? Colors.red
-                  : primaryColor.withValues(alpha: isDark ? 0.28 : 0.16),
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.055),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
-          child: TextField(
-            controller: _smartInputCtrl,
-            textInputAction: TextInputAction.done,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-            onSubmitted: _processNLP,
-            decoration: InputDecoration(
-              hintText: _isListening ? 'Listening…' : 'e.g. 500 for groceries',
-              hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.only(left: 16, top: 16, bottom: 16),
-              suffixIconConstraints: const BoxConstraints(minHeight: 40),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Scan receipt',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _isScanningReceipt ? null : _scanReceiptIntoInput,
-                    icon: _isScanningReceipt
-                        ? SizedBox(
-                            width: 17,
-                            height: 17,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: (_isListening ? Colors.red : primaryColor)
+                      .withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _isListening
+                      ? Icons.graphic_eq_rounded
+                      : Icons.auto_awesome_rounded,
+                  color: _isListening ? Colors.red : primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isListening ? 'Listening now' : 'Smart Entry',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isListening
+                          ? 'Speak naturally — it saves automatically'
+                          : 'Instant save · Cash first · JazzCash fallback',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_isListening)
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 54,
+            decoration: BoxDecoration(
+              color: inputColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: TextField(
+              controller: _smartInputCtrl,
+              textInputAction: TextInputAction.done,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              onSubmitted: _processNLP,
+              decoration: InputDecoration(
+                hintText: _isListening
+                    ? 'Listening…'
+                    : 'e.g. 500 biryani from JazzCash',
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.only(left: 15, top: 17, bottom: 17),
+                suffixIconConstraints:
+                    const BoxConstraints(minHeight: 40),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Scan receipt',
+                      visualDensity: VisualDensity.compact,
+                      constraints:
+                          const BoxConstraints.tightFor(width: 38, height: 40),
+                      onPressed:
+                          _isScanningReceipt ? null : _scanReceiptIntoInput,
+                      icon: _isScanningReceipt
+                          ? SizedBox(
+                              width: 17,
+                              height: 17,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: primaryColor,
+                              ),
+                            )
+                          : Icon(
+                              Icons.document_scanner_outlined,
+                              size: 20,
                               color: primaryColor,
                             ),
-                          )
-                        : Icon(Icons.document_scanner_outlined, size: 20, color: primaryColor),
-                  ),
-                  IconButton(
-                    tooltip: _isListening ? 'Stop listening' : 'Voice input',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _listenForExpense,
-                    icon: Icon(
-                      _isListening ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
-                      size: 21,
-                      color: _isListening ? Colors.red : primaryColor,
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Review quick entry',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => _processNLP(_smartInputCtrl.text),
-                    icon: Icon(Icons.arrow_upward_rounded, size: 20, color: primaryColor),
-                  ),
-                  const SizedBox(width: 4),
-                ],
+                    IconButton(
+                      tooltip:
+                          _isListening ? 'Stop listening' : 'Voice input',
+                      visualDensity: VisualDensity.compact,
+                      constraints:
+                          const BoxConstraints.tightFor(width: 38, height: 40),
+                      onPressed: _listenForExpense,
+                      icon: Icon(
+                        _isListening
+                            ? Icons.stop_circle_rounded
+                            : Icons.mic_none_rounded,
+                        size: 21,
+                        color: _isListening ? Colors.red : primaryColor,
+                      ),
+                    ),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      margin: const EdgeInsets.only(right: 5),
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        tooltip: 'Save Smart Entry',
+                        padding: EdgeInsets.zero,
+                        onPressed: () =>
+                            _processNLP(_smartInputCtrl.text),
+                        icon: const Icon(
+                          Icons.arrow_upward_rounded,
+                          size: 19,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiniHero(double totalAvailable, Color primary) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [primary, primary.withValues(alpha: 0.8)]),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))]
-      ),
-      child: Center(
-        child: Text("Total: Rs. ${totalAvailable.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        ],
       ),
     );
   }
 
-  Widget _buildHeroCard(double totalAvailable, double spent, List<Wallet> wallets, Color primary) {
-    final activeWallets = wallets.where((w) => !w.isBackup).take(3).toList();
+  Widget _buildHeroCard(
+    double totalAvailable,
+    double spent,
+    List<Wallet> wallets,
+    Color primary,
+  ) {
+    final dailyWallets = wallets
+        .where((wallet) =>
+            !wallet.isBackup &&
+            (wallet.walletType.toLowerCase() == 'cash' ||
+                wallet.walletType.toLowerCase() == 'jazzcash'))
+        .toList()
+      ..sort((a, b) {
+        int priority(Wallet wallet) =>
+            wallet.walletType.toLowerCase() == 'cash' ? 0 : 1;
+        return priority(a).compareTo(priority(b));
+      });
+    final shownWallets = dailyWallets.take(2).toList(growable: false);
+    final darkerPrimary =
+        Color.lerp(primary, Colors.black, isDarkMode(context) ? 0.12 : 0.18)!;
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [primary, primary.withValues(alpha: 0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))]
+        gradient: LinearGradient(
+          colors: [primary, darkerPrimary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: primary.withValues(alpha: 0.20),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Total Available", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
-              IconButton(
-                tooltip: 'Manage money accounts',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-                onPressed: _openIncomeAccounts,
-                icon: const Icon(Icons.edit_outlined, color: Colors.white70, size: 19),
+              const Expanded(
+                child: Text(
+                  'Total available',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: _openIncomeAccounts,
+                borderRadius: BorderRadius.circular(10),
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    color: Colors.white,
+                    size: 19,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1330,53 +1453,142 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text("Rs. ${totalAvailable.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -1.0)),
-          ),
-          const SizedBox(height: 16),
-
-          if (activeWallets.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: List.generate(activeWallets.length, (index) {
-                  final w = activeWallets[index];
-                  final balance = ref.read(walletProvider.notifier).getBalanceForWallet(w.id);
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: index == activeWallets.length - 1 ? 0 : 6.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.account_balance_wallet_rounded, size: 12, color: Colors.white.withValues(alpha: 0.7)),
-                            const SizedBox(width: 6),
-                            Text(w.name, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                        Text("Rs. ${balance.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  );
-                }),
+            child: Text(
+              'Rs. ${totalAvailable.toStringAsFixed(0)}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.8,
               ),
             ),
-
+          ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Spent This Month", style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w500)),
-              Text("Rs. ${spent.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+              Expanded(
+                child: _buildBalanceMetric(
+                  label: 'Spent this month',
+                  value: 'Rs. ${spent.toStringAsFixed(0)}',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildBalanceMetric(
+                  label: 'Active accounts',
+                  value: '${wallets.where((wallet) => !wallet.isBackup).length}',
+                ),
+              ),
             ],
-          )
+          ),
+          if (shownWallets.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                for (var index = 0;
+                    index < shownWallets.length;
+                    index++) ...[
+                  if (index > 0) const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildDefaultAccountPill(shownWallets[index]),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
+
+  Widget _buildBalanceMetric({
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.68),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDefaultAccountPill(Wallet wallet) {
+    final balance =
+        ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id);
+    final isJazzCash = wallet.walletType.toLowerCase() == 'jazzcash';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isJazzCash
+                ? Icons.phone_android_rounded
+                : Icons.payments_outlined,
+            color: Colors.white70,
+            size: 15,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              wallet.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            'Rs. ${balance.toStringAsFixed(0)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool isDarkMode(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
 
   Future<void> _pickBudgetMonth() async {
     var selectedYear = _focusedMonth.year;
@@ -1651,7 +1863,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final amount = result['amount'];
     if (amount is! num || !amount.isFinite || amount <= 0) {
       _showTransactionError(
-        "Include an amount in your entry, for example: '500 for biryani' or '1.5k petrol'.",
+        "Include an amount, for example: '500 biryani' or '1.5k petrol from JazzCash'.",
         title: 'Amount not detected',
       );
       return;
@@ -1660,46 +1872,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
-        'Create a money account before using Smart Entry.',
+        'Create a Cash or JazzCash account before using Smart Entry.',
         title: 'Money account required',
       );
       return;
     }
 
-    final mentionedWalletId = _findMentionedWalletId(normalized, wallets);
-    final activeWallets =
-        wallets.where((wallet) => !wallet.isBackup).toList(growable: false);
-    final resolvedWalletId = mentionedWalletId ??
-        (activeWallets.length == 1 ? activeWallets.first.id : null);
-    final canSaveInstantly = shouldAutoSaveSmartEntry(
-      result,
-      hasResolvedWallet: resolvedWalletId != null,
+    final type = result['type'] == 'income' ? 'income' : 'expense';
+    final amountValue = amount.toDouble();
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final smartAccounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+            id: wallet.id,
+            name: wallet.name,
+            type: wallet.walletType,
+            availableBalance:
+                walletNotifier.getBalanceForWallet(wallet.id),
+            isBackup: wallet.isBackup,
+          ),
+        )
+        .toList(growable: false);
+    final mentionedWalletId =
+        findMentionedSmartEntryAccountId(normalized, smartAccounts);
+    final resolvedWalletId = resolveSmartEntryAccount(
+      input: normalized,
+      accounts: smartAccounts,
+      transactionType: type,
+      amount: amountValue,
     );
 
-    if (canSaveInstantly && resolvedWalletId != null) {
-      final type = result['type'] == 'income' ? 'income' : 'expense';
+    if (shouldAutoSaveSmartEntry(
+      result,
+      hasResolvedWallet: resolvedWalletId != null,
+    )) {
       final wallet = wallets.firstWhere(
         (item) => item.id == resolvedWalletId,
       );
-      final amountValue = amount.toDouble();
-
-      if (type == 'expense') {
-        final available = ref
-            .read(walletProvider.notifier)
-            .getBalanceForWallet(resolvedWalletId);
-        if (amountValue > available) {
-          _showTransactionError(
-            'Available in ${wallet.name}: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amountValue.toStringAsFixed(0)}. Add money or choose another account manually.',
-            title: 'Insufficient balance',
-          );
-          return;
-        }
-      }
-
       final entry = Expense(
         id: const Uuid().v4(),
-        title: result['title']?.toString() ??
-            (type == 'income' ? 'Income / Allowance' : 'Quick Expense'),
+        title: _smartEntryTitle(result, wallet, type),
         amount: amountValue,
         category: type == 'income'
             ? 'Income / Allowance'
@@ -1710,7 +1922,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         colorValue:
             Color(ref.read(settingsProvider).profileColorValue).toARGB32(),
         type: type,
-        walletId: resolvedWalletId,
+        walletId: resolvedWalletId!,
       );
 
       final saved =
@@ -1718,7 +1930,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (!mounted) return;
       if (!saved) {
         _showTransactionError(
-          'The entry could not be saved. Check the selected account balance and try again.',
+          'The selected account changed or no longer has enough balance. Try the entry again.',
           title: 'Smart Entry not saved',
         );
         return;
@@ -1729,7 +1941,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       await HapticFeedback.lightImpact();
       if (!mounted) return;
       _showTransactionSuccess(
-        '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} from ${wallet.name}',
+        '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} · ${wallet.name}',
         title: type == 'income' ? 'Income added' : 'Expense saved',
         actionLabel: 'Undo',
         onAction: () async {
@@ -1748,67 +1960,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
-    final confidence =
-        (result['confidence'] as num?)?.toDouble() ?? 0.0;
-    final confidencePercent = (confidence * 100).round();
-    final needsAccount = resolvedWalletId == null;
-    final reviewMessage = needsAccount
-        ? 'Choose the correct money account. The other detected details are editable before saving.'
-        : 'Some details are uncertain ($confidencePercent% confidence). Review the amount, type, category, and date.';
+    final defaultAccounts = smartAccounts.where((account) {
+      final accountType = account.type.toLowerCase();
+      return !account.isBackup &&
+          (accountType == 'cash' || accountType == 'jazzcash');
+    }).toList(growable: false);
+    final defaultsAreEmpty = defaultAccounts.isEmpty ||
+        defaultAccounts.every((account) => account.availableBalance <= 0);
+    final reviewMessage = mentionedWalletId != null
+        ? 'The named account cannot cover this expense. Choose another account before saving.'
+        : defaultsAreEmpty
+            ? 'Cash and JazzCash are empty. Choose the account that should receive or pay this entry.'
+            : 'Cash and JazzCash cannot cover this amount. Choose another funded account.';
 
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
-          amount.toDouble() == amount.toDouble().truncateToDouble()
-              ? amount.toStringAsFixed(0)
-              : amount.toStringAsFixed(2),
+          amountValue == amountValue.truncateToDouble()
+              ? amountValue.toStringAsFixed(0)
+              : amountValue.toStringAsFixed(2),
       prefilledTitle: result['title']?.toString(),
       prefilledCategory: result['category']?.toString(),
       prefilledDate: result['date'] is DateTime
           ? result['date'] as DateTime
           : DateTime.now(),
-      preselectedWalletId: resolvedWalletId,
-      initialType: result['type'] == 'income' ? 'income' : 'expense',
+      preselectedWalletId: mentionedWalletId,
+      initialType: type,
       reviewMessage: reviewMessage,
     );
 
     if (confirmed == true && mounted) {
       _smartInputCtrl.clear();
       _showTransactionSuccess(
-        'Your reviewed Smart Entry was added to the selected account.',
+        'The Smart Entry was saved to the selected account.',
         title: 'Transaction saved',
       );
     }
     if (mounted) FocusScope.of(context).unfocus();
   }
 
-  String? _findMentionedWalletId(String text, List<Wallet> wallets) {
-    final normalizedText = text
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-        .trim();
-    final compactText = normalizedText.replaceAll(' ', '');
-    final sortedWallets = List<Wallet>.from(wallets)
-      ..sort((a, b) => b.name.length.compareTo(a.name.length));
+  String _smartEntryTitle(
+    Map<String, dynamic> result,
+    Wallet wallet,
+    String type,
+  ) {
+    var title = result['title']?.toString().trim() ?? '';
+    final removable = <String>[
+      wallet.name,
+      wallet.walletType,
+      'cash in hand',
+      'jazz cash',
+      'jazzcash',
+    ];
 
-    for (final wallet in sortedWallets) {
-      final normalizedName = wallet.name
-          .toLowerCase()
-          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-          .trim();
-      if (normalizedName.isEmpty) continue;
-
-      final exactName = RegExp(
-        '(^|\\s)${RegExp.escape(normalizedName)}(\\s|\$)',
+    for (final phrase in removable) {
+      final normalized = phrase.trim();
+      if (normalized.isEmpty) continue;
+      title = title.replaceAll(
+        RegExp(
+          '\\b${RegExp.escape(normalized)}\\b',
+          caseSensitive: false,
+        ),
+        ' ',
       );
-      if (exactName.hasMatch(normalizedText)) return wallet.id;
-
-      final compactName = normalizedName.replaceAll(' ', '');
-      if (compactName.length >= 5 && compactText.contains(compactName)) {
-        return wallet.id;
-      }
     }
-    return null;
+    title = title
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim()
+        .replaceAll(RegExp(r'^(From|Via|Using)\s+', caseSensitive: false), '');
+
+    if (title.isEmpty || title.toLowerCase() == 'quick expense') {
+      if (type == 'income') return 'Income / Allowance';
+      final category = result['category']?.toString().trim() ?? '';
+      return category.isEmpty || category.toLowerCase() == 'general'
+          ? 'Quick Expense'
+          : category;
+    }
+    return title;
   }
+
 }
 
 

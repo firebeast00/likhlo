@@ -98,7 +98,8 @@ class LocalNlpService {
     'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
     'paisa', 'mani', 'money', 'subah', 'shaam', 'raat', 'rupay', 'pkr',
     'received', 'receive', 'credited', 'credit', 'deposit', 'aayi', 'ayi',
-    'aya', 'mila', 'mili', 'hui', 'hue'
+    'aya', 'mila', 'mili', 'hui', 'hue', 'from', 'via', 'using', 'through',
+    'account', 'wallet'
   ];
 
   // ==========================================
@@ -324,7 +325,7 @@ class LocalNlpService {
     DateTime transactionDate = DateTime.now();
     List<String> consumedTokens = [];
     final isIncome = RegExp(
-      r'\b(income|salary|allowance|received|credited|deposit|kamai|aayi|ayi|aya|mila|mili)\b',
+      r'\b(income|salary|allowance|received|credited|deposit|kamai|earning|earned|bonus|refund|aayi|ayi|aya|mila|mili|jama)\b',
     ).hasMatch(lowerInput);
     final transactionType = isIncome ? 'income' : 'expense';
 
@@ -452,32 +453,127 @@ class LocalNlpService {
   }
 }
 
+class SmartEntryAccount {
+  final String id;
+  final String name;
+  final String type;
+  final double availableBalance;
+  final bool isBackup;
+
+  const SmartEntryAccount({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.availableBalance,
+    this.isBackup = false,
+  });
+}
+
+String _normalizeAccountText(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+      .trim();
+}
+
+bool _accountMentioned(String input, SmartEntryAccount account) {
+  final normalizedInput = _normalizeAccountText(input);
+  final normalizedName = _normalizeAccountText(account.name);
+  final normalizedType = _normalizeAccountText(account.type);
+  // Do not interpret the "cash" part of "Jazz Cash" as the Cash account.
+  final searchableInput = normalizedType == 'cash'
+      ? normalizedInput.replaceAll(RegExp(r'\bjazz\s*cash\b'), ' ')
+      : normalizedInput;
+  final compactInput = searchableInput.replaceAll(' ', '');
+  final aliases = <String>{
+    normalizedName,
+    normalizedType,
+    if (normalizedType == 'cash') 'cash',
+    if (normalizedType == 'jazzcash') ...['jazzcash', 'jazz cash'],
+  }..removeWhere((alias) => alias.isEmpty);
+
+  for (final alias in aliases) {
+    final exact = RegExp(
+      '(^|\\s)${RegExp.escape(alias)}(\\s|\$)',
+    );
+    if (exact.hasMatch(searchableInput)) return true;
+
+    final compactAlias = alias.replaceAll(' ', '');
+    if (compactAlias.length >= 5 && compactInput.contains(compactAlias)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+String? findMentionedSmartEntryAccountId(
+  String input,
+  Iterable<SmartEntryAccount> accounts,
+) {
+  final matches = accounts
+      .where((account) => !account.isBackup && _accountMentioned(input, account))
+      .map((account) => account.id)
+      .toSet();
+  return matches.length == 1 ? matches.single : null;
+}
+
+String? resolveSmartEntryAccount({
+  required String input,
+  required Iterable<SmartEntryAccount> accounts,
+  required String transactionType,
+  required double amount,
+}) {
+  final availableAccounts =
+      accounts.where((account) => !account.isBackup).toList(growable: false);
+  final mentionedId =
+      findMentionedSmartEntryAccountId(input, availableAccounts);
+
+  bool canUse(SmartEntryAccount account, {required bool explicitlySelected}) {
+    if (transactionType == 'income') {
+      // An explicit account can receive its first deposit. For an implicit
+      // choice, an empty Cash/JazzCash pair is intentionally sent to review.
+      return explicitlySelected || account.availableBalance > 0;
+    }
+    return account.availableBalance + 0.000001 >= amount;
+  }
+
+  if (mentionedId != null) {
+    final mentioned =
+        availableAccounts.firstWhere((account) => account.id == mentionedId);
+    return canUse(mentioned, explicitlySelected: true) ? mentioned.id : null;
+  }
+
+  int defaultPriority(SmartEntryAccount account) {
+    final type = _normalizeAccountText(account.type).replaceAll(' ', '');
+    final name = _normalizeAccountText(account.name).replaceAll(' ', '');
+    if (type == 'cash' || name == 'cash' || name == 'cashinhand') return 0;
+    if (type == 'jazzcash' || name == 'jazzcash') return 1;
+    return 2;
+  }
+
+  final defaults = availableAccounts
+      .where((account) => defaultPriority(account) < 2)
+      .toList()
+    ..sort((a, b) => defaultPriority(a).compareTo(defaultPriority(b)));
+
+  for (final account in defaults) {
+    if (canUse(account, explicitlySelected: false)) return account.id;
+  }
+  return null;
+}
+
 bool shouldAutoSaveSmartEntry(
   Map<String, dynamic> parsed, {
   required bool hasResolvedWallet,
 }) {
   final amount = parsed['amount'];
   final type = parsed['type'];
-  final title = parsed['title']?.toString().trim() ?? '';
-  final category = parsed['category']?.toString().trim() ?? '';
-  final confidence = (parsed['confidence'] as num?)?.toDouble() ?? 0.0;
 
-  if (!hasResolvedWallet ||
-      amount is! num ||
-      !amount.isFinite ||
-      amount <= 0 ||
-      (type != 'expense' && type != 'income') ||
-      title.isEmpty ||
-      title == 'Quick Expense' ||
-      confidence < 0.8) {
-    return false;
-  }
-
-  if (type == 'expense' &&
-      (category.isEmpty || category.toLowerCase() == 'general')) {
-    return false;
-  }
-  return true;
+  return hasResolvedWallet &&
+      amount is num &&
+      amount.isFinite &&
+      amount > 0 &&
+      (type == 'expense' || type == 'income');
 }
 
 class _WordAmountResult {
