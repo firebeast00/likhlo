@@ -335,7 +335,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             if (type == 'lent') {
                               if (selectedWalletId.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Create a money account before lending money.')),
+                                  const SnackBar(content: Text('Create a wallet before lending money.')),
                                 );
                                 return;
                               }
@@ -346,7 +346,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Not enough money in the selected account. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amt.toStringAsFixed(0)}. Add money or enter a smaller amount.',
+                                      'Not enough money in the selected wallet. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amt.toStringAsFixed(0)}. Add money or enter a smaller amount.',
                                     ),
                                   ),
                                 );
@@ -355,7 +355,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             }
                             if (selectedWalletId.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Create a money account first.')),
+                                const SnackBar(content: Text('Create a wallet first.')),
                               );
                               return;
                             }
@@ -382,7 +382,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             if (!linkedSaved) {
                               if (!ctx.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Could not save the linked account transaction.')),
+                                const SnackBar(content: Text('Could not save the linked wallet transaction.')),
                               );
                               return;
                             }
