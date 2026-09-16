@@ -641,8 +641,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   void _showTransactionSuccess(
     String message, {
     String title = 'Completed',
+    String? actionLabel,
+    Future<void> Function()? onAction,
   }) {
-    _showTopMessage(title: title, message: message, tone: _MessageTone.success);
+    _showTopMessage(
+      title: title,
+      message: message,
+      tone: _MessageTone.success,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
   }
 
   void _showTransactionInfo(
@@ -656,6 +664,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     required String title,
     required String message,
     required _MessageTone tone,
+    String? actionLabel,
+    Future<void> Function()? onAction,
   }) {
     if (!mounted) return;
 
@@ -682,6 +692,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             title: title,
             message: message,
             tone: tone,
+            actionLabel: actionLabel,
+            onAction: onAction,
             onDismiss: dismiss,
           ),
         ),
@@ -690,7 +702,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     _activeMessageEntry = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
-    _messageTimer = Timer(const Duration(seconds: 5), dismiss);
+    _messageTimer = Timer(
+      Duration(seconds: actionLabel == null ? 5 : 7),
+      dismiss,
+    );
   }
 
   Widget _buildSegment(String current, String type, String label, Color color, VoidCallback onTap) {
@@ -1479,6 +1494,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (mounted) setState(() => _isListening = false);
       return;
     }
+
     _voiceResultProcessed = false;
     _smartInputCtrl.clear();
     final available = await _speech.initialize(
@@ -1487,9 +1503,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         debugPrint('STT Error: $error');
         if (!mounted) return;
         setState(() => _isListening = false);
+        final languageUnavailable =
+            error.errorMsg.contains('error_language_unavailable');
         _showTransactionError(
-          'Voice Log stopped before an entry could be saved. Please try again.',
-          title: 'Voice Log stopped',
+          languageUnavailable
+              ? 'English speech recognition is unavailable on this phone. Install or enable an English speech language in Google voice typing, then try again.'
+              : 'Voice Log stopped before an entry could be saved. Please try again.',
+          title: languageUnavailable
+              ? 'Speech language unavailable'
+              : 'Voice Log stopped',
         );
       },
     );
@@ -1501,9 +1523,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
       return;
     }
+
+    final speechLocaleId = await _resolveSpeechLocale();
+    if (!mounted) return;
+    if (speechLocaleId == null) {
+      _showTransactionError(
+        'Install an English speech-recognition language in Google voice typing and reopen Likhlo.',
+        title: 'English speech language required',
+      );
+      return;
+    }
+
     setState(() => _isListening = true);
     await HapticFeedback.mediumImpact();
     await _speech.listen(
+      localeId: speechLocaleId,
       onResult: (result) async {
         if (!mounted) return;
         final words = result.recognizedWords.trim();
@@ -1515,6 +1549,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         }
       },
     );
+  }
+
+  Future<String?> _resolveSpeechLocale() async {
+    try {
+      final locales = await _speech.locales();
+      if (locales.isEmpty) return null;
+
+      String normalize(String value) =>
+          value.toLowerCase().replaceAll('-', '_');
+      const preferred = ['en_us', 'en_gb', 'en_in', 'en_pk'];
+
+      for (final preferredId in preferred) {
+        for (final locale in locales) {
+          if (normalize(locale.localeId) == preferredId) {
+            return locale.localeId;
+          }
+        }
+      }
+
+      for (final locale in locales) {
+        if (normalize(locale.localeId).startsWith('en_')) {
+          return locale.localeId;
+        }
+      }
+      return null;
+    } catch (error) {
+      debugPrint('Speech locale lookup failed: $error');
+      return null;
+    }
   }
 
   Future<void> _scanReceiptIntoInput() async {
@@ -1591,19 +1654,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
-        'Create a money account before reviewing this entry.',
+        'Create a money account before using Smart Entry.',
         title: 'Money account required',
       );
       return;
     }
 
-    final selectedWalletId = _findMentionedWalletId(normalized, wallets);
+    final mentionedWalletId = _findMentionedWalletId(normalized, wallets);
+    final activeWallets =
+        wallets.where((wallet) => !wallet.isBackup).toList(growable: false);
+    final resolvedWalletId = mentionedWalletId ??
+        (activeWallets.length == 1 ? activeWallets.first.id : null);
+    final canSaveInstantly = shouldAutoSaveSmartEntry(
+      result,
+      hasResolvedWallet: resolvedWalletId != null,
+    );
+
+    if (canSaveInstantly && resolvedWalletId != null) {
+      final type = result['type'] == 'income' ? 'income' : 'expense';
+      final wallet = wallets.firstWhere(
+        (item) => item.id == resolvedWalletId,
+      );
+      final amountValue = amount.toDouble();
+
+      if (type == 'expense') {
+        final available = ref
+            .read(walletProvider.notifier)
+            .getBalanceForWallet(resolvedWalletId);
+        if (amountValue > available) {
+          _showTransactionError(
+            'Available in ${wallet.name}: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amountValue.toStringAsFixed(0)}. Add money or choose another account manually.',
+            title: 'Insufficient balance',
+          );
+          return;
+        }
+      }
+
+      final entry = Expense(
+        id: const Uuid().v4(),
+        title: result['title']?.toString() ??
+            (type == 'income' ? 'Income / Allowance' : 'Quick Expense'),
+        amount: amountValue,
+        category: type == 'income'
+            ? 'Income / Allowance'
+            : result['category']?.toString() ?? 'General',
+        date: result['date'] is DateTime
+            ? result['date'] as DateTime
+            : DateTime.now(),
+        colorValue:
+            Color(ref.read(settingsProvider).profileColorValue).toARGB32(),
+        type: type,
+        walletId: resolvedWalletId,
+      );
+
+      final saved =
+          await ref.read(expenseProvider.notifier).addExpense(entry);
+      if (!mounted) return;
+      if (!saved) {
+        _showTransactionError(
+          'The entry could not be saved. Check the selected account balance and try again.',
+          title: 'Smart Entry not saved',
+        );
+        return;
+      }
+
+      _smartInputCtrl.clear();
+      FocusScope.of(context).unfocus();
+      await HapticFeedback.lightImpact();
+      if (!mounted) return;
+      _showTransactionSuccess(
+        '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} from ${wallet.name}',
+        title: type == 'income' ? 'Income added' : 'Expense saved',
+        actionLabel: 'Undo',
+        onAction: () async {
+          final deleted = await ref
+              .read(expenseProvider.notifier)
+              .deleteExpense(entry.id);
+          if (!mounted) return;
+          if (deleted) {
+            _showTransactionInfo(
+              'The instant Smart Entry was removed.',
+              title: 'Entry undone',
+            );
+          }
+        },
+      );
+      return;
+    }
+
     final confidence =
         (result['confidence'] as num?)?.toDouble() ?? 0.0;
     final confidencePercent = (confidence * 100).round();
-    final reviewMessage = confidence < 0.75
-        ? 'Some details are uncertain ($confidencePercent% confidence). Check the amount, type, account, category, and date.'
-        : 'Smart Entry prepared this draft with $confidencePercent% confidence. Confirm every field before saving.';
+    final needsAccount = resolvedWalletId == null;
+    final reviewMessage = needsAccount
+        ? 'Choose the correct money account. The other detected details are editable before saving.'
+        : 'Some details are uncertain ($confidencePercent% confidence). Review the amount, type, category, and date.';
 
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
@@ -1615,7 +1760,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       prefilledDate: result['date'] is DateTime
           ? result['date'] as DateTime
           : DateTime.now(),
-      preselectedWalletId: selectedWalletId,
+      preselectedWalletId: resolvedWalletId,
       initialType: result['type'] == 'income' ? 'income' : 'expense',
       reviewMessage: reviewMessage,
     );
@@ -1667,12 +1812,16 @@ class _TopMessageCard extends StatelessWidget {
   final String title;
   final String message;
   final _MessageTone tone;
+  final String? actionLabel;
+  final Future<void> Function()? onAction;
   final VoidCallback onDismiss;
 
   const _TopMessageCard({
     required this.title,
     required this.message,
     required this.tone,
+    required this.actionLabel,
+    required this.onAction,
     required this.onDismiss,
   });
 
@@ -1773,6 +1922,28 @@ class _TopMessageCard extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (actionLabel != null && onAction != null) ...[
+                          const SizedBox(height: 7),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: accent,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 30),
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () async {
+                              onDismiss();
+                              await onAction!();
+                            },
+                            child: Text(
+                              actionLabel!,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

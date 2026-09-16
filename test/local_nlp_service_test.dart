@@ -74,5 +74,29 @@ void main() {
       expect(result['confidence'], isA<double>());
       expect(result['needsReview'], isA<bool>());
     });
+
+    test('allows instant save only for a confident complete entry', () {
+      final parsed =
+          LocalNlpService().parseExpense('500 for biryani', categories);
+
+      expect(
+        shouldAutoSaveSmartEntry(parsed, hasResolvedWallet: true),
+        isTrue,
+      );
+      expect(
+        shouldAutoSaveSmartEntry(parsed, hasResolvedWallet: false),
+        isFalse,
+      );
+    });
+
+    test('requires review for an unknown expense category', () {
+      final parsed =
+          LocalNlpService().parseExpense('500 something', categories);
+
+      expect(
+        shouldAutoSaveSmartEntry(parsed, hasResolvedWallet: true),
+        isFalse,
+      );
+    });
   });
 }

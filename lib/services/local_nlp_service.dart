@@ -452,6 +452,34 @@ class LocalNlpService {
   }
 }
 
+bool shouldAutoSaveSmartEntry(
+  Map<String, dynamic> parsed, {
+  required bool hasResolvedWallet,
+}) {
+  final amount = parsed['amount'];
+  final type = parsed['type'];
+  final title = parsed['title']?.toString().trim() ?? '';
+  final category = parsed['category']?.toString().trim() ?? '';
+  final confidence = (parsed['confidence'] as num?)?.toDouble() ?? 0.0;
+
+  if (!hasResolvedWallet ||
+      amount is! num ||
+      !amount.isFinite ||
+      amount <= 0 ||
+      (type != 'expense' && type != 'income') ||
+      title.isEmpty ||
+      title == 'Quick Expense' ||
+      confidence < 0.8) {
+    return false;
+  }
+
+  if (type == 'expense' &&
+      (category.isEmpty || category.toLowerCase() == 'general')) {
+    return false;
+  }
+  return true;
+}
+
 class _WordAmountResult {
   final double amount;
   final List<String> consumedTokens;
