@@ -1,0 +1,248 @@
+Yes—we can turn Smart Entry into Likhlo’s main control system. The best approach is a fast, local-first **NLP Command Engine** that understands intent, extracts financial details, applies existing accounting rules, and performs safe actions with Undo.
+
+No code has been changed yet.
+
+## Target capabilities
+
+| User command                         | Expected action                                      |
+| ------------------------------------ | ---------------------------------------------------- |
+| `500 burger cash`                    | Add Rs. 500 expense from Cash                        |
+| `salary 50 hazar JazzCash mein aayi` | Add Rs. 50,000 income to JazzCash                    |
+| `kal 1200 petrol`                    | Add yesterday’s expense using the default wallet     |
+| `delete burger`                      | Delete the most recent unique burger entry with Undo |
+| `delete yesterday 500 burger`        | Delete the specifically matched transaction          |
+| `change burger amount to 600`        | Edit the matched entry                               |
+| `transfer 2000 cash se JazzCash`     | Transfer between wallets                             |
+| `same expense again`                 | Repeat the previous transaction                      |
+| `how much spent on food this month`  | Show a financial answer without modifying data       |
+
+## Core architecture
+
+Every Smart Entry command should pass through this pipeline:
+
+```mermaid
+flowchart TD
+    A["Voice or typed command"] --> B["Normalize language"]
+    B --> C["Detect intent"]
+    C --> D["Extract details"]
+    D --> E["Resolve wallets and entries"]
+    E --> F["Validate accounting rules"]
+    F --> G{"Safe and confident?"}
+    G -->|Yes| H["Perform action + Undo"]
+    G -->|Uncertain| I["Ask one short question"]
+```
+
+### 1. Language normalization
+
+Before interpreting the command, normalize:
+
+* English and Roman Urdu.
+* Spelling variations and typing mistakes.
+* `50k`, `50 thousand`, `50 hazar`, `pachaas hazar`.
+* `Jazz Cash`, `jazzcash`, `JC`.
+* Dates such as `today`, `aaj`, `kal`, `yesterday`, `parso`.
+* Words such as `delete`, `remove`, `hatao`, `nikalo`.
+* Income phrases such as `received`, `aayi`, `mili`, `jama hui`.
+* Expense phrases such as `spent`, `diye`, `kharch`, `pay kiye`.
+
+Normalization should not write anything to the database.
+
+### 2. Intent detection
+
+The engine should first decide what the user wants:
+
+* Add expense
+* Add income
+* Transfer money
+* Delete transaction
+* Edit transaction
+* Repeat transaction
+* Search transactions
+* Show a total or summary
+* Open a screen or filter
+* Unknown command
+
+Intent detection must occur before amount/category extraction. For example, `delete burger` must never be interpreted as a new burger expense.
+
+### 3. Entity extraction
+
+Each recognized command should produce a structured object:
+
+```text
+Intent: Add expense
+Amount: 500
+Title: Burger
+Category: Food
+Wallet: Cash
+Date: Today
+Confidence: 96%
+```
+
+Important entities include:
+
+* Amount
+* Transaction title or merchant
+* Expense/income type
+* Wallet
+* Category
+* Date
+* Source and destination wallets
+* Target transaction for deletion/editing
+* Words such as `last`, `latest`, `yesterday`, or `from JazzCash`
+
+### 4. Contextual intelligence
+
+Smart Entry should gradually become personalized without requiring cloud AI:
+
+* Remember that `burger`, `biryani`, and `pizza` usually mean Food.
+* Remember the wallet previously used for a merchant or category.
+* Use the user-selected default wallet when none is mentioned.
+* Understand `same as yesterday` and `repeat last petrol`.
+* Prefer recent transactions when resolving `delete burger`.
+* Learn from corrections. If the user changes `Careem` from General to Transport, suggest Transport next time.
+* Store learned aliases locally, such as `JC → JazzCash`.
+
+User learning should only improve suggestions; it must not bypass balance or deletion safety.
+
+## Action safety rules
+
+| Action                    | Recommended behavior                                      |
+| ------------------------- | --------------------------------------------------------- |
+| Add expense               | Instant save when amount and funded wallet are resolved   |
+| Add income                | Instant save when amount and wallet are resolved          |
+| Transfer                  | Instant only when both wallets and amount are unambiguous |
+| Delete unique entry       | Instant delete with a 10-second Undo                      |
+| Multiple matching entries | Show a compact transaction chooser                        |
+| Edit unique entry         | Apply change and provide Undo                             |
+| Clear wallet/account      | Always require confirmation                               |
+| Delete wallet/account     | Always require confirmation                               |
+| Financial question        | Answer directly; never modify data                        |
+
+### Example: `delete burger`
+
+The engine should:
+
+1. Search normalized transaction titles and categories.
+2. Prefer recent expense entries.
+3. Consider optional date, amount, and wallet information.
+4. If exactly one strong match exists, delete it and show:
+
+> Burger · Rs. 500 deleted from Cash — **Undo**
+
+5. If several entries match, show only those entries in a compact chooser.
+6. If confidence is low, delete nothing.
+
+This keeps the interaction fast without risking financial records.
+
+## Confidence system
+
+A single overall confidence number is insufficient. Confidence should be calculated separately:
+
+* Intent confidence
+* Amount confidence
+* Wallet confidence
+* Transaction-match confidence
+* Date confidence
+* Category confidence
+
+Category uncertainty should not block instant saving; it can use `General`. However, an uncertain amount, action type, wallet, or deletion target must block automatic execution.
+
+Suggested thresholds:
+
+* **90–100%:** perform immediately.
+* **70–89%:** perform safe additions when critical fields are certain.
+* **Below 70%:** ask one focused question.
+* **Deletion:** require a unique target with at least 95% match confidence.
+
+## Smart clarification
+
+The app should never reopen the complete transaction form merely because one value is missing. It should ask only for the missing information:
+
+* `Which wallet should I use?`
+* `Did you mean income or expense?`
+* `I found three burger entries. Which one should be deleted?`
+* `Cash has Rs. 300, but the expense is Rs. 500. Use another wallet?`
+
+This preserves the fast workflow.
+
+## Performance strategy
+
+To keep NLP quick:
+
+* Use a deterministic Dart parser as the primary engine.
+* Cache wallet names, aliases, categories, and common phrases.
+* Maintain a lightweight searchable transaction index.
+* Search recent entries first for delete/edit commands.
+* Avoid scanning the complete Hive database after every word.
+* Run parsing only after submission or final speech recognition.
+* Keep speech-to-text active only while the user presses the microphone.
+* Perform database writes through the existing providers so all balance rules remain centralized.
+
+A cloud LLM should not be required for basic commands. It would add latency, internet dependence, cost, and unpredictable financial decisions. Later, an optional AI interpreter could convert difficult language into a structured command—but the local validator must still approve every action.
+
+## Implementation phases
+
+### Phase 1 — Command foundation
+
+* Create a common `ParsedCommand` model.
+* Add intent routing and entity extraction.
+* Separate parsing from execution.
+* Add confidence scores and clarification reasons.
+* Preserve current instant expense/income behavior.
+
+### Phase 2 — Strong expense and income intelligence
+
+* Expand English and Roman Urdu vocabulary.
+* Add typo handling, number words, merchants, categories, wallets, and dates.
+* Add local correction-based learning.
+* Add commands containing multiple natural word orders.
+
+### Phase 3 — Safe delete and edit commands
+
+* Build indexed transaction matching.
+* Support `last`, amount, wallet, category, and date filters.
+* Add instant unique deletion with Undo.
+* Add compact selection for ambiguous matches.
+* Add edit and repeat commands.
+
+### Phase 4 — Transfers and financial questions
+
+* Natural-language transfers.
+* Spending and income questions.
+* Wallet balance questions.
+* Category and monthly summaries.
+* Navigation and filtering commands.
+
+### Phase 5 — Personal intelligence
+
+* Learn wallet/category preferences locally.
+* Add merchant aliases and recurring behavior.
+* Understand conversational references such as `same one`, `that entry`, and `again`.
+* Provide optional suggestions without automatic financial changes.
+
+### Phase 6 — Advanced optional AI
+
+* Use an optional AI interpreter only for complex sentences.
+* Require structured JSON output.
+* Pass the result through the same local validator.
+* Never allow AI to write directly to Hive or bypass account protections.
+
+## Testing requirements
+
+Before enabling destructive commands, we should build a large test set covering:
+
+* English and Roman Urdu.
+* Misspellings and incomplete commands.
+* Similar transaction names.
+* Multiple transactions with the same title.
+* Zero and negative amounts.
+* Empty and underfunded wallets.
+* Transfer-credit records.
+* Dates across months and years.
+* Accidental phrases that contain words such as `delete`.
+* Undo restoration of balances and transaction records.
+
+The most important target should be: **zero incorrect automatic deletions**.
+
+My recommended first implementation would combine Phases 1–3: establish the command engine, significantly improve expense/income intelligence, and introduce safe deletion with unique-match detection and Undo. After that foundation is stable, transfers, editing, financial questions, and personalized learning can be added reliably.
+
