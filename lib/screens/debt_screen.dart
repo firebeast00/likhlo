@@ -37,6 +37,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   void _listenForInput() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (!_isListening) {
       bool available = await _speech.initialize(
         onStatus: (val) {
@@ -101,6 +102,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   void _startReceiptScan() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -134,6 +136,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   void _showAddDialog({String initialName = "", String initialAmount = "", String initialType = 'lent'}) {
+    FocusManager.instance.primaryFocus?.unfocus();
     final nameCtrl = TextEditingController(text: initialName);
     final amountCtrl = TextEditingController(text: initialAmount);
     String type = initialType;
