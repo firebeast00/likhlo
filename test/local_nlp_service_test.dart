@@ -400,5 +400,175 @@ void main() {
     });
 
 
+    test('finds one exact entry for a delete command', () {
+      final command =
+          LocalNlpService().parseCommand('delete burger', categories);
+      final match = matchSmartEntryTransaction(
+        command: command,
+        entries: [
+          SmartEntryTransaction(
+            id: 'burger',
+            title: 'Burger',
+            amount: 500,
+            category: 'Food',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'cash',
+          ),
+          SmartEntryTransaction(
+            id: 'petrol',
+            title: 'Petrol',
+            amount: 1000,
+            category: 'Transport',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'cash',
+          ),
+        ],
+      );
+
+      expect(match.status, SmartEntryMatchStatus.unique);
+      expect(match.matches.single.id, 'burger');
+    });
+
+    test('returns a chooser list when exact titles are ambiguous', () {
+      final command =
+          LocalNlpService().parseCommand('delete burger', categories);
+      final match = matchSmartEntryTransaction(
+        command: command,
+        entries: [
+          SmartEntryTransaction(
+            id: 'new',
+            title: 'Burger',
+            amount: 500,
+            category: 'Food',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'cash',
+          ),
+          SmartEntryTransaction(
+            id: 'old',
+            title: 'Burger',
+            amount: 400,
+            category: 'Food',
+            type: 'expense',
+            date: DateTime(2026, 9, 15),
+            walletId: 'cash',
+          ),
+        ],
+      );
+
+      expect(match.status, SmartEntryMatchStatus.ambiguous);
+      expect(match.matches, hasLength(2));
+    });
+
+    test('last selector chooses the newest matching entry', () {
+      final command =
+          LocalNlpService().parseCommand('delete last burger', categories);
+      final match = matchSmartEntryTransaction(
+        command: command,
+        entries: [
+          SmartEntryTransaction(
+            id: 'old',
+            title: 'Burger',
+            amount: 400,
+            category: 'Food',
+            type: 'expense',
+            date: DateTime(2026, 9, 15),
+            walletId: 'cash',
+          ),
+          SmartEntryTransaction(
+            id: 'new',
+            title: 'Burger',
+            amount: 500,
+            category: 'Food',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'cash',
+          ),
+        ],
+      );
+
+      expect(match.status, SmartEntryMatchStatus.unique);
+      expect(match.matches.single.id, 'new');
+    });
+
+    test('delete matching can narrow by amount and wallet', () {
+      final command =
+          LocalNlpService().parseCommand('delete 500 burger cash', categories);
+      final match = matchSmartEntryTransaction(
+        command: command,
+        walletId: 'cash',
+        ignoredTitlePhrases: const ['cash'],
+        entries: [
+          SmartEntryTransaction(
+            id: 'cash-entry',
+            title: 'Burger',
+            amount: 500,
+            category: 'Food',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'cash',
+          ),
+          SmartEntryTransaction(
+            id: 'jazz-entry',
+            title: 'Burger',
+            amount: 500,
+            category: 'Food',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'jazz',
+          ),
+        ],
+      );
+
+      expect(match.status, SmartEntryMatchStatus.unique);
+      expect(match.matches.single.id, 'cash-entry');
+    });
+
+    test('critical matcher never returns transfer records', () {
+      final command =
+          LocalNlpService().parseCommand('delete transfer', categories);
+      final match = matchSmartEntryTransaction(
+        command: command,
+        entries: [
+          SmartEntryTransaction(
+            id: 'pair_out',
+            title: 'Transfer to JazzCash',
+            amount: 1000,
+            category: 'Transfer',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'cash',
+          ),
+        ],
+      );
+
+      expect(match.status, SmartEntryMatchStatus.notFound);
+    });
+
+    test('edit command uses the final numeric amount', () {
+      final command = LocalNlpService()
+          .parseCommand('change 500 burger amount to 600', categories);
+
+      expect(command.intent, SmartEntryIntent.editEntry);
+      expect(command.amount, 600);
+      expect(command.title, 'Burger');
+    });
+
+
+    test('day before yesterday is parsed as two days ago', () {
+      final command = LocalNlpService()
+          .parseCommand('delete day before yesterday burger', categories);
+      final expected = DateTime.now().subtract(const Duration(days: 2));
+
+      expect(command.hasExplicitDate, isTrue);
+      expect(
+        DateTime(command.date.year, command.date.month, command.date.day),
+        DateTime(expected.year, expected.month, expected.day),
+      );
+    });
+
+
   });
 }
