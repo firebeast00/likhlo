@@ -52,6 +52,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   bool _voiceResultProcessed = false;
+  bool _handlingSpeechError = false;
+  List<String?> _speechLocaleCandidates = const [null];
+  int _speechLocaleCandidateIndex = 0;
   bool _isScanningReceipt = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
   String? _smartEntryDefaultWalletId;
@@ -845,8 +848,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (_selectedCategoryTab != 'All') displayExpenses = displayExpenses.where((e) => e.category == _selectedCategoryTab).toList();
     if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-    displayExpenses.sort((a,b) => b.date.compareTo(a.date));
 
     return Scaffold(
       drawer: AppDrawer(
@@ -2146,94 +2147,162 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     _voiceResultProcessed = false;
+    _handlingSpeechError = false;
     _smartInputCtrl.clear();
     final available = await _speech.initialize(
       onStatus: _handleSpeechStatus,
-      onError: (error) {
-        debugPrint('STT Error: $error');
-        if (!mounted) return;
-        _voiceResultProcessed = true;
-        setState(() => _isListening = false);
-        final languageUnavailable =
-            error.errorMsg.contains('error_language_unavailable');
-        _showTransactionError(
-          languageUnavailable
-              ? 'English speech recognition is unavailable on this phone. Install or enable an English speech language in Google voice typing, then try again.'
-              : 'Voice Log stopped before an entry could be saved. Please try again.',
-          title: languageUnavailable
-              ? 'Speech language unavailable'
-              : 'Voice Log stopped',
-        );
-      },
+      onError: (error) => _handleSpeechError(error.errorMsg),
     );
     if (!mounted) return;
     if (!available) {
       _showTransactionError(
-        'Allow microphone and speech-recognition access in phone settings, then try again.',
-        title: 'Permission required',
+        'Speech recognition is not available. Enable the Google app or your phone\'s speech-recognition service, then allow microphone access.',
+        title: 'Voice recognition unavailable',
       );
       return;
     }
 
-    final speechLocaleId = await _resolveSpeechLocale();
+    _speechLocaleCandidates = await _buildSpeechLocaleCandidates();
+    _speechLocaleCandidateIndex = 0;
     if (!mounted) return;
-    if (speechLocaleId == null) {
-      _showTransactionError(
-        'Install an English speech-recognition language in Google voice typing and reopen Likhlo.',
-        title: 'English speech language required',
-      );
-      return;
-    }
 
     setState(() => _isListening = true);
     await HapticFeedback.mediumImpact();
-    await _speech.listen(
-      listenOptions: stt.SpeechListenOptions(
-        localeId: speechLocaleId,
-        cancelOnError: true,
-        partialResults: true,
-        listenMode: stt.ListenMode.search,
-      ),
-      onResult: (result) async {
-        if (!mounted) return;
-        final words = result.recognizedWords.trim();
-        setState(() => _smartInputCtrl.text = words);
-        if (result.finalResult && words.isNotEmpty && !_voiceResultProcessed) {
-          _voiceResultProcessed = true;
-          setState(() => _isListening = false);
-          await _processNLP(words);
-        }
-      },
-    );
+    await _startSpeechListening();
   }
 
-  Future<String?> _resolveSpeechLocale() async {
+  Future<List<String?>> _buildSpeechLocaleCandidates() async {
+    final candidates = <String?>[null];
     try {
       final locales = await _speech.locales();
-      if (locales.isEmpty) return null;
+      final systemLocale = await _speech.systemLocale();
 
       String normalize(String value) =>
           value.toLowerCase().replaceAll('-', '_');
-      const preferred = ['en_us', 'en_gb', 'en_in', 'en_pk'];
+      final added = <String>{};
 
+      void addLocale(String? localeId) {
+        if (localeId == null || localeId.trim().isEmpty) return;
+        final normalized = normalize(localeId);
+        if (added.add(normalized)) candidates.add(localeId);
+      }
+
+      addLocale(systemLocale?.localeId);
+      const preferred = ['en_pk', 'en_in', 'en_gb', 'en_us'];
       for (final preferredId in preferred) {
         for (final locale in locales) {
           if (normalize(locale.localeId) == preferredId) {
-            return locale.localeId;
+            addLocale(locale.localeId);
           }
         }
       }
-
       for (final locale in locales) {
         if (normalize(locale.localeId).startsWith('en_')) {
-          return locale.localeId;
+          addLocale(locale.localeId);
         }
       }
-      return null;
     } catch (error) {
       debugPrint('Speech locale lookup failed: $error');
-      return null;
     }
+
+    return candidates.take(4).toList(growable: false);
+  }
+
+  Future<void> _startSpeechListening() async {
+    if (!mounted) return;
+    final localeId =
+        _speechLocaleCandidates[_speechLocaleCandidateIndex];
+
+    try {
+      await _speech.listen(
+        listenOptions: stt.SpeechListenOptions(
+          localeId: localeId,
+          cancelOnError: true,
+          partialResults: true,
+          listenMode: stt.ListenMode.search,
+          pauseFor: const Duration(seconds: 4),
+          listenFor: const Duration(seconds: 20),
+        ),
+        onResult: (result) async {
+          if (!mounted) return;
+          final words = result.recognizedWords.trim();
+          setState(() => _smartInputCtrl.text = words);
+          if (result.finalResult &&
+              words.isNotEmpty &&
+              !_voiceResultProcessed) {
+            _voiceResultProcessed = true;
+            setState(() => _isListening = false);
+            await _processNLP(words);
+          }
+        },
+      );
+    } catch (error) {
+      debugPrint('Speech listen failed: $error');
+      if (!mounted || _handlingSpeechError) return;
+      _handlingSpeechError = true;
+      _voiceResultProcessed = true;
+      setState(() => _isListening = false);
+      _showTransactionError(
+        'Voice recognition could not start. Check microphone permission and the phone\'s speech-recognition service.',
+        title: 'Voice Log unavailable',
+      );
+    }
+  }
+
+  Future<void> _handleSpeechError(String errorMessage) async {
+    debugPrint('STT Error: $errorMessage');
+    if (!mounted || _handlingSpeechError) return;
+    _handlingSpeechError = true;
+
+    final normalized = errorMessage.toLowerCase();
+    final languageFailure =
+        normalized.contains('error_language_unavailable') ||
+        normalized.contains('error_language_not_supported');
+
+    if (languageFailure &&
+        _speechLocaleCandidateIndex + 1 <
+            _speechLocaleCandidates.length) {
+      _voiceResultProcessed = true;
+      await _speech.cancel();
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
+
+      _speechLocaleCandidateIndex++;
+      _smartInputCtrl.clear();
+      _voiceResultProcessed = false;
+      _handlingSpeechError = false;
+      await _startSpeechListening();
+      return;
+    }
+
+    _voiceResultProcessed = true;
+    setState(() => _isListening = false);
+
+    final networkFailure =
+        normalized.contains('error_network') ||
+        normalized.contains('error_server') ||
+        normalized.contains('error_too_many_requests');
+
+    if (networkFailure) {
+      _showTransactionError(
+        'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
+        title: 'Voice service is offline',
+      );
+      return;
+    }
+
+    if (languageFailure) {
+      _showTransactionError(
+        'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
+        title: 'Speech language unavailable',
+      );
+      return;
+    }
+
+    _showTransactionError(
+      'Voice Log stopped before an entry could be saved. Please try again.',
+      title: 'Voice Log stopped',
+    );
   }
 
   Future<void> _scanReceiptIntoInput() async {
