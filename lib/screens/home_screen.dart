@@ -187,7 +187,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     });
   }
 
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   void _selectCategory(String category, int index) {
+    _dismissKeyboard();
     setState(() => _selectedCategoryTab = category);
     double offset = (index * 70.0) - (MediaQuery.of(context).size.width / 2) + 35;
     if (offset < 0) offset = 0;
@@ -197,6 +202,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _changeView(String view) async {
+    _dismissKeyboard();
     if (!mounted || view == _currentView) return;
 
     try {
@@ -223,6 +229,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   void _showAddCategoryDialog() {
+    _dismissKeyboard();
     final catCtrl = TextEditingController();
     final primaryColor = Color(ref.read(settingsProvider).profileColorValue);
 
@@ -279,6 +286,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _confirmDeleteCategory(String category) async {
+    _dismissKeyboard();
     if (category == 'All') return;
     final categories = ref.read(categoryProvider);
 
@@ -339,6 +347,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     String initialType = 'expense',
     String? reviewMessage,
   }) async {
+    _dismissKeyboard();
     if (existing?.category == 'Transfer') {
       _showTransactionInfo(
         'Delete this transfer and create it again if its details need to change.',
@@ -782,6 +791,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _openIncomeAccounts() async {
+    _dismissKeyboard();
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const IncomeAccountsScreen()),
     );
@@ -817,7 +827,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           leading: Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu_rounded, size: 24),
-              onPressed: () => Scaffold.of(context).openDrawer(),
+              onPressed: () {
+                _dismissKeyboard();
+                Scaffold.of(context).openDrawer();
+              },
             ),
           ),
         ),
@@ -857,9 +870,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: _isSearching ? TextField(autofocus: true, style: const TextStyle(fontSize: 15), decoration: InputDecoration(border: InputBorder.none, hintText: "Search transactions...", hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14)), onChanged: (v)=>setState(()=>_searchQuery=v)) : Text(_currentView, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        title: _isSearching ? TextField(style: const TextStyle(fontSize: 15), decoration: InputDecoration(border: InputBorder.none, hintText: "Search transactions...", hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14)), onChanged: (v)=>setState(()=>_searchQuery=v)) : Text(_currentView, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         centerTitle: true,
-        leading: Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu_rounded, size: 24), onPressed: () => Scaffold.of(context).openDrawer())),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu_rounded, size: 24),
+            onPressed: () {
+              _dismissKeyboard();
+              Scaffold.of(context).openDrawer();
+            },
+          ),
+        ),
         actions: [
           if (_currentView == 'Dashboard' && !_isSearching)
             IconButton(
@@ -874,10 +895,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 _isSearching ? Icons.close_rounded : Icons.search_rounded,
                 size: 22,
               ),
-              onPressed: () => setState(() {
-                _isSearching = !_isSearching;
-                if (!_isSearching) _searchQuery = '';
-              }),
+              onPressed: () {
+                _dismissKeyboard();
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) _searchQuery = '';
+                });
+              },
             ),
         ],
       ),
@@ -1447,6 +1471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _showSmartEntryAccountPicker() async {
+    _dismissKeyboard();
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
@@ -1607,6 +1632,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _showHomeWalletPicker() async {
+    _dismissKeyboard();
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
@@ -2030,6 +2056,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _pickBudgetMonth() async {
+    _dismissKeyboard();
     var selectedYear = _focusedMonth.year;
     final selected = await showDialog<DateTime>(
       context: context,
@@ -2139,6 +2166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _listenForExpense() async {
+    _dismissKeyboard();
     if (_isListening) {
       await _speech.stop();
       await HapticFeedback.selectionClick();
@@ -2307,7 +2335,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   Future<void> _scanReceiptIntoInput() async {
     if (_isScanningReceipt) return;
-    FocusScope.of(context).unfocus();
+    _dismissKeyboard();
     setState(() => _isScanningReceipt = true);
     try {
       final receiptData = await OcrScannerService().scanReceipt();
@@ -2362,6 +2390,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _processNLP(String text) async {
+    _dismissKeyboard();
     final normalized = text.trim();
     if (normalized.isEmpty) return;
 
@@ -2478,7 +2507,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final defaultsAreEmpty = defaultAccounts.isEmpty ||
         defaultAccounts.every((account) => account.availableBalance <= 0);
     final reviewMessage = mentionedWalletId != null
-        ? 'The named wallet cannot cover this expense. Choose another account before saving.'
+        ? 'The named wallet cannot cover this expense. Choose another wallet before saving.'
         : configuredDefaultWallet != null
             ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
             : defaultsAreEmpty
