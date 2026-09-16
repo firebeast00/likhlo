@@ -43,6 +43,7 @@ class ParsedSmartEntryCommand {
   final String title;
   final String category;
   final DateTime date;
+  final bool hasExplicitDate;
   final double confidence;
   final Map<String, double> confidenceByField;
   final List<String> clarificationReasons;
@@ -54,6 +55,7 @@ class ParsedSmartEntryCommand {
     required this.title,
     required this.category,
     required this.date,
+    required this.hasExplicitDate,
     required this.confidence,
     required this.confidenceByField,
     required this.clarificationReasons,
@@ -73,6 +75,7 @@ class ParsedSmartEntryCommand {
       'category': category,
       'title': title,
       'date': date,
+      'hasExplicitDate': hasExplicitDate,
       'type': transactionType,
       'intent': intent.wireName,
       'confidence': confidence,
@@ -83,6 +86,229 @@ class ParsedSmartEntryCommand {
       'needsReview': needsClarification || confidence < 0.75,
     };
   }
+}
+
+enum SmartEntryMatchStatus { unique, ambiguous, notFound }
+
+class SmartEntryTransaction {
+  final String id;
+  final String title;
+  final double amount;
+  final String category;
+  final String type;
+  final DateTime date;
+  final String walletId;
+
+  const SmartEntryTransaction({
+    required this.id,
+    required this.title,
+    required this.amount,
+    required this.category,
+    required this.type,
+    required this.date,
+    required this.walletId,
+  });
+}
+
+class SmartEntryMatchResult {
+  final SmartEntryMatchStatus status;
+  final List<SmartEntryTransaction> matches;
+  final double confidence;
+
+  const SmartEntryMatchResult({
+    required this.status,
+    required this.matches,
+    required this.confidence,
+  });
+
+  const SmartEntryMatchResult.notFound()
+      : status = SmartEntryMatchStatus.notFound,
+        matches = const [],
+        confidence = 0;
+}
+
+class _ScoredSmartEntryTransaction {
+  final SmartEntryTransaction transaction;
+  final double score;
+
+  const _ScoredSmartEntryTransaction(this.transaction, this.score);
+}
+
+String _normalizeMatchText(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+bool _sameCalendarDay(DateTime first, DateTime second) {
+  return first.year == second.year &&
+      first.month == second.month &&
+      first.day == second.day;
+}
+
+int _smartEntryMatchDistance(String first, String second) {
+  if (first == second) return 0;
+  if (first.isEmpty) return second.length;
+  if (second.isEmpty) return first.length;
+
+  var previous = List<int>.generate(second.length + 1, (index) => index);
+  var current = List<int>.filled(second.length + 1, 0);
+  for (var firstIndex = 0;
+      firstIndex < first.length;
+      firstIndex++) {
+    current[0] = firstIndex + 1;
+    for (var secondIndex = 0;
+        secondIndex < second.length;
+        secondIndex++) {
+      final substitution =
+          first[firstIndex] == second[secondIndex] ? 0 : 1;
+      current[secondIndex + 1] = min(
+        current[secondIndex] + 1,
+        min(
+          previous[secondIndex + 1] + 1,
+          previous[secondIndex] + substitution,
+        ),
+      );
+    }
+    final swap = previous;
+    previous = current;
+    current = swap;
+  }
+  return previous[second.length];
+}
+
+double _smartEntryTitleScore(
+  String target,
+  SmartEntryTransaction transaction,
+) {
+  final title = _normalizeMatchText(transaction.title);
+  final category = _normalizeMatchText(transaction.category);
+  if (target.isEmpty) return 0.80;
+  if (title == target) return 1.0;
+  if (title.contains(target) || target.contains(title)) return 0.96;
+  if (category == target) return 0.84;
+
+  final targetTokens =
+      target.split(' ').where((token) => token.isNotEmpty).toSet();
+  final titleTokens =
+      title.split(' ').where((token) => token.isNotEmpty).toSet();
+  if (targetTokens.isNotEmpty && titleTokens.isNotEmpty) {
+    final shared = targetTokens.intersection(titleTokens).length;
+    final ratio = shared / max(targetTokens.length, titleTokens.length);
+    if (ratio >= 0.5) return 0.78 + (0.16 * ratio);
+  }
+
+  final longest = max(target.length, title.length);
+  if (longest > 0) {
+    final distance = _smartEntryMatchDistance(target, title);
+    final allowedDistance = max(1, (longest * 0.20).floor());
+    if (distance <= allowedDistance) return 0.86;
+  }
+  return 0;
+}
+
+SmartEntryMatchResult matchSmartEntryTransaction({
+  required ParsedSmartEntryCommand command,
+  required Iterable<SmartEntryTransaction> entries,
+  String? walletId,
+  Iterable<String> ignoredTitlePhrases = const [],
+}) {
+  var target = _normalizeMatchText(command.title);
+  for (final phrase in ignoredTitlePhrases) {
+    final normalizedPhrase = _normalizeMatchText(phrase);
+    if (normalizedPhrase.isEmpty) continue;
+    target = target
+        .replaceAll(
+          RegExp(
+            r'(^|\s)' + RegExp.escape(normalizedPhrase) + r'(\s|$)',
+          ),
+          ' ',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+  if (target == 'transaction' ||
+      target == 'quick expense' ||
+      target == 'income allowance') {
+    target = '';
+  }
+
+  final normalizedRaw = _normalizeMatchText(command.rawInput);
+  String? requestedType;
+  if (RegExp(
+    r'\b(income|salary|allowance|received|credited|bonus|refund|aayi|mili|jama)\b',
+  ).hasMatch(normalizedRaw)) {
+    requestedType = 'income';
+  } else if (RegExp(
+    r'\b(expense|spent|paid|kharch)\b',
+  ).hasMatch(normalizedRaw)) {
+    requestedType = 'expense';
+  }
+
+  final scored = <_ScoredSmartEntryTransaction>[];
+  for (final entry in entries) {
+    final isTransfer =
+        entry.category.trim().toLowerCase() == 'transfer' ||
+        entry.id.endsWith('_out') ||
+        entry.id.endsWith('_in');
+    if (isTransfer) continue;
+    if (walletId != null && entry.walletId != walletId) continue;
+    if (requestedType != null && entry.type != requestedType) continue;
+    if (command.hasExplicitDate &&
+        !_sameCalendarDay(entry.date, command.date)) {
+      continue;
+    }
+    if (command.intent == SmartEntryIntent.deleteEntry &&
+        command.amount > 0 &&
+        (entry.amount - command.amount).abs() > 0.005) {
+      continue;
+    }
+
+    final score = _smartEntryTitleScore(target, entry);
+    if (score >= 0.78) {
+      scored.add(_ScoredSmartEntryTransaction(entry, score));
+    }
+  }
+
+  if (scored.isEmpty) return const SmartEntryMatchResult.notFound();
+
+  scored.sort((first, second) {
+    final byScore = second.score.compareTo(first.score);
+    if (byScore != 0) return byScore;
+    return second.transaction.date.compareTo(first.transaction.date);
+  });
+
+  final strongMatches =
+      scored.where((candidate) => candidate.score >= 0.95).toList();
+  final prefersLatest = RegExp(
+    r'\b(last|latest|recent|previous|akhri|pichli)\b',
+  ).hasMatch(normalizedRaw);
+
+  if (strongMatches.length == 1) {
+    return SmartEntryMatchResult(
+      status: SmartEntryMatchStatus.unique,
+      matches: [strongMatches.single.transaction],
+      confidence: strongMatches.single.score,
+    );
+  }
+  if (prefersLatest && scored.first.score >= 0.86) {
+    return SmartEntryMatchResult(
+      status: SmartEntryMatchStatus.unique,
+      matches: [scored.first.transaction],
+      confidence: scored.first.score,
+    );
+  }
+
+  return SmartEntryMatchResult(
+    status: SmartEntryMatchStatus.ambiguous,
+    matches: scored
+        .take(6)
+        .map((candidate) => candidate.transaction)
+        .toList(growable: false),
+    confidence: scored.first.score,
+  );
 }
 
 class LocalNlpService {
@@ -188,7 +414,8 @@ class LocalNlpService {
     'expense', 'income', 'transaction', 'entry', 'delete', 'remove',
     'hatao', 'hata', 'nikalo', 'edit', 'change', 'update', 'modify',
     'badlo', 'badal', 'transfer', 'move', 'shift', 'send', 'bhejo',
-    'show', 'list', 'find', 'search', 'please', 'plz'
+    'show', 'list', 'find', 'search', 'please', 'plz', 'last', 'latest',
+    'recent', 'previous', 'akhri', 'pichli'
   ];
 
   // ==========================================
@@ -471,16 +698,16 @@ class LocalNlpService {
     if (RegExp(r'\b(aaj|today)\b').hasMatch(lowerInput)) {
       consumedTokens.addAll(['aaj', 'today']);
       explicitDate = true;
-    } else if (RegExp(r'\b(kal|yesterday)\b').hasMatch(lowerInput)) {
-      transactionDate = transactionDate.subtract(const Duration(days: 1));
-      consumedTokens.addAll(['kal', 'yesterday']);
-      explicitDate = true;
     } else if (RegExp(r'\b(parso|parson|day before yesterday)\b')
         .hasMatch(lowerInput)) {
       transactionDate = transactionDate.subtract(const Duration(days: 2));
       consumedTokens.addAll(
         ['parso', 'parson', 'day', 'before', 'yesterday'],
       );
+      explicitDate = true;
+    } else if (RegExp(r'\b(kal|yesterday)\b').hasMatch(lowerInput)) {
+      transactionDate = transactionDate.subtract(const Duration(days: 1));
+      consumedTokens.addAll(['kal', 'yesterday']);
       explicitDate = true;
     }
 
@@ -490,7 +717,12 @@ class LocalNlpService {
     final containsNegativeAmount = RegExp(
       r'(^|\s)(-|minus)\s*\d',
     ).hasMatch(lowerInput);
-    final digitMatch = amountRegExp.firstMatch(lowerInput);
+    final digitMatches = amountRegExp.allMatches(lowerInput).toList();
+    final digitMatch = digitMatches.isEmpty
+        ? null
+        : intent == SmartEntryIntent.editEntry
+            ? digitMatches.last
+            : digitMatches.first;
     if (digitMatch != null && !containsNegativeAmount) {
       final base = double.tryParse(
             digitMatch.group(1)!.replaceAll(',', ''),
@@ -659,6 +891,7 @@ class LocalNlpService {
       title: cleanTitle,
       category: isIncome ? 'Income / Allowance' : category,
       date: transactionDate,
+      hasExplicitDate: explicitDate,
       confidence: confidence,
       confidenceByField: fieldConfidence,
       clarificationReasons: clarificationReasons,
@@ -726,7 +959,7 @@ bool _accountMentioned(String input, SmartEntryAccount account) {
   return false;
 }
 
-Set<String> _mentionedSmartEntryAccountIds(
+Set<String> findMentionedSmartEntryAccountIds(
   String input,
   Iterable<SmartEntryAccount> accounts,
 ) {
@@ -740,7 +973,7 @@ String? findMentionedSmartEntryAccountId(
   String input,
   Iterable<SmartEntryAccount> accounts,
 ) {
-  final matches = _mentionedSmartEntryAccountIds(input, accounts);
+  final matches = findMentionedSmartEntryAccountIds(input, accounts);
   return matches.length == 1 ? matches.single : null;
 }
 
@@ -753,7 +986,7 @@ String? resolveSmartEntryAccount({
 }) {
   final availableAccounts = accounts.toList(growable: false);
   final mentionedIds =
-      _mentionedSmartEntryAccountIds(input, availableAccounts);
+      findMentionedSmartEntryAccountIds(input, availableAccounts);
   if (mentionedIds.length > 1) return null;
   final mentionedId =
       mentionedIds.length == 1 ? mentionedIds.single : null;
