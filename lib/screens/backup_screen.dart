@@ -174,7 +174,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                 Text('Created: $created'),
                 const SizedBox(height: 16),
                 _CountRow('Transactions', preview.expenses),
-                _CountRow('Money accounts', preview.wallets),
+                _CountRow('Wallets', preview.wallets),
                 _CountRow('Categories', preview.categories),
                 _CountRow('Udhar records', preview.debts),
                 _CountRow('Mess Khata records', preview.messEntries),
@@ -267,7 +267,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       leading: const Icon(Icons.backup_rounded),
                       title: const Text('Create encrypted backup'),
                       subtitle: const Text(
-                        'Accounts, transactions, categories, settings, Udhar and Mess Khata',
+                        'Wallets, transactions, categories, settings, Udhar and Mess Khata',
                       ),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: _busy ? null : _createBackup,
