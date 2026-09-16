@@ -511,7 +511,7 @@ String? findMentionedSmartEntryAccountId(
   Iterable<SmartEntryAccount> accounts,
 ) {
   final matches = accounts
-      .where((account) => !account.isBackup && _accountMentioned(input, account))
+      .where((account) => _accountMentioned(input, account))
       .map((account) => account.id)
       .toSet();
   return matches.length == 1 ? matches.single : null;
@@ -522,9 +522,9 @@ String? resolveSmartEntryAccount({
   required Iterable<SmartEntryAccount> accounts,
   required String transactionType,
   required double amount,
+  String? preferredAccountId,
 }) {
-  final availableAccounts =
-      accounts.where((account) => !account.isBackup).toList(growable: false);
+  final availableAccounts = accounts.toList(growable: false);
   final mentionedId =
       findMentionedSmartEntryAccountId(input, availableAccounts);
 
@@ -543,6 +543,21 @@ String? resolveSmartEntryAccount({
     return canUse(mentioned, explicitlySelected: true) ? mentioned.id : null;
   }
 
+  if (preferredAccountId != null) {
+    SmartEntryAccount? preferred;
+    for (final account in availableAccounts) {
+      if (account.id == preferredAccountId) {
+        preferred = account;
+        break;
+      }
+    }
+    if (preferred != null) {
+      return canUse(preferred, explicitlySelected: true)
+          ? preferred.id
+          : null;
+    }
+  }
+
   int defaultPriority(SmartEntryAccount account) {
     final type = _normalizeAccountText(account.type).replaceAll(' ', '');
     final name = _normalizeAccountText(account.name).replaceAll(' ', '');
@@ -552,7 +567,7 @@ String? resolveSmartEntryAccount({
   }
 
   final defaults = availableAccounts
-      .where((account) => defaultPriority(account) < 2)
+      .where((account) => !account.isBackup && defaultPriority(account) < 2)
       .toList()
     ..sort((a, b) => defaultPriority(a).compareTo(defaultPriority(b)));
 

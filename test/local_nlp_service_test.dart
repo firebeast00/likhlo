@@ -225,5 +225,85 @@ void main() {
         'cash',
       );
     });
+    test('selected custom account overrides automatic Cash selection', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 1000,
+        ),
+        SmartEntryAccount(
+          id: 'hbl',
+          name: 'HBL Account',
+          type: 'custom',
+          availableBalance: 2000,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: '500 groceries',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 500,
+          preferredAccountId: 'hbl',
+        ),
+        'hbl',
+      );
+    });
+
+    test('selected reserve account can be used for instant entry', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'reserve',
+          name: 'Emergency Stash',
+          type: 'reserve',
+          availableBalance: 1000,
+          isBackup: true,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: '300 medicine',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 300,
+          preferredAccountId: 'reserve',
+        ),
+        'reserve',
+      );
+    });
+
+    test('underfunded selected account requires review', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 100,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 1000,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryAccount(
+          input: '500 groceries',
+          accounts: accounts,
+          transactionType: 'expense',
+          amount: 500,
+          preferredAccountId: 'cash',
+        ),
+        isNull,
+      );
+    });
+
+
   });
 }

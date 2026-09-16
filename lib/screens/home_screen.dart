@@ -36,6 +36,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.likhlo/quick_tile');
+  static const _smartEntryDefaultAccountKey =
+      'smart_entry_default_wallet_id';
   String _currentView = 'Dashboard';
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
@@ -51,6 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _voiceResultProcessed = false;
   bool _isScanningReceipt = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
+  String? _smartEntryDefaultWalletId;
   Timer? _notificationUpdateTimer;
   Timer? _messageTimer;
   OverlayEntry? _activeMessageEntry;
@@ -58,6 +61,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
+    final storedSmartEntryWallet =
+        Hive.box('preferences').get(_smartEntryDefaultAccountKey);
+    _smartEntryDefaultWalletId = storedSmartEntryWallet is String &&
+            storedSmartEntryWallet.trim().isNotEmpty
+        ? storedSmartEntryWallet
+        : null;
     _fabController = AnimationController(vsync: this, duration: const Duration(milliseconds: 200), lowerBound: 0.0, upperBound: 0.1);
     _fabScale = Tween<double>(begin: 1.0, end: 0.95).animate(_fabController);
 
@@ -917,7 +926,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     primaryColor,
                   ),
                   const SizedBox(height: 14),
-                  _buildSmartInputBar(primaryColor, isDark),
+                  _buildSmartInputBar(primaryColor, isDark, wallets),
                   const SizedBox(height: 8),
                   _buildCategoryTabsWidget(
                     categories,
@@ -976,7 +985,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.only(top: 14, bottom: 8),
-            child: _buildSmartInputBar(primaryColor, isDark),
+            child: _buildSmartInputBar(primaryColor, isDark, wallets),
           ),
         ),
         SliverPersistentHeader(
@@ -1198,11 +1207,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildSmartInputBar(Color primaryColor, bool isDark) {
+  Widget _buildSmartInputBar(
+    Color primaryColor,
+    bool isDark,
+    List<Wallet> wallets,
+  ) {
     final cardColor = Theme.of(context).cardColor;
     final inputColor = isDark
         ? Colors.white.withValues(alpha: 0.055)
         : primaryColor.withValues(alpha: 0.045);
+    final defaultAccountLabel = _smartEntryDefaultAccountLabel(wallets);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -1246,28 +1260,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               ),
               const SizedBox(width: 11),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isListening ? 'Listening now' : 'Smart Entry',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
+                child: InkWell(
+                  onTap: _isListening
+                      ? null
+                      : _showSmartEntryAccountPicker,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isListening ? 'Listening now' : 'Smart Entry',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _isListening
+                              ? 'Speak naturally — it saves automatically'
+                              : defaultAccountLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: _isListening
+                                ? Colors.grey.shade500
+                                : primaryColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _isListening
-                          ? 'Speak naturally — it saves automatically'
-                          : 'Instant save · Cash first · JazzCash fallback',
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               if (_isListening)
@@ -1277,6 +1304,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
+                  ),
+                )
+              else
+                IconButton(
+                  tooltip: 'Select default Smart Entry account',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _showSmartEntryAccountPicker,
+                  icon: Icon(
+                    Icons.tune_rounded,
+                    color: primaryColor,
+                    size: 20,
                   ),
                 ),
             ],
@@ -1380,26 +1418,169 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
+  String _smartEntryDefaultAccountLabel(List<Wallet> wallets) {
+    final selected = _selectedSmartEntryWallet(wallets);
+    return selected == null
+        ? 'Default: Automatic (Cash → JazzCash) · Tap to change'
+        : 'Default: ${selected.name} · Tap to change';
+  }
+
+  Wallet? _selectedSmartEntryWallet(List<Wallet> wallets) {
+    final selectedId = _smartEntryDefaultWalletId;
+    if (selectedId == null) return null;
+    for (final wallet in wallets) {
+      if (wallet.id == selectedId) return wallet;
+    }
+    return null;
+  }
+
+  Future<void> _showSmartEntryAccountPicker() async {
+    final wallets = ref.read(walletProvider);
+    if (wallets.isEmpty) {
+      _showTransactionError(
+        'Create a money account before selecting a Smart Entry default.',
+        title: 'No money accounts',
+      );
+      return;
+    }
+
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final selectedId = _selectedSmartEntryWallet(wallets)?.id;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.72,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Default Smart Entry account',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  children: [
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(sheetContext)
+                            .colorScheme
+                            .primaryContainer,
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Theme.of(sheetContext)
+                              .colorScheme
+                              .primary,
+                        ),
+                      ),
+                      title: const Text(
+                        'Automatic',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: const Text(
+                        'Use Cash first, then JazzCash',
+                      ),
+                      trailing: selectedId == null
+                          ? const Icon(Icons.check_circle_rounded)
+                          : null,
+                      onTap: () async {
+                        await Hive.box('preferences')
+                            .delete(_smartEntryDefaultAccountKey);
+                        if (!mounted) return;
+                        setState(() => _smartEntryDefaultWalletId = null);
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      },
+                    ),
+                    const Divider(height: 1),
+                    for (final wallet in wallets)
+                      ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Color(wallet.colorValue)
+                              .withValues(alpha: 0.14),
+                          child: Icon(
+                            _walletIcon(wallet),
+                            color: Color(wallet.colorValue),
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          wallet.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${wallet.isBackup ? 'Reserve' : 'Income source'} · Rs. ${walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}',
+                        ),
+                        trailing: selectedId == wallet.id
+                            ? const Icon(Icons.check_circle_rounded)
+                            : null,
+                        onTap: () async {
+                          await Hive.box('preferences').put(
+                            _smartEntryDefaultAccountKey,
+                            wallet.id,
+                          );
+                          if (!mounted) return;
+                          setState(
+                            () => _smartEntryDefaultWalletId = wallet.id,
+                          );
+                          if (sheetContext.mounted) {
+                            Navigator.pop(sheetContext);
+                          }
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeroCard(
     double totalAvailable,
     double spent,
     List<Wallet> wallets,
     Color primary,
   ) {
-    final dailyWallets = wallets
-        .where((wallet) =>
-            !wallet.isBackup &&
-            (wallet.walletType.toLowerCase() == 'cash' ||
-                wallet.walletType.toLowerCase() == 'jazzcash'))
-        .toList()
+    final visibleWallets = List<Wallet>.from(wallets)
       ..sort((a, b) {
-        int priority(Wallet wallet) =>
-            wallet.walletType.toLowerCase() == 'cash' ? 0 : 1;
-        return priority(a).compareTo(priority(b));
+        int priority(Wallet wallet) {
+          if (wallet.walletType.toLowerCase() == 'cash') return 0;
+          if (wallet.walletType.toLowerCase() == 'jazzcash') return 1;
+          if (!wallet.isBackup) return 2;
+          return 3;
+        }
+
+        final priorityCompare = priority(a).compareTo(priority(b));
+        return priorityCompare != 0
+            ? priorityCompare
+            : a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
-    final shownWallets = dailyWallets.take(2).toList(growable: false);
-    final darkerPrimary =
-        Color.lerp(primary, Colors.black, isDarkMode(context) ? 0.12 : 0.18)!;
+    final darkerPrimary = Color.lerp(
+      primary,
+      Colors.black,
+      Theme.of(context).brightness == Brightness.dark ? 0.12 : 0.18,
+    )!;
 
     return Container(
       width: double.infinity,
@@ -1475,27 +1656,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               const SizedBox(width: 10),
               Expanded(
                 child: _buildBalanceMetric(
-                  label: 'Active accounts',
-                  value: '${wallets.where((wallet) => !wallet.isBackup).length}',
+                  label: 'All accounts',
+                  value: '${wallets.length}',
                 ),
               ),
             ],
           ),
-          if (shownWallets.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                for (var index = 0;
-                    index < shownWallets.length;
-                    index++) ...[
-                  if (index > 0) const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildDefaultAccountPill(shownWallets[index]),
+          const SizedBox(height: 13),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Money accounts',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                   ),
-                ],
-              ],
+                ),
+              ),
+              Text(
+                'Swipe to view all',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          if (visibleWallets.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Text(
+                'No money accounts yet',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 62,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: visibleWallets.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 9),
+                itemBuilder: (context, index) =>
+                    _buildAccountPill(visibleWallets[index]),
+              ),
             ),
-          ],
         ],
       ),
     );
@@ -1540,55 +1758,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildDefaultAccountPill(Wallet wallet) {
+  Widget _buildAccountPill(Wallet wallet) {
     final balance =
         ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id);
-    final isJazzCash = wallet.walletType.toLowerCase() == 'jazzcash';
 
     return Container(
+      width: 158,
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.13),
+        color: Colors.black.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.10),
+        ),
       ),
       child: Row(
         children: [
-          Icon(
-            isJazzCash
-                ? Icons.phone_android_rounded
-                : Icons.payments_outlined,
-            color: Colors.white70,
-            size: 15,
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: Color(wallet.colorValue).withValues(alpha: 0.22),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _walletIcon(wallet),
+              color: Colors.white,
+              size: 15,
+            ),
           ),
-          const SizedBox(width: 7),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              wallet.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  wallet.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Rs. ${balance.toStringAsFixed(0)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (wallet.isBackup)
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(
+                Icons.shield_outlined,
+                color: Colors.white54,
+                size: 13,
               ),
             ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            'Rs. ${balance.toStringAsFixed(0)}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  bool isDarkMode(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark;
+  IconData _walletIcon(Wallet wallet) {
+    if (wallet.isBackup) return Icons.shield_outlined;
+    switch (wallet.walletType.toLowerCase()) {
+      case 'jazzcash':
+        return Icons.phone_android_rounded;
+      case 'bank':
+        return Icons.account_balance_outlined;
+      case 'cash':
+        return Icons.payments_outlined;
+      default:
+        return Icons.account_balance_wallet_outlined;
+    }
+  }
 
   Future<void> _pickBudgetMonth() async {
     var selectedYear = _focusedMonth.year;
@@ -1895,11 +2150,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         .toList(growable: false);
     final mentionedWalletId =
         findMentionedSmartEntryAccountId(normalized, smartAccounts);
+    final configuredDefaultWallet =
+        _selectedSmartEntryWallet(wallets);
     final resolvedWalletId = resolveSmartEntryAccount(
       input: normalized,
       accounts: smartAccounts,
       transactionType: type,
       amount: amountValue,
+      preferredAccountId: configuredDefaultWallet?.id,
     );
 
     if (shouldAutoSaveSmartEntry(
@@ -1969,9 +2227,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         defaultAccounts.every((account) => account.availableBalance <= 0);
     final reviewMessage = mentionedWalletId != null
         ? 'The named account cannot cover this expense. Choose another account before saving.'
-        : defaultsAreEmpty
-            ? 'Cash and JazzCash are empty. Choose the account that should receive or pay this entry.'
-            : 'Cash and JazzCash cannot cover this amount. Choose another funded account.';
+        : configuredDefaultWallet != null
+            ? 'Your default account, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
+            : defaultsAreEmpty
+                ? 'Cash and JazzCash are empty. Choose the account that should receive or pay this entry.'
+                : 'Cash and JazzCash cannot cover this amount. Choose another funded account.';
 
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
