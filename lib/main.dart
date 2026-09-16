@@ -97,6 +97,7 @@ class LikhloApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Likhlo',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const _LikhloScrollBehavior(),
       themeAnimationDuration: Duration.zero,
       themeMode: themeMode == 'system'
           ? ThemeMode.system
@@ -123,9 +124,20 @@ class LikhloApp extends ConsumerWidget {
 
       // 🚀 THE BUILDER: Handles Global Overlays (Dimmer & AI Chat)
       builder: (context, child) {
-        return AppLockGate(
-          child: _AppContentWithDimmer(
-            child: child ?? const SizedBox.shrink(),
+        return Actions(
+          actions: <Type, Action<Intent>>{
+            EditableTextTapOutsideIntent:
+                CallbackAction<EditableTextTapOutsideIntent>(
+              onInvoke: (intent) {
+                intent.focusNode.unfocus();
+                return null;
+              },
+            ),
+          },
+          child: AppLockGate(
+            child: _AppContentWithDimmer(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },
@@ -135,6 +147,17 @@ class LikhloApp extends ConsumerWidget {
               ? const HomeScreen()
               : const OnboardingScreen(),
     );
+  }
+}
+
+class _LikhloScrollBehavior extends MaterialScrollBehavior {
+  const _LikhloScrollBehavior();
+
+  @override
+  ScrollViewKeyboardDismissBehavior getKeyboardDismissBehavior(
+    BuildContext context,
+  ) {
+    return ScrollViewKeyboardDismissBehavior.onDrag;
   }
 }
 
