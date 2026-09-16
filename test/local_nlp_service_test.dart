@@ -570,5 +570,116 @@ void main() {
     });
 
 
+    test('treats adding money to a wallet as income', () {
+      final command =
+          LocalNlpService().parseCommand('paso cash me add karo', categories);
+
+      expect(command.intent, SmartEntryIntent.addIncome);
+      expect(command.amount, 500);
+    });
+
+    test('cleans natural filler words from long delete commands', () {
+      final command = LocalNlpService().parseCommand(
+        'milk prepayment 840 ye milk prepayment ko delete karo',
+        categories,
+      );
+      final match = matchSmartEntryTransaction(
+        command: command,
+        entries: [
+          SmartEntryTransaction(
+            id: 'milk',
+            title: 'Milk Prepayment',
+            amount: 840,
+            category: 'General',
+            type: 'expense',
+            date: DateTime(2026, 9, 16),
+            walletId: 'cash',
+          ),
+        ],
+      );
+
+      expect(command.intent, SmartEntryIntent.deleteEntry);
+      expect(match.status, SmartEntryMatchStatus.unique);
+      expect(match.matches.single.id, 'milk');
+    });
+
+    test('resolves English transfer direction', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 1000,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 1000,
+        ),
+      ];
+
+      final resolution = resolveSmartEntryTransferAccounts(
+        'transfer 500 from Cash to JazzCash',
+        accounts,
+      );
+
+      expect(resolution, isNotNull);
+      expect(resolution!.sourceAccountId, 'cash');
+      expect(resolution.destinationAccountId, 'jazz');
+    });
+
+    test('resolves Roman Urdu transfer direction', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 1000,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 1000,
+        ),
+      ];
+
+      final resolution = resolveSmartEntryTransferAccounts(
+        '500 cash se jazzcash me bhejo',
+        accounts,
+      );
+
+      expect(resolution, isNotNull);
+      expect(resolution!.sourceAccountId, 'cash');
+      expect(resolution.destinationAccountId, 'jazz');
+    });
+
+    test('transfer requires exactly two named wallets', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 1000,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 1000,
+        ),
+      ];
+
+      expect(
+        resolveSmartEntryTransferAccounts(
+          'transfer 500 from cash',
+          accounts,
+        ),
+        isNull,
+      );
+    });
+
+
   });
 }
