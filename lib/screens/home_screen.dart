@@ -38,6 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   static const platform = MethodChannel('com.likhlo/quick_tile');
   static const _smartEntryDefaultAccountKey =
       'smart_entry_default_wallet_id';
+  static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
   String _currentView = 'Dashboard';
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
@@ -54,6 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _isScanningReceipt = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
   String? _smartEntryDefaultWalletId;
+  List<String> _homeVisibleWalletIds = const [];
   Timer? _notificationUpdateTimer;
   Timer? _messageTimer;
   OverlayEntry? _activeMessageEntry;
@@ -67,6 +69,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             storedSmartEntryWallet.trim().isNotEmpty
         ? storedSmartEntryWallet
         : null;
+    final storedHomeWallets =
+        Hive.box('preferences').get(_homeVisibleWalletsKey);
+    _homeVisibleWalletIds = storedHomeWallets is List
+        ? storedHomeWallets
+            .whereType<String>()
+            .where((id) => id.trim().isNotEmpty)
+            .take(4)
+            .toList(growable: false)
+        : const [];
     _fabController = AnimationController(vsync: this, duration: const Duration(milliseconds: 200), lowerBound: 0.0, upperBound: 0.1);
     _fabScale = Tween<double>(begin: 1.0, end: 0.95).animate(_fabController);
 
@@ -471,7 +482,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Icon(Icons.arrow_downward_rounded, color: Colors.grey)),
                     _buildWalletDropdown(wallets, transferToWalletId, "To Wallet", (v) => setModalState(() => transferToWalletId = v!)),
                   ] else ...[
-                    _buildWalletDropdown(wallets, selectedWalletId, "Fund Source", (v) => setModalState(() => selectedWalletId = v!)),
+                    _buildWalletDropdown(wallets, selectedWalletId, "Wallet", (v) => setModalState(() => selectedWalletId = v!)),
                   ],
                   const SizedBox(height: 12),
 
@@ -531,7 +542,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           return;
                         }
                         if (wallets.isEmpty) {
-                          _showTransactionError('Create an income account first.');
+                          _showTransactionError('Create a wallet first.');
                           return;
                         }
 
@@ -550,7 +561,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                                 .firstWhere((w) => w.id == selectedWalletId)
                                 .name;
                             _showTransactionError(
-                              'Available in $accountName: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amt.toStringAsFixed(0)}. Add money to this account or enter a smaller amount.',
+                              'Available in $accountName: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amt.toStringAsFixed(0)}. Add money to this wallet or enter a smaller amount.',
                               title: 'Insufficient balance',
                             );
                             return;
@@ -559,11 +570,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
                         if (transactionType == 'transfer') {
                           if (wallets.length < 2) {
-                            _showTransactionError('Create at least two accounts to transfer money.');
+                            _showTransactionError('Create at least two wallets to transfer money.');
                             return;
                           }
                           if (selectedWalletId == transferToWalletId) {
-                            _showTransactionError('Choose two different accounts.');
+                            _showTransactionError('Choose two different wallets.');
                             return;
                           }
                           final available = ref
@@ -571,7 +582,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                               .getBalanceForWallet(selectedWalletId);
                           if (amt > available) {
                             _showTransactionError(
-                              'Available in the source account: Rs. ${available.toStringAsFixed(0)}. Enter a smaller amount or add money first.',
+                              'Available in the source wallet: Rs. ${available.toStringAsFixed(0)}. Enter a smaller amount or add money first.',
                               title: 'Insufficient balance',
                             );
                             return;
@@ -588,7 +599,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           ]);
                           if (!saved) {
                             _showTransactionError(
-                              'The source account no longer has enough money for this transfer.',
+                              'The source wallet no longer has enough money for this transfer.',
                               title: 'Transfer not saved',
                             );
                             return;
@@ -609,7 +620,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             final saved = await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
                             if (!saved) {
                               _showTransactionError(
-                                'Check the selected account balance and try again.',
+                                'Check the selected wallet balance and try again.',
                                 title: 'Transaction not saved',
                               );
                               return;
@@ -851,7 +862,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         actions: [
           if (_currentView == 'Dashboard' && !_isSearching)
             IconButton(
-              tooltip: 'Income Accounts',
+              tooltip: 'Wallets',
               icon: const Icon(Icons.account_balance_wallet_outlined, size: 22),
               onPressed: _openIncomeAccounts,
             ),
@@ -1112,7 +1123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       direction: DismissDirection.endToStart,
       background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.delete_outline_rounded, color: Colors.white)),
       confirmDismiss: (direction) async {
-        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), Text(isTransfer ? "Delete Transfer?" : "Delete Transaction?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(isTransfer ? "Delete this complete transfer? Both linked account entries will be removed." : "Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
+        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), Text(isTransfer ? "Delete Transfer?" : "Delete Transaction?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(isTransfer ? "Delete this complete transfer? Both linked wallet entries will be removed." : "Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
       },
       onDismissed: (direction) async {
         if (isTransfer) {
@@ -1308,7 +1319,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 )
               else
                 IconButton(
-                  tooltip: 'Select default Smart Entry account',
+                  tooltip: 'Select default Smart Entry wallet',
                   visualDensity: VisualDensity.compact,
                   onPressed: _showSmartEntryAccountPicker,
                   icon: Icon(
@@ -1438,8 +1449,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
-        'Create a money account before selecting a Smart Entry default.',
-        title: 'No money accounts',
+        'Create a wallet before selecting a Smart Entry default.',
+        title: 'No wallets',
       );
       return;
     }
@@ -1463,7 +1474,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Default Smart Entry account',
+                    'Default Smart Entry wallet',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -1527,7 +1538,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           ),
                         ),
                         subtitle: Text(
-                          '${wallet.isBackup ? 'Reserve' : 'Income source'} · Rs. ${walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}',
+                          '${wallet.isBackup ? 'Reserve wallet' : 'Wallet'} · Rs. ${walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}',
                         ),
                         trailing: selectedId == wallet.id
                             ? const Icon(Icons.check_circle_rounded)
@@ -1556,26 +1567,196 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
+  List<Wallet> _resolvedHomeWallets(List<Wallet> wallets) {
+    if (wallets.isEmpty) return const [];
+
+    final walletsById = {for (final wallet in wallets) wallet.id: wallet};
+    final savedSelection = _homeVisibleWalletIds
+        .where(walletsById.containsKey)
+        .take(4)
+        .map((id) => walletsById[id]!)
+        .toList(growable: false);
+    if (savedSelection.isNotEmpty) return savedSelection;
+
+    int defaultPriority(Wallet wallet) {
+      final type = wallet.walletType.toLowerCase();
+      final id = wallet.id.toLowerCase();
+      final name = wallet.name.toLowerCase().replaceAll(' ', '');
+      if (type == 'cash' || id == 'default_cash' || name == 'cashinhand') {
+        return 0;
+      }
+      if (type == 'jazzcash' ||
+          id == 'default_jazzcash' ||
+          name == 'jazzcash') {
+        return 1;
+      }
+      return 2;
+    }
+
+    final defaults = wallets
+        .where((wallet) => defaultPriority(wallet) < 2)
+        .toList(growable: false)
+      ..sort((a, b) => defaultPriority(a).compareTo(defaultPriority(b)));
+    if (defaults.isNotEmpty) {
+      return defaults.take(4).toList(growable: false);
+    }
+
+    final fallbackCount = wallets.length < 2 ? wallets.length : 2;
+    return wallets.take(fallbackCount).toList(growable: false);
+  }
+
+  Future<void> _showHomeWalletPicker() async {
+    final wallets = ref.read(walletProvider);
+    if (wallets.isEmpty) {
+      _showTransactionError(
+        'Create a wallet before choosing daily wallets.',
+        title: 'No wallets',
+      );
+      return;
+    }
+
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final selectedIds = <String>{
+      ..._resolvedHomeWallets(wallets).map((wallet) => wallet.id),
+    };
+
+    final savedIds = await showModalBottomSheet<List<String>>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.78,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Daily wallets',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                'Choose up to 4 wallets for quick Home tracking.',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${selectedIds.length}/4',
+                          style: TextStyle(
+                            color: Theme.of(sheetContext).colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: wallets.length,
+                      itemBuilder: (context, index) {
+                        final wallet = wallets[index];
+                        final isSelected = selectedIds.contains(wallet.id);
+                        final selectionLimitReached =
+                            !isSelected && selectedIds.length >= 4;
+                        final balance =
+                            walletNotifier.getBalanceForWallet(wallet.id);
+
+                        return CheckboxListTile(
+                          value: isSelected,
+                          onChanged: selectionLimitReached
+                              ? null
+                              : (checked) {
+                                  setSheetState(() {
+                                    if (checked == true) {
+                                      selectedIds.add(wallet.id);
+                                    } else {
+                                      selectedIds.remove(wallet.id);
+                                    }
+                                  });
+                                },
+                          secondary: CircleAvatar(
+                            backgroundColor: Color(wallet.colorValue)
+                                .withValues(alpha: 0.14),
+                            child: Icon(
+                              _walletIcon(wallet),
+                              color: Color(wallet.colorValue),
+                              size: 20,
+                            ),
+                          ),
+                          title: Text(
+                            wallet.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${wallet.isBackup ? 'Reserve wallet' : 'Wallet'} · Rs. ${balance.toStringAsFixed(0)}',
+                          ),
+                          controlAffinity: ListTileControlAffinity.trailing,
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: selectedIds.isEmpty
+                            ? null
+                            : () => Navigator.pop(
+                                  sheetContext,
+                                  selectedIds.toList(growable: false),
+                                ),
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text('Save daily wallets'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    if (savedIds == null || !mounted) return;
+    await Hive.box('preferences').put(_homeVisibleWalletsKey, savedIds);
+    if (!mounted) return;
+    setState(() => _homeVisibleWalletIds = savedIds);
+  }
+
   Widget _buildHeroCard(
     double totalAvailable,
     double spent,
     List<Wallet> wallets,
     Color primary,
   ) {
-    final visibleWallets = List<Wallet>.from(wallets)
-      ..sort((a, b) {
-        int priority(Wallet wallet) {
-          if (wallet.walletType.toLowerCase() == 'cash') return 0;
-          if (wallet.walletType.toLowerCase() == 'jazzcash') return 1;
-          if (!wallet.isBackup) return 2;
-          return 3;
-        }
-
-        final priorityCompare = priority(a).compareTo(priority(b));
-        return priorityCompare != 0
-            ? priorityCompare
-            : a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      });
+    final visibleWallets = _resolvedHomeWallets(wallets);
     final darkerPrimary = Color.lerp(
       primary,
       Colors.black,
@@ -1616,16 +1797,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   ),
                 ),
               ),
-              InkWell(
-                onTap: _openIncomeAccounts,
-                borderRadius: BorderRadius.circular(10),
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(
-                    Icons.tune_rounded,
-                    color: Colors.white,
-                    size: 19,
-                  ),
+              IconButton(
+                tooltip: 'Choose daily wallets',
+                onPressed: _showHomeWalletPicker,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                icon: const Icon(
+                  Icons.tune_rounded,
+                  color: Colors.white,
+                  size: 19,
                 ),
               ),
             ],
@@ -1656,7 +1839,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               const SizedBox(width: 10),
               Expanded(
                 child: _buildBalanceMetric(
-                  label: 'All accounts',
+                  label: 'All wallets',
                   value: '${wallets.length}',
                 ),
               ),
@@ -1667,7 +1850,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             children: [
               const Expanded(
                 child: Text(
-                  'Money accounts',
+                  'Daily wallets',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
@@ -1676,7 +1859,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 ),
               ),
               Text(
-                'Swipe to view all',
+                '${visibleWallets.length} of ${wallets.length} shown',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.55),
                   fontSize: 9.5,
@@ -1695,7 +1878,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 borderRadius: BorderRadius.circular(13),
               ),
               child: const Text(
-                'No money accounts yet',
+                'No wallets yet',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 11,
@@ -2075,7 +2258,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           (receiptData['confidence'] as num?)?.toDouble() ?? 0.0;
       final confidencePercent = (confidence * 100).round();
       final reviewMessage = confidence < 0.7
-          ? 'Scan confidence is $confidencePercent%. Carefully verify the amount, account, category, and date.'
+          ? 'Scan confidence is $confidencePercent%. Carefully verify the amount, wallet, category, and date.'
           : 'Receipt details were detected with $confidencePercent% confidence. Verify every field before saving.';
 
       final confirmed = await _showAddOrEditModal(
@@ -2127,8 +2310,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
-        'Create a Cash or JazzCash account before using Smart Entry.',
-        title: 'Money account required',
+        'Create a Cash or JazzCash wallet before using Smart Entry.',
+        title: 'Wallet required',
       );
       return;
     }
@@ -2188,7 +2371,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (!mounted) return;
       if (!saved) {
         _showTransactionError(
-          'The selected account changed or no longer has enough balance. Try the entry again.',
+          'The selected wallet changed or no longer has enough balance. Try the entry again.',
           title: 'Smart Entry not saved',
         );
         return;
@@ -2226,12 +2409,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final defaultsAreEmpty = defaultAccounts.isEmpty ||
         defaultAccounts.every((account) => account.availableBalance <= 0);
     final reviewMessage = mentionedWalletId != null
-        ? 'The named account cannot cover this expense. Choose another account before saving.'
+        ? 'The named wallet cannot cover this expense. Choose another account before saving.'
         : configuredDefaultWallet != null
-            ? 'Your default account, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
+            ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
             : defaultsAreEmpty
-                ? 'Cash and JazzCash are empty. Choose the account that should receive or pay this entry.'
-                : 'Cash and JazzCash cannot cover this amount. Choose another funded account.';
+                ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
+                : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
 
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
@@ -2251,7 +2434,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (confirmed == true && mounted) {
       _smartInputCtrl.clear();
       _showTransactionSuccess(
-        'The Smart Entry was saved to the selected account.',
+        'The Smart Entry was saved to the selected wallet.',
         title: 'Transaction saved',
       );
     }
