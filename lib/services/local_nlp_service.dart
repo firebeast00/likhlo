@@ -96,7 +96,9 @@ class LocalNlpService {
     'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya', 'liye',
     'kha', 'pee', 'diya', 'kharida',
     'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
-    'paisa', 'mani', 'money', 'subah', 'shaam', 'raat', 'rupay', 'pkr'
+    'paisa', 'mani', 'money', 'subah', 'shaam', 'raat', 'rupay', 'pkr',
+    'received', 'receive', 'credited', 'credit', 'deposit', 'aayi', 'ayi',
+    'aya', 'mila', 'mili', 'hui', 'hue'
   ];
 
   // ==========================================
@@ -319,11 +321,17 @@ class LocalNlpService {
     String lowerInput = input.toLowerCase();
     double amount = 0.0;
     String category = 'General';
-    DateTime transactionDate = DateTime.now(); // 🚀 NEW: Temporal Intelligence
+    DateTime transactionDate = DateTime.now();
     List<String> consumedTokens = [];
+    final isIncome = RegExp(
+      r'\b(income|salary|allowance|received|credited|deposit|kamai|aayi|ayi|aya|mila|mili)\b',
+    ).hasMatch(lowerInput);
+    final transactionType = isIncome ? 'income' : 'expense';
 
     // 1. Extract Temporal Elements (Dates)
-    if (RegExp(r'\b(kal|yesterday)\b').hasMatch(lowerInput)) {
+    if (RegExp(r'\b(aaj|today)\b').hasMatch(lowerInput)) {
+      consumedTokens.addAll(['aaj', 'today']);
+    } else if (RegExp(r'\b(kal|yesterday)\b').hasMatch(lowerInput)) {
       transactionDate = transactionDate.subtract(const Duration(days: 1));
       consumedTokens.addAll(['kal', 'yesterday']);
     } else if (RegExp(r'\b(parso|parson)\b').hasMatch(lowerInput)) {
@@ -332,10 +340,24 @@ class LocalNlpService {
     }
 
     // 2. Extract Amount
-    final amountRegExp = RegExp(r'\b\d+(\.\d+)?\b');
+    final amountRegExp = RegExp(
+      r'\b(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k|thousand|hazar|hazaar|lakh|lac)?\b',
+    );
     final digitMatch = amountRegExp.firstMatch(lowerInput);
     if (digitMatch != null) {
-      amount = double.tryParse(digitMatch.group(0)!) ?? 0.0;
+      final base = double.tryParse(
+            digitMatch.group(1)!.replaceAll(',', ''),
+          ) ??
+          0.0;
+      final scale = digitMatch.group(2);
+      var multiplier = 1.0;
+      if (scale == 'k' || scale == 'thousand' ||
+          scale == 'hazar' || scale == 'hazaar') {
+        multiplier = 1000;
+      } else if (scale == 'lakh' || scale == 'lac') {
+        multiplier = 100000;
+      }
+      amount = base * multiplier;
     } else {
       final tokens = lowerInput.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
       final wordResult = _parseWordAmount(tokens);
@@ -412,11 +434,20 @@ class LocalNlpService {
       }).join(' ');
     }
 
+    var confidence = 0.25;
+    if (amount > 0) confidence += 0.4;
+    if (categoryFound) confidence += 0.2;
+    if (cleanTitle != 'Quick Expense') confidence += 0.1;
+    if (isIncome) confidence += 0.05;
+
     return {
       'amount': amount,
-      'category': category,
+      'category': isIncome ? 'Income / Allowance' : category,
       'title': cleanTitle,
-      'date': transactionDate, // 🚀 NEW: Temporal routing
+      'date': transactionDate,
+      'type': transactionType,
+      'confidence': confidence.clamp(0.0, 1.0).toDouble(),
+      'needsReview': confidence < 0.75,
     };
   }
 }

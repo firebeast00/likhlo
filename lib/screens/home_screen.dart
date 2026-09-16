@@ -306,24 +306,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   // ==================== TRANSACTION / TRANSFER MODAL ====================
-  void _showAddOrEditModal({Expense? existing, String? prefilledAmount}) {
+  Future<bool?> _showAddOrEditModal({
+    Expense? existing,
+    String? prefilledAmount,
+    String? prefilledTitle,
+    String? prefilledCategory,
+    DateTime? prefilledDate,
+    String? preselectedWalletId,
+    String initialType = 'expense',
+    String? reviewMessage,
+  }) async {
     if (existing?.category == 'Transfer') {
       _showTransactionInfo(
         'Delete this transfer and create it again if its details need to change.',
         title: 'Transfers cannot be edited',
       );
-      return;
+      return null;
     }
 
-    final titleCtrl = TextEditingController(text: existing?.title ?? "");
-    final amountCtrl = TextEditingController(text: prefilledAmount ?? (existing?.amount.toString() ?? ""));
-    String selectedCategory = existing?.category ?? "General";
-    DateTime selectedDate = existing?.date ?? DateTime.now();
+    final titleCtrl = TextEditingController(
+      text: existing?.title ?? prefilledTitle ?? "",
+    );
+    final amountCtrl = TextEditingController(
+      text: prefilledAmount ?? (existing?.amount.toString() ?? ""),
+    );
+    String selectedCategory =
+        existing?.category ?? prefilledCategory ?? "General";
+    DateTime selectedDate =
+        existing?.date ?? prefilledDate ?? DateTime.now();
 
-    String transactionType = existing?.type ?? 'expense';
+    String transactionType = existing?.type ?? initialType;
 
     final wallets = ref.read(walletProvider);
-    String selectedWalletId = existing?.walletId ?? '';
+    String selectedWalletId =
+        existing?.walletId ?? preselectedWalletId ?? '';
     String transferToWalletId = '';
 
     final categories = ref.read(categoryProvider);
@@ -350,7 +366,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       transferToWalletId = wallets.firstWhere((w) => w.id != selectedWalletId, orElse: () => wallets.last).id;
     }
 
-    showModalBottomSheet(
+    return showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -367,6 +383,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(width: 48, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)), margin: const EdgeInsets.only(bottom: 24)),
+
+                  if (reviewMessage != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: primaryColor.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.fact_check_outlined,
+                            color: primaryColor,
+                            size: 21,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Review before saving',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  reviewMessage,
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    fontSize: 12.5,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   Container(
                     decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
@@ -551,7 +618,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         } catch (e) {
                           debugPrint("Notification reset failed: $e");
                         }
-                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (ctx.mounted) Navigator.pop(ctx, true);
                       },
                       child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
@@ -1185,7 +1252,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Save quick expense',
+                    tooltip: 'Review quick entry',
                     visualDensity: VisualDensity.compact,
                     onPressed: () => _processNLP(_smartInputCtrl.text),
                     icon: Icon(Icons.arrow_upward_rounded, size: 20, color: primaryColor),
@@ -1456,26 +1523,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     setState(() => _isScanningReceipt = true);
     try {
       final receiptData = await OcrScannerService().scanReceipt();
-      if (!mounted) return;
-      final amount = receiptData?['amount'];
-      final title = receiptData?['title']?.toString().trim() ?? '';
+      if (!mounted || receiptData == null) return;
+
+      final amount = receiptData['amount'];
       if (amount is! num || !amount.isFinite || amount <= 0) {
-        _showTransactionError('Could not read a valid amount from the receipt.');
+        _showTransactionError(
+          'No reliable receipt total was detected. Retake the photo with the full receipt visible and good lighting.',
+          title: 'Receipt total not found',
+        );
         return;
       }
-      final amountText = amount.toDouble() == amount.toDouble().truncateToDouble()
-          ? amount.toStringAsFixed(0)
-          : amount.toStringAsFixed(2);
-      _smartInputCtrl.text = title.isEmpty
-          ? amountText
-          : '$amountText for $title';
-      _smartInputCtrl.selection = TextSelection.collapsed(
-        offset: _smartInputCtrl.text.length,
+
+      final title = receiptData['title']?.toString().trim() ?? '';
+      final confidence =
+          (receiptData['confidence'] as num?)?.toDouble() ?? 0.0;
+      final confidencePercent = (confidence * 100).round();
+      final reviewMessage = confidence < 0.7
+          ? 'Scan confidence is $confidencePercent%. Carefully verify the amount, account, category, and date.'
+          : 'Receipt details were detected with $confidencePercent% confidence. Verify every field before saving.';
+
+      final confirmed = await _showAddOrEditModal(
+        prefilledAmount: amount.toDouble() ==
+                amount.toDouble().truncateToDouble()
+            ? amount.toStringAsFixed(0)
+            : amount.toStringAsFixed(2),
+        prefilledTitle: title.isEmpty ? 'Receipt purchase' : title,
+        prefilledCategory: receiptData['category']?.toString(),
+        initialType: 'expense',
+        reviewMessage: reviewMessage,
       );
-      _showTransactionInfo(
-        'Review the detected details, then tap the arrow to save.',
-        title: 'Receipt scanned',
-      );
+      if (confirmed == true && mounted) {
+        _showTransactionSuccess(
+          'The reviewed receipt was added to your records.',
+          title: 'Receipt saved',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isScanningReceipt = false);
     }
@@ -1494,52 +1576,87 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Future<void> _processNLP(String text) async {
     final normalized = text.trim();
     if (normalized.isEmpty) return;
+
     final categories = ref.read(categoryProvider);
     final result = LocalNlpService().parseExpense(normalized, categories);
     final amount = result['amount'];
-    if (amount is num && amount.isFinite && amount > 0) {
-      final wallets = ref.read(walletProvider);
-      if (wallets.isEmpty) {
-        _showTransactionError('Create an income account before saving this entry.');
-        return;
-      }
-      final activeWallets = wallets.where((w) => !w.isBackup).toList();
-      final defaultWalletId = activeWallets.isNotEmpty ? activeWallets.first.id : (wallets.isNotEmpty ? wallets.first.id : '');
-      final defaultWallet =
-          wallets.firstWhere((wallet) => wallet.id == defaultWalletId);
-      final available = ref
-          .read(walletProvider.notifier)
-          .getBalanceForWallet(defaultWalletId);
-      if (amount.toDouble() > available) {
-        _showTransactionError(
-          'Available in ${defaultWallet.name}: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amount.toStringAsFixed(0)}. Add money or use manual entry to choose another account.',
-          title: 'Insufficient balance',
-        );
-        return;
-      }
-      final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.toARGB32(), type: 'expense', walletId: defaultWalletId);
-      final saved =
-          await ref.read(expenseProvider.notifier).addExpense(newExpense);
-      if (!mounted) return;
-      if (!saved) {
-        _showTransactionError(
-          'The selected account no longer has enough money for this entry.',
-          title: 'Entry not saved',
-        );
-        return;
-      }
+    if (amount is! num || !amount.isFinite || amount <= 0) {
+      _showTransactionError(
+        "Include an amount in your entry, for example: '500 for biryani' or '1.5k petrol'.",
+        title: 'Amount not detected',
+      );
+      return;
+    }
+
+    final wallets = ref.read(walletProvider);
+    if (wallets.isEmpty) {
+      _showTransactionError(
+        'Create a money account before reviewing this entry.',
+        title: 'Money account required',
+      );
+      return;
+    }
+
+    final selectedWalletId = _findMentionedWalletId(normalized, wallets);
+    final confidence =
+        (result['confidence'] as num?)?.toDouble() ?? 0.0;
+    final confidencePercent = (confidence * 100).round();
+    final reviewMessage = confidence < 0.75
+        ? 'Some details are uncertain ($confidencePercent% confidence). Check the amount, type, account, category, and date.'
+        : 'Smart Entry prepared this draft with $confidencePercent% confidence. Confirm every field before saving.';
+
+    final confirmed = await _showAddOrEditModal(
+      prefilledAmount:
+          amount.toDouble() == amount.toDouble().truncateToDouble()
+              ? amount.toStringAsFixed(0)
+              : amount.toStringAsFixed(2),
+      prefilledTitle: result['title']?.toString(),
+      prefilledCategory: result['category']?.toString(),
+      prefilledDate: result['date'] is DateTime
+          ? result['date'] as DateTime
+          : DateTime.now(),
+      preselectedWalletId: selectedWalletId,
+      initialType: result['type'] == 'income' ? 'income' : 'expense',
+      reviewMessage: reviewMessage,
+    );
+
+    if (confirmed == true && mounted) {
       _smartInputCtrl.clear();
       _showTransactionSuccess(
-        "${result['title']} — Rs. ${amount.toStringAsFixed(0)}",
-        title: 'Expense saved',
-      );
-    } else {
-      _showTransactionError(
-        "Include an amount in your entry, for example: '500 for biryani'.",
-        title: 'Amount not detected',
+        'Your reviewed Smart Entry was added to the selected account.',
+        title: 'Transaction saved',
       );
     }
     if (mounted) FocusScope.of(context).unfocus();
+  }
+
+  String? _findMentionedWalletId(String text, List<Wallet> wallets) {
+    final normalizedText = text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .trim();
+    final compactText = normalizedText.replaceAll(' ', '');
+    final sortedWallets = List<Wallet>.from(wallets)
+      ..sort((a, b) => b.name.length.compareTo(a.name.length));
+
+    for (final wallet in sortedWallets) {
+      final normalizedName = wallet.name
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+          .trim();
+      if (normalizedName.isEmpty) continue;
+
+      final exactName = RegExp(
+        '(^|\\s)${RegExp.escape(normalizedName)}(\\s|\$)',
+      );
+      if (exactName.hasMatch(normalizedText)) return wallet.id;
+
+      final compactName = normalizedName.replaceAll(' ', '');
+      if (compactName.length >= 5 && compactText.contains(compactName)) {
+        return wallet.id;
+      }
+    }
+    return null;
   }
 }
 

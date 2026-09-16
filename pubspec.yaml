@@ -23,6 +23,8 @@ dependencies:
   speech_to_text: ^7.4.0
   google_mlkit_text_recognition: ^0.16.0
   image_picker: ^1.1.2
+  image: ^4.5.4
+  path_provider: ^2.1.5
   quick_actions: ^1.1.0
   flutter_tts: ^4.2.5
   cryptography: ^2.7.0

@@ -28,5 +28,51 @@ void main() {
 
       expect(result['amount'], 0);
     });
+
+    test('parses comma-formatted and shorthand amounts', () {
+      final comma = LocalNlpService()
+          .parseExpense('Rs 1,250 for groceries', categories);
+      final shorthand =
+          LocalNlpService().parseExpense('1.5k petrol', categories);
+
+      expect(comma['amount'], 1250);
+      expect(shorthand['amount'], 1500);
+      expect(shorthand['category'], 'Transport');
+    });
+
+    test('parses Roman Urdu scaled amounts', () {
+      final result =
+          LocalNlpService().parseExpense('do hazar books', categories);
+
+      expect(result['amount'], 2000);
+      expect(result['category'], 'Education');
+    });
+
+    test('detects income intent without treating it as an expense', () {
+      final result = LocalNlpService()
+          .parseExpense('salary 50 hazar aayi', categories);
+
+      expect(result['amount'], 50000);
+      expect(result['type'], 'income');
+      expect(result['category'], 'Income / Allowance');
+    });
+
+    test('routes yesterday entries to the previous date', () {
+      final result =
+          LocalNlpService().parseExpense('kal 500 lunch', categories);
+      final date = result['date'] as DateTime;
+      final expected = DateTime.now().subtract(const Duration(days: 1));
+
+      expect(DateTime(date.year, date.month, date.day),
+          DateTime(expected.year, expected.month, expected.day));
+    });
+
+    test('returns confidence and review metadata', () {
+      final result =
+          LocalNlpService().parseExpense('500 for biryani', categories);
+
+      expect(result['confidence'], isA<double>());
+      expect(result['needsReview'], isA<bool>());
+    });
   });
 }
