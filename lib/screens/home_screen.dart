@@ -1432,8 +1432,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   String _smartEntryDefaultAccountLabel(List<Wallet> wallets) {
     final selected = _selectedSmartEntryWallet(wallets);
     return selected == null
-        ? 'Default: Automatic (Cash → JazzCash) · Tap to change'
-        : 'Default: ${selected.name} · Tap to change';
+        ? 'Default wallet: Automatic (Cash → JazzCash) · Tap to change'
+        : 'Default wallet: ${selected.name} · Tap to change';
   }
 
   Wallet? _selectedSmartEntryWallet(List<Wallet> wallets) {
