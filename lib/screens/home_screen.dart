@@ -1502,6 +1502,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       onError: (error) {
         debugPrint('STT Error: $error');
         if (!mounted) return;
+        _voiceResultProcessed = true;
         setState(() => _isListening = false);
         final languageUnavailable =
             error.errorMsg.contains('error_language_unavailable');
@@ -1537,7 +1538,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     setState(() => _isListening = true);
     await HapticFeedback.mediumImpact();
     await _speech.listen(
-      localeId: speechLocaleId,
+      listenOptions: stt.SpeechListenOptions(
+        localeId: speechLocaleId,
+        cancelOnError: true,
+        partialResults: true,
+        listenMode: stt.ListenMode.search,
+      ),
       onResult: (result) async {
         if (!mounted) return;
         final words = result.recognizedWords.trim();
