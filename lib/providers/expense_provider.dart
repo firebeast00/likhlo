@@ -37,6 +37,16 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     state = ExpenseState(allExpenses: _sortByNewest(_box.values));
   }
 
+  dynamic _findKeyForId(String id) {
+    if (_box.containsKey(id) && _box.get(id)?.id == id) {
+      return id;
+    }
+    for (final key in _box.keys) {
+      if (_box.get(key)?.id == id) return key;
+    }
+    return null;
+  }
+
   Future<bool> addExpense(Expense expense) async {
     return addExpenses([expense]);
   }
@@ -86,11 +96,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     )) {
       return false;
     }
-    // 🚀 FIXED: Finds the exact key even for legacy entries
-    final keyToEdit = _box.keys.cast<dynamic>().firstWhere(
-      (key) => _box.get(key)?.id == id,
-      orElse: () => null,
-    );
+    final keyToEdit = _findKeyForId(id);
     if (keyToEdit == null) return false;
     await _box.put(keyToEdit, updated);
 
@@ -101,9 +107,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 
   Future<bool> deleteExpense(String id) async {
-    // 🚀 FIXED: Protects against old auto-incrementing integer keys
-    // It searches the database for the matching ID and retrieves its true internal Hive key.
-    final keyToDelete = _box.keys.firstWhere((k) => _box.get(k)?.id == id, orElse: () => null);
+    final keyToDelete = _findKeyForId(id);
 
     if (keyToDelete != null) {
       await _box.delete(keyToDelete);
@@ -129,12 +133,10 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
         ? transactionId
         : transactionId.substring(0, transactionId.length - separator.length);
 
-    final keys = _box.keys
-        .where((key) {
-          final id = _box.get(key)?.id;
-          return id == '${transferId}_out' || id == '${transferId}_in';
-        })
-        .toList();
+    final keys = <dynamic>[
+      _findKeyForId('${transferId}_out'),
+      _findKeyForId('${transferId}_in'),
+    ].where((key) => key != null).toList(growable: false);
     await _box.deleteAll(keys);
     state = ExpenseState(
       allExpenses: state.allExpenses
