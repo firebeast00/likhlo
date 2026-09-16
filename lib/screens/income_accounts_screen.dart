@@ -45,7 +45,6 @@ class IncomeAccountsScreen extends ConsumerWidget {
             children: [
               TextField(
                 controller: controller,
-                autofocus: true,
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   labelText: 'Wallet name',
