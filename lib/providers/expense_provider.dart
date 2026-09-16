@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/expense_model.dart';
+import '../models/wallet_model.dart';
 
 class ExpenseState {
   final List<Expense> allExpenses;
@@ -50,6 +51,16 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     )) {
       return false;
     }
+    if (!keepsWalletBalancesNonNegative(
+      openingBalances: {
+        for (final wallet in Hive.box<Wallet>('wallets').values)
+          wallet.id: wallet.balance,
+      },
+      existingEntries: state.allExpenses,
+      proposedEntries: additions,
+    )) {
+      return false;
+    }
 
     await _box.putAll({for (final entry in additions) entry.id: entry});
     final addedIds = additions.map((entry) => entry.id).toSet();
@@ -64,6 +75,17 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 
   Future<bool> editExpense(String id, Expense updated) async {
     if (!updated.amount.isFinite || updated.amount <= 0) return false;
+    if (!keepsWalletBalancesNonNegative(
+      openingBalances: {
+        for (final wallet in Hive.box<Wallet>('wallets').values)
+          wallet.id: wallet.balance,
+      },
+      existingEntries: state.allExpenses,
+      proposedEntries: [updated],
+      replacedIds: {id},
+    )) {
+      return false;
+    }
     // 🚀 FIXED: Finds the exact key even for legacy entries
     final keyToEdit = _box.keys.cast<dynamic>().firstWhere(
       (key) => _box.get(key)?.id == id,
@@ -146,6 +168,58 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 final expenseProvider = StateNotifierProvider<ExpenseNotifier, ExpenseState>((ref) {
   return ExpenseNotifier();
 });
+
+bool keepsWalletBalancesNonNegative({
+  required Map<String, double> openingBalances,
+  required Iterable<Expense> existingEntries,
+  required Iterable<Expense> proposedEntries,
+  Set<String> replacedIds = const {},
+}) {
+  final proposed = proposedEntries.toList(growable: false);
+  if (proposed.any((entry) => !openingBalances.containsKey(entry.walletId))) {
+    return false;
+  }
+  final existing = existingEntries.toList(growable: false);
+  final balances = Map<String, double>.from(openingBalances);
+  void apply(Expense entry) {
+    if (!balances.containsKey(entry.walletId)) return;
+    final delta = entry.type == 'income'
+        ? entry.amount
+        : entry.type == 'expense'
+            ? -entry.amount
+            : 0.0;
+    balances[entry.walletId] = balances[entry.walletId]! + delta;
+  }
+  for (final entry in existing) {
+    if (!replacedIds.contains(entry.id)) apply(entry);
+  }
+
+  final affectedWallets = {
+    ...proposed.map((entry) => entry.walletId),
+    ...existing
+        .where((entry) => replacedIds.contains(entry.id))
+        .map((entry) => entry.walletId),
+  };
+  final balancesBefore = {
+    for (final walletId in affectedWallets) walletId: balances[walletId]!,
+  };
+  for (final entry in proposed) {
+    apply(entry);
+  }
+
+  const tolerance = 0.000001;
+  for (final walletId in affectedWallets) {
+    final before = balancesBefore[walletId]!;
+    final after = balances[walletId]!;
+    if (!after.isFinite) return false;
+    if (replacedIds.isNotEmpty && after < -tolerance) return false;
+    if (replacedIds.isEmpty) {
+      if (before >= -tolerance && after < -tolerance) return false;
+      if (before < -tolerance && after < before - tolerance) return false;
+    }
+  }
+  return true;
+}
 
 bool isValidTransactionBatch(
   Iterable<Expense> entries, {

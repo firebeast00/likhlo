@@ -36,7 +36,12 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
   }
 
   Future<bool> addWallet(Wallet wallet) async {
-    if (wallet.name.trim().isEmpty || nameExists(wallet.name)) return false;
+    if (wallet.name.trim().isEmpty ||
+        !wallet.balance.isFinite ||
+        wallet.balance < 0 ||
+        nameExists(wallet.name)) {
+      return false;
+    }
     await _box.put(wallet.id, wallet);
     state = _box.values.toList();
     return true;
@@ -48,7 +53,8 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
   }) async {
     if (wallet.name.trim().isEmpty ||
         nameExists(wallet.name, excludingId: wallet.id) ||
-        (currentBalance != null && !currentBalance.isFinite)) {
+        (currentBalance != null &&
+            (!currentBalance.isFinite || currentBalance < 0))) {
       return false;
     }
 

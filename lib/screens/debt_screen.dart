@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
@@ -315,7 +316,21 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () async {
-                          final amt = double.tryParse(amountCtrl.text) ?? 0;
+                          final amt = double.tryParse(amountCtrl.text);
+                          if (nameCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Enter the person name.')),
+                            );
+                            return;
+                          }
+                          if (amt == null || !amt.isFinite || amt <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Enter a valid Udhar amount above zero. Negative amounts are not allowed.'),
+                              ),
+                            );
+                            return;
+                          }
                           if (nameCtrl.text.isNotEmpty && amt > 0) {
                             if (type == 'lent') {
                               if (selectedWalletId.isEmpty) {
@@ -331,7 +346,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Insufficient account balance. Available: Rs. ${available.toStringAsFixed(0)}',
+                                      'Not enough money in the selected account. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amt.toStringAsFixed(0)}. Add money or enter a smaller amount.',
                                     ),
                                   ),
                                 );
@@ -423,7 +438,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   Widget _buildModernInput(TextEditingController ctrl, String label, IconData icon, Color primaryColor, bool isDark, {bool isNumber = false}) {
     return TextField(
       controller: ctrl,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      keyboardType: isNumber
+          ? const TextInputType.numberWithOptions(decimal: true, signed: false)
+          : TextInputType.text,
+      inputFormatters: isNumber
+          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))]
+          : null,
       textCapitalization: isNumber ? TextCapitalization.none : TextCapitalization.words,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       decoration: InputDecoration(

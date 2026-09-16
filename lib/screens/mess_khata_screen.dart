@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -8,6 +9,7 @@ import '../models/expense_model.dart';
 import '../providers/mess_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/wallet_provider.dart';
 import '../services/local_nlp_service.dart';
 import '../services/ocr_scanner_service.dart';
 
@@ -278,8 +280,60 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: () async {
-                      final amt = double.tryParse(amountCtrl.text) ?? 0;
-                      final count = int.tryParse(countCtrl.text) ?? 1;
+                      final amt = double.tryParse(amountCtrl.text);
+                      final count = int.tryParse(countCtrl.text);
+                      if (titleCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Enter an expense title.')),
+                        );
+                        return;
+                      }
+                      if (amt == null || !amt.isFinite || amt <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Enter a valid amount above zero. Negative amounts are not allowed.'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (count == null || count <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Split count must be at least 1.')),
+                        );
+                        return;
+                      }
+
+                      final wallets = ref.read(walletProvider);
+                      if (wallets.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Create a money account before adding an expense.')),
+                        );
+                        return;
+                      }
+                      final sourceWallet = wallets.firstWhere(
+                        (wallet) =>
+                            !wallet.isBackup &&
+                            (wallet.walletType == 'cash' ||
+                                wallet.name.toLowerCase().contains('cash')),
+                        orElse: () => wallets.firstWhere(
+                          (wallet) => !wallet.isBackup,
+                          orElse: () => wallets.first,
+                        ),
+                      );
+                      final available = ref
+                          .read(walletProvider.notifier)
+                          .getBalanceForWallet(sourceWallet.id);
+                      if (amt > available) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Not enough money in ${sourceWallet.name}. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amt.toStringAsFixed(0)}. Add money or enter a smaller amount.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
                       if (titleCtrl.text.isNotEmpty && amt > 0 && count > 0) {
                         final expenseId = const Uuid().v4();
 
@@ -310,6 +364,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                                 category: "Hostel/Mess",
                                 date: DateTime.now(),
                                 colorValue: primaryColor.toARGB32(),
+                                walletId: sourceWallet.id,
                               ),
                             );
                         if (!linkedSaved) {
@@ -341,7 +396,12 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   Widget _buildDialogInput(TextEditingController ctrl, String label, IconData icon, BuildContext context, Color primaryColor, {bool isNumber = false}) {
     return TextField(
       controller: ctrl,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      keyboardType: isNumber
+          ? const TextInputType.numberWithOptions(decimal: true, signed: false)
+          : TextInputType.text,
+      inputFormatters: isNumber
+          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))]
+          : null,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,

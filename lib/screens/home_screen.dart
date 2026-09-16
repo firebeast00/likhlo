@@ -455,6 +455,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           return;
                         }
 
+                        if (transactionType == 'expense') {
+                          final currentBalance = ref
+                              .read(walletProvider.notifier)
+                              .getBalanceForWallet(selectedWalletId);
+                          final reusableAmount = existing != null &&
+                                  existing.type == 'expense' &&
+                                  existing.walletId == selectedWalletId
+                              ? existing.amount
+                              : 0.0;
+                          final available = currentBalance + reusableAmount;
+                          if (amt > available) {
+                            final accountName = wallets
+                                .firstWhere((w) => w.id == selectedWalletId)
+                                .name;
+                            _showTransactionError(
+                              'Not enough money in $accountName. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amt.toStringAsFixed(0)}. Add money or enter a smaller amount.',
+                            );
+                            return;
+                          }
+                        }
+
                         if (transactionType == 'transfer') {
                           if (wallets.length < 2) {
                             _showTransactionError('Create at least two accounts to transfer money.');
@@ -477,10 +498,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           final toName = wallets.firstWhere((w) => w.id == transferToWalletId).name;
                           final transferId = const Uuid().v4();
 
-                          await ref.read(expenseProvider.notifier).addExpenses([
+                          final saved = await ref
+                              .read(expenseProvider.notifier)
+                              .addExpenses([
                             Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
                             Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
                           ]);
+                          if (!saved) {
+                            _showTransactionError(
+                              'Transfer could not be saved because the source account balance is too low.',
+                            );
+                            return;
+                          }
                         } else {
                           String finalTitle = titleCtrl.text.trim();
                           if (finalTitle.isEmpty) {
@@ -494,7 +523,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
                           final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
                           if (existing == null) {
-                            await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
+                            final saved = await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
+                            if (!saved) {
+                              _showTransactionError(
+                                'Could not save this transaction. Check the account balance and try again.',
+                              );
+                              return;
+                            }
                           } else {
                             final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
                             if (!updated) {
@@ -566,7 +601,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Widget _buildModernInput(TextEditingController ctrl, String label, IconData icon, Color primaryColor, {bool isNumber = false}) {
     return TextField(
       controller: ctrl,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      keyboardType: isNumber
+          ? const TextInputType.numberWithOptions(decimal: true, signed: false)
+          : TextInputType.text,
+      inputFormatters: isNumber
+          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))]
+          : null,
       textCapitalization: isNumber ? TextCapitalization.none : TextCapitalization.sentences,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       decoration: InputDecoration(labelText: label, labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13), prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20), filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: primaryColor, width: 1.5)), contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16)),
@@ -1398,9 +1438,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
       final activeWallets = wallets.where((w) => !w.isBackup).toList();
       final defaultWalletId = activeWallets.isNotEmpty ? activeWallets.first.id : (wallets.isNotEmpty ? wallets.first.id : '');
+      final defaultWallet =
+          wallets.firstWhere((wallet) => wallet.id == defaultWalletId);
+      final available = ref
+          .read(walletProvider.notifier)
+          .getBalanceForWallet(defaultWalletId);
+      if (amount.toDouble() > available) {
+        _showTransactionError(
+          'Not enough money in ${defaultWallet.name}. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amount.toStringAsFixed(0)}. Add money or use manual entry to choose another account.',
+        );
+        return;
+      }
       final newExpense = Expense(id: const Uuid().v4(), title: result['title'], amount: amount.toDouble(), category: result['category'], date: DateTime.now(), colorValue: Colors.purple.toARGB32(), type: 'expense', walletId: defaultWalletId);
-      await ref.read(expenseProvider.notifier).addExpense(newExpense);
+      final saved =
+          await ref.read(expenseProvider.notifier).addExpense(newExpense);
       if (!mounted) return;
+      if (!saved) {
+        _showTransactionError(
+          'Could not save this entry because the account balance is too low.',
+        );
+        return;
+      }
       _smartInputCtrl.clear();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("  Saved: ${result['title']} (Rs. ${amount.toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));
     } else {

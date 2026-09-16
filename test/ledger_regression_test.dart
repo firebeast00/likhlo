@@ -60,4 +60,76 @@ void main() {
     expect(visibleTransactions(records).length, 3);
   });
 
+  test('wallet guard rejects overdrafts and accepts exact available amount', () {
+    final existing = [
+      Expense(id: 'old', title: 'Food', amount: 200,
+        date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0,
+        type: 'expense', walletId: 'cash'),
+    ];
+    final exact = Expense(id: 'exact', title: 'Travel', amount: 300,
+      date: DateTime(2026, 9, 15), category: 'Travel', colorValue: 0,
+      type: 'expense', walletId: 'cash');
+    final tooMuch = exact.copyWith(id: 'too-much', amount: 301);
+
+    expect(keepsWalletBalancesNonNegative(
+      openingBalances: {'cash': 500},
+      existingEntries: existing,
+      proposedEntries: [exact],
+    ), isTrue);
+    expect(keepsWalletBalancesNonNegative(
+      openingBalances: {'cash': 500},
+      existingEntries: existing,
+      proposedEntries: [tooMuch],
+    ), isFalse);
+  });
+
+  test('editing income cannot create a negative account balance', () {
+    final income = Expense(id: 'income', title: 'Income', amount: 100,
+      date: DateTime(2026, 9, 15), category: 'Income', colorValue: 0,
+      type: 'income', walletId: 'cash');
+    final spending = Expense(id: 'spending', title: 'Spending', amount: 100,
+      date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0,
+      type: 'expense', walletId: 'cash');
+
+    expect(keepsWalletBalancesNonNegative(
+      openingBalances: {'cash': 0},
+      existingEntries: [income, spending],
+      proposedEntries: [income.copyWith(amount: 50)],
+      replacedIds: {'income'},
+    ), isFalse);
+  });
+
+  test('legacy negative balance can improve but cannot get worse', () {
+    final income = Expense(id: 'income', title: 'Income', amount: 50,
+      date: DateTime(2026, 9, 15), category: 'Income', colorValue: 0,
+      type: 'income', walletId: 'cash');
+    final expense = income.copyWith(
+      id: 'expense', title: 'Expense', type: 'expense');
+
+    expect(keepsWalletBalancesNonNegative(
+      openingBalances: {'cash': -100},
+      existingEntries: const [],
+      proposedEntries: [income],
+    ), isTrue);
+    expect(keepsWalletBalancesNonNegative(
+      openingBalances: {'cash': -100},
+      existingEntries: const [],
+      proposedEntries: [expense],
+    ), isFalse);
+  });
+
+  test('wallet guard credits the old expense while editing', () {
+    final old = Expense(id: 'edit', title: 'Food', amount: 400,
+      date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0,
+      type: 'expense', walletId: 'cash');
+    final updated = old.copyWith(amount: 450);
+
+    expect(keepsWalletBalancesNonNegative(
+      openingBalances: {'cash': 500},
+      existingEntries: [old],
+      proposedEntries: [updated],
+      replacedIds: {'edit'},
+    ), isTrue);
+  });
+
 }

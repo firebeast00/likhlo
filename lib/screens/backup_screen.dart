@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -61,13 +61,28 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   }
 
   Future<void> _restoreBackup() async {
-    final result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'Choose a Likhlo backup',
-      type: FileType.custom,
-      allowedExtensions: const ['likhlo'],
-      allowMultiple: false,
-      withData: true,
-    );
+    FilePickerResult? result;
+    try {
+      // Android does not map the private .likhlo extension to a MIME type.
+      // The authenticated codec verifies the selected document instead.
+      result = await FilePicker.platform.pickFiles(
+        dialogTitle: 'Choose a Likhlo backup',
+        type: FileType.any,
+        allowMultiple: false,
+        withData: true,
+      );
+    } on PlatformException catch (error) {
+      debugPrint('Backup picker failed: $error');
+      if (mounted) {
+        _showMessage('Could not open the file picker. Please try again.');
+      }
+      return;
+    } catch (error) {
+      debugPrint('Backup picker failed: $error');
+      if (mounted) _showMessage('Could not select the backup file.');
+      return;
+    }
+
     if (result == null || result.files.isEmpty || !mounted) return;
     final selected = result.files.single;
     if (selected.size > BackupService.maxBackupBytes) {
@@ -81,19 +96,21 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     if (password == null || !mounted) return;
 
     await _runBusy(() async {
-      final bytes = selected.bytes ??
-          (selected.path == null
-              ? null
-              : await File(selected.path!).readAsBytes());
-      if (bytes == null) {
-        throw const BackupException('Could not read the selected file.');
+      Uint8List bytes;
+      try {
+        bytes = selected.bytes ?? await selected.xFile.readAsBytes();
+      } catch (error) {
+        debugPrint('Could not read selected backup: $error');
+        throw const BackupException(
+          'Could not read this file. Select the original Likhlo backup again.',
+        );
       }
       if (bytes.length > BackupService.maxBackupBytes) {
         throw const BackupException(
           'This backup is larger than the 25 MB safety limit.',
         );
       }
-      final payload = await _codec.decrypt(Uint8List.fromList(bytes), password);
+      final payload = await _codec.decrypt(bytes, password);
       final backup = _service.validate(payload);
       if (!mounted) return;
       final confirmed = await _confirmRestore(backup.preview);
@@ -102,7 +119,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       _refreshProviders();
       await _refreshRecoveryState();
       if (mounted) {
-        _showMessage('Backup restored. Your previous data can still be recovered.');
+        _showMessage(
+          'Backup restored successfully. Your previous data is available as a recovery snapshot.',
+        );
       }
     });
   }

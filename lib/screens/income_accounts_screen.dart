@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -61,7 +62,12 @@ class IncomeAccountsScreen extends ConsumerWidget {
               TextField(
                 controller: balanceController,
                 keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                    const TextInputType.numberWithOptions(decimal: true, signed: false),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'^\d*\.?\d{0,2}'),
+                  ),
+                ],
                 decoration: InputDecoration(
                   labelText: 'Current balance',
                   hintText: 'Amount currently available',
@@ -175,7 +181,12 @@ class IncomeAccountsScreen extends ConsumerWidget {
               TextField(
                 controller: amountController,
                 keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                    const TextInputType.numberWithOptions(decimal: true, signed: false),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'^\d*\.?\d{0,2}'),
+                  ),
+                ],
                 decoration: InputDecoration(
                   labelText: 'Amount',
                   prefixText: 'Rs. ',
