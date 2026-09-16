@@ -195,6 +195,10 @@ double _smartEntryTitleScore(
   final titleTokens =
       title.split(' ').where((token) => token.isNotEmpty).toSet();
   if (targetTokens.isNotEmpty && titleTokens.isNotEmpty) {
+    if (targetTokens.length == titleTokens.length &&
+        targetTokens.containsAll(titleTokens)) {
+      return 0.98;
+    }
     final shared = targetTokens.intersection(titleTokens).length;
     final ratio = shared / max(targetTokens.length, titleTokens.length);
     if (ratio >= 0.5) return 0.78 + (0.16 * ratio);
@@ -415,7 +419,9 @@ class LocalNlpService {
     'hatao', 'hata', 'nikalo', 'edit', 'change', 'update', 'modify',
     'badlo', 'badal', 'transfer', 'move', 'shift', 'send', 'bhejo',
     'show', 'list', 'find', 'search', 'please', 'plz', 'last', 'latest',
-    'recent', 'previous', 'akhri', 'pichli'
+    'recent', 'previous', 'akhri', 'pichli', 'me', 'ko', 'ye', 'yeh',
+    'isko', 'usko', 'iss', 'is', 'wo', 'woh', 'dalo', 'daalo', 'daldo',
+    'daaldo'
   ];
 
   // ==========================================
@@ -656,6 +662,15 @@ class LocalNlpService {
     if (has(r'\b(how much|show|list|find|search|kitna|kitni|balance|total)\b')) {
       return SmartEntryIntent.query;
     }
+    final addsMoneyToWallet = has(
+          r'\b(me|mein|ko)\s+(add|jama|deposit|dalo|daalo|daldo|daaldo)\b',
+        ) ||
+        has(
+          r'\b(add|jama|deposit)\b.{0,30}\b(to|me|mein|ko)\s+(cash|jazz\s*cash|wallet|account)\b',
+        );
+    if (addsMoneyToWallet) {
+      return SmartEntryIntent.addIncome;
+    }
     if (has(
       r'\b(income|salary|allowance|received|receive|credited|credit|deposit|kamai|earning|earned|bonus|refund|cashback|profit|aayi|ayi|aya|mila|mili|jama|wasool)\b',
     )) {
@@ -772,20 +787,21 @@ class LocalNlpService {
     }
     candidates.addAll(words);
 
-    for (final candidate in candidates) {
-      final normalizedCandidate = _normalize(candidate);
-      String? mappedCategory = _normalizedLexicon[normalizedCandidate];
-      mappedCategory ??= candidate.length >= 4
-          ? _fuzzyLookup(normalizedCandidate, _normalizedLexicon)
-          : null;
+    void applyCategory(String mappedCategory, String candidate) {
+      category = activeCategories.firstWhere(
+        (active) =>
+            active.toLowerCase() == mappedCategory.toLowerCase(),
+      );
+      categoryFound = true;
+      matchedCategoryTokens.addAll(candidate.split(' '));
+    }
 
+    for (final candidate in candidates) {
+      final mappedCategory =
+          _normalizedLexicon[_normalize(candidate)];
       if (mappedCategory != null &&
           lowerActiveCategories.contains(mappedCategory.toLowerCase())) {
-        category = activeCategories.firstWhere(
-          (active) => active.toLowerCase() == mappedCategory!.toLowerCase(),
-        );
-        categoryFound = true;
-        matchedCategoryTokens.addAll(candidate.split(' '));
+        applyCategory(mappedCategory, candidate);
         break;
       }
     }
@@ -795,11 +811,26 @@ class LocalNlpService {
         if (RegExp(
           r'\b' + RegExp.escape(activeCategory.toLowerCase()) + r'\b',
         ).hasMatch(lowerInput)) {
-          category = activeCategory;
-          categoryFound = true;
-          matchedCategoryTokens.addAll(
-            activeCategory.toLowerCase().split(' '),
-          );
+          applyCategory(activeCategory, activeCategory.toLowerCase());
+          break;
+        }
+      }
+    }
+
+    if (!categoryFound) {
+      final fuzzyCandidates = words
+          .where((word) =>
+              word.length >= 4 &&
+              !_stopWords.contains(word) &&
+              !RegExp(r'^\d').hasMatch(word))
+          .toSet()
+          .take(8);
+      for (final candidate in fuzzyCandidates) {
+        final mappedCategory =
+            _fuzzyLookup(_normalize(candidate), _normalizedLexicon);
+        if (mappedCategory != null &&
+            lowerActiveCategories.contains(mappedCategory.toLowerCase())) {
+          applyCategory(mappedCategory, candidate);
           break;
         }
       }
@@ -929,34 +960,170 @@ String _normalizeAccountText(String value) {
       .trim();
 }
 
-bool _accountMentioned(String input, SmartEntryAccount account) {
-  final normalizedInput = _normalizeAccountText(input);
+Set<String> _smartEntryAccountAliases(SmartEntryAccount account) {
   final normalizedName = _normalizeAccountText(account.name);
   final normalizedType = _normalizeAccountText(account.type);
-  // Do not interpret the "cash" part of "Jazz Cash" as the Cash account.
-  final searchableInput = normalizedType == 'cash'
-      ? normalizedInput.replaceAll(RegExp(r'\bjazz\s*cash\b'), ' ')
-      : normalizedInput;
-  final compactInput = searchableInput.replaceAll(' ', '');
-  final aliases = <String>{
+  return <String>{
     normalizedName,
-    normalizedType,
     if (normalizedType == 'cash') 'cash',
     if (normalizedType == 'jazzcash') ...['jazzcash', 'jazz cash'],
   }..removeWhere((alias) => alias.isEmpty);
+}
 
-  for (final alias in aliases) {
+bool _isCashInsideJazzCash(String input, int start, String alias) {
+  if (alias != 'cash' || start < 5) return false;
+  return input.substring(start - 5, start) == 'jazz ';
+}
+
+bool _accountMentioned(String input, SmartEntryAccount account) {
+  final normalizedInput = _normalizeAccountText(input);
+  final compactInput = normalizedInput.replaceAll(' ', '');
+
+  for (final alias in _smartEntryAccountAliases(account)) {
     final exact = RegExp(
-      '(^|\\s)${RegExp.escape(alias)}(\\s|\$)',
+      '(^|\\s)' + RegExp.escape(alias) + '(\\s|\$)',
     );
-    if (exact.hasMatch(searchableInput)) return true;
+    for (final match in exact.allMatches(normalizedInput)) {
+      final start = match.start + (match.group(1)?.length ?? 0);
+      if (!_isCashInsideJazzCash(normalizedInput, start, alias)) {
+        return true;
+      }
+    }
 
     final compactAlias = alias.replaceAll(' ', '');
-    if (compactAlias.length >= 5 && compactInput.contains(compactAlias)) {
+    if (alias != 'cash' &&
+        compactAlias.length >= 5 &&
+        compactInput.contains(compactAlias)) {
       return true;
     }
   }
   return false;
+}
+
+class SmartEntryTransferAccounts {
+  final String sourceAccountId;
+  final String destinationAccountId;
+  final double confidence;
+
+  const SmartEntryTransferAccounts({
+    required this.sourceAccountId,
+    required this.destinationAccountId,
+    required this.confidence,
+  });
+}
+
+class _SmartEntryAccountMention {
+  final SmartEntryAccount account;
+  final int start;
+  final int end;
+
+  const _SmartEntryAccountMention(this.account, this.start, this.end);
+}
+
+SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
+  String input,
+  Iterable<SmartEntryAccount> accounts,
+) {
+  final normalizedInput = _normalizeAccountText(input);
+  final mentions = <_SmartEntryAccountMention>[];
+
+  for (final account in accounts) {
+    _SmartEntryAccountMention? best;
+    final aliases = _smartEntryAccountAliases(account).toList()
+      ..sort((first, second) => second.length.compareTo(first.length));
+    for (final alias in aliases) {
+      final pattern = RegExp(
+        '(^|\\s)' + RegExp.escape(alias) + '(\\s|\$)',
+      );
+      for (final match in pattern.allMatches(normalizedInput)) {
+        final leadingLength = match.group(1)?.length ?? 0;
+        final start = match.start + leadingLength;
+        if (_isCashInsideJazzCash(normalizedInput, start, alias)) {
+          continue;
+        }
+        final mention = _SmartEntryAccountMention(
+          account,
+          start,
+          start + alias.length,
+        );
+        if (best == null ||
+            mention.start < best.start ||
+            (mention.start == best.start &&
+                mention.end > best.end)) {
+          best = mention;
+        }
+      }
+    }
+    if (best != null) mentions.add(best);
+  }
+
+  mentions.sort((first, second) => first.start.compareTo(second.start));
+  final uniqueMentions = <_SmartEntryAccountMention>[];
+  final seenIds = <String>{};
+  for (final mention in mentions) {
+    if (seenIds.add(mention.account.id)) {
+      uniqueMentions.add(mention);
+    }
+  }
+  if (uniqueMentions.length != 2) return null;
+
+  bool hasBefore(_SmartEntryAccountMention mention, String marker) {
+    final before = normalizedInput.substring(0, mention.start).trimRight();
+    return RegExp(
+      r'(^|\s)' + RegExp.escape(marker) + r'$',
+    ).hasMatch(before);
+  }
+
+  bool hasAfter(
+    _SmartEntryAccountMention mention,
+    Iterable<String> markers,
+  ) {
+    final after = normalizedInput.substring(mention.end).trimLeft();
+    return markers.any(
+      (marker) => RegExp(
+        '^' + RegExp.escape(marker) + r'(\s|$)',
+      ).hasMatch(after),
+    );
+  }
+
+  _SmartEntryAccountMention? source;
+  _SmartEntryAccountMention? destination;
+  for (final mention in uniqueMentions) {
+    if (hasBefore(mention, 'from') ||
+        hasAfter(mention, const ['se', 'say', 'to'])) {
+      source ??= mention;
+    }
+    if (hasBefore(mention, 'to') ||
+        hasAfter(mention, const ['me', 'mein', 'ko'])) {
+      destination ??= mention;
+    }
+  }
+
+  late final _SmartEntryAccountMention resolvedSource;
+  late final _SmartEntryAccountMention resolvedDestination;
+  if (source != null &&
+      destination != null &&
+      source.account.id != destination.account.id) {
+    resolvedSource = source;
+    resolvedDestination = destination;
+  } else {
+    resolvedSource = uniqueMentions.first;
+    resolvedDestination = uniqueMentions.last;
+  }
+  if (resolvedSource.account.id == resolvedDestination.account.id) {
+    return null;
+  }
+
+  final directional = hasBefore(resolvedSource, 'from') ||
+      hasAfter(resolvedSource, const ['se', 'say', 'to']) ||
+      hasBefore(resolvedDestination, 'to') ||
+      hasAfter(resolvedDestination, const ['me', 'mein', 'ko']);
+
+  return SmartEntryTransferAccounts(
+    sourceAccountId: resolvedSource.account.id,
+    destinationAccountId: resolvedDestination.account.id,
+    confidence: directional ? 0.99 : 0.92,
+  );
 }
 
 Set<String> findMentionedSmartEntryAccountIds(

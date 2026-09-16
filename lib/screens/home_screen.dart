@@ -53,6 +53,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _isListening = false;
   bool _voiceResultProcessed = false;
   bool _handlingSpeechError = false;
+  bool _speechInitialized = false;
+  bool _speechLocalesLoaded = false;
   List<String?> _speechLocaleCandidates = const [null];
   int _speechLocaleCandidateIndex = 0;
   bool _isScanningReceipt = false;
@@ -2177,20 +2179,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _voiceResultProcessed = false;
     _handlingSpeechError = false;
     _smartInputCtrl.clear();
-    final available = await _speech.initialize(
-      onStatus: _handleSpeechStatus,
-      onError: (error) => _handleSpeechError(error.errorMsg),
-    );
-    if (!mounted) return;
-    if (!available) {
-      _showTransactionError(
-        'Speech recognition is not available. Enable the Google app or your phone\'s speech-recognition service, then allow microphone access.',
-        title: 'Voice recognition unavailable',
+    if (!_speechInitialized) {
+      final available = await _speech.initialize(
+        onStatus: _handleSpeechStatus,
+        onError: (error) => _handleSpeechError(error.errorMsg),
       );
-      return;
+      if (!mounted) return;
+      if (!available) {
+        _showTransactionError(
+          'Speech recognition is not available. Enable the Google app or your phone\'s speech-recognition service, then allow microphone access.',
+          title: 'Voice recognition unavailable',
+        );
+        return;
+      }
+      _speechInitialized = true;
     }
 
-    _speechLocaleCandidates = await _buildSpeechLocaleCandidates();
+    if (!_speechLocalesLoaded) {
+      _speechLocaleCandidates = await _buildSpeechLocaleCandidates();
+      _speechLocalesLoaded = true;
+    }
     _speechLocaleCandidateIndex = 0;
     if (!mounted) return;
 
@@ -2200,7 +2208,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<List<String?>> _buildSpeechLocaleCandidates() async {
-    final candidates = <String?>[null];
+    final candidates = <String?>[];
     try {
       final locales = await _speech.locales();
       final systemLocale = await _speech.systemLocale();
@@ -2215,7 +2223,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         if (added.add(normalized)) candidates.add(localeId);
       }
 
-      addLocale(systemLocale?.localeId);
       const preferred = ['en_pk', 'en_in', 'en_gb', 'en_us'];
       for (final preferredId in preferred) {
         for (final locale in locales) {
@@ -2224,15 +2231,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           }
         }
       }
+      final systemId = systemLocale?.localeId;
+      if (systemId != null && normalize(systemId).startsWith('en_')) {
+        addLocale(systemId);
+      }
       for (final locale in locales) {
         if (normalize(locale.localeId).startsWith('en_')) {
           addLocale(locale.localeId);
         }
       }
     } catch (error) {
-      debugPrint('Speech locale lookup failed: $error');
+      debugPrint('Speech locale lookup failed: ' + error.toString());
     }
 
+    candidates.add(null);
     return candidates.take(4).toList(growable: false);
   }
 
@@ -2248,13 +2260,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           cancelOnError: true,
           partialResults: true,
           listenMode: stt.ListenMode.search,
-          pauseFor: const Duration(seconds: 4),
-          listenFor: const Duration(seconds: 20),
+          pauseFor: const Duration(seconds: 2),
+          listenFor: const Duration(seconds: 12),
         ),
         onResult: (result) async {
           if (!mounted) return;
           final words = result.recognizedWords.trim();
-          setState(() => _smartInputCtrl.text = words);
+          _smartInputCtrl.value = TextEditingValue(
+            text: words,
+            selection: TextSelection.collapsed(offset: words.length),
+          );
           if (result.finalResult &&
               words.isNotEmpty &&
               !_voiceResultProcessed) {
@@ -2278,11 +2293,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _handleSpeechError(String errorMessage) async {
+    if (!mounted || _handlingSpeechError || _voiceResultProcessed) return;
     debugPrint('STT Error: $errorMessage');
-    if (!mounted || _handlingSpeechError) return;
     _handlingSpeechError = true;
 
     final normalized = errorMessage.toLowerCase();
+    final partialWords = _smartInputCtrl.text.trim();
+    final recoverableEnd = normalized.contains('error_speech_timeout') ||
+        normalized.contains('error_no_match') ||
+        normalized.contains('error_client');
+    if (recoverableEnd && partialWords.isNotEmpty) {
+      _voiceResultProcessed = true;
+      setState(() => _isListening = false);
+      await _processNLP(partialWords);
+      return;
+    }
     final languageFailure =
         normalized.contains('error_language_unavailable') ||
         normalized.contains('error_language_not_supported');
@@ -2292,7 +2317,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             _speechLocaleCandidates.length) {
       _voiceResultProcessed = true;
       await _speech.cancel();
-      await Future<void>.delayed(const Duration(milliseconds: 250));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
 
       _speechLocaleCandidateIndex++;
@@ -2305,6 +2330,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     _voiceResultProcessed = true;
     setState(() => _isListening = false);
+
+    if (normalized.contains('error_client')) {
+      _speechInitialized = false;
+    }
 
     final networkFailure =
         normalized.contains('error_network') ||
@@ -2533,6 +2562,143 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleSmartEntryTransferCommand(
+    ParsedSmartEntryCommand command,
+  ) async {
+    if (command.amount <= 0) {
+      _showTransactionError(
+        "Include an amount, for example: 'transfer 500 Cash to JazzCash'.",
+        title: 'Transfer amount required',
+      );
+      return;
+    }
+
+    final wallets = ref.read(walletProvider);
+    if (wallets.length < 2) {
+      _showTransactionError(
+        'Create at least two wallets before making a transfer.',
+        title: 'Two wallets required',
+      );
+      return;
+    }
+
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final accounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+            id: wallet.id,
+            name: wallet.name,
+            type: wallet.walletType,
+            availableBalance:
+                walletNotifier.getBalanceForWallet(wallet.id),
+            isBackup: wallet.isBackup,
+          ),
+        )
+        .toList(growable: false);
+    final resolution = resolveSmartEntryTransferAccounts(
+      command.rawInput,
+      accounts,
+    );
+    if (resolution == null) {
+      _showTransactionError(
+        "Name both wallets, for example: 'transfer 500 Cash to JazzCash'.",
+        title: 'Source and destination required',
+      );
+      return;
+    }
+
+    final source = wallets.firstWhere(
+      (wallet) => wallet.id == resolution.sourceAccountId,
+    );
+    final destination = wallets.firstWhere(
+      (wallet) => wallet.id == resolution.destinationAccountId,
+    );
+    if (source.id == destination.id) {
+      _showTransactionError(
+        'Choose two different wallets.',
+        title: 'Invalid transfer',
+      );
+      return;
+    }
+
+    final available = walletNotifier.getBalanceForWallet(source.id);
+    if (command.amount > available + 0.000001) {
+      _showTransactionError(
+        'Available in ' +
+            source.name +
+            ': Rs. ' +
+            available.toStringAsFixed(0) +
+            '. Required: Rs. ' +
+            command.amount.toStringAsFixed(0) +
+            '.',
+        title: 'Insufficient balance',
+      );
+      return;
+    }
+
+    final transferId = const Uuid().v4();
+    final transferEntries = [
+      Expense(
+        id: transferId + '_out',
+        title: 'Transfer to ' + destination.name,
+        amount: command.amount,
+        date: command.date,
+        category: 'Transfer',
+        colorValue: Colors.blue.toARGB32(),
+        type: 'expense',
+        walletId: source.id,
+      ),
+      Expense(
+        id: transferId + '_in',
+        title: 'Transfer from ' + source.name,
+        amount: command.amount,
+        date: command.date,
+        category: 'Transfer',
+        colorValue: Colors.blue.toARGB32(),
+        type: 'income',
+        walletId: destination.id,
+      ),
+    ];
+    final saved = await ref
+        .read(expenseProvider.notifier)
+        .addExpenses(transferEntries);
+    if (!mounted) return;
+    if (!saved) {
+      _showTransactionError(
+        'The source wallet changed or no longer has enough money.',
+        title: 'Transfer not saved',
+      );
+      return;
+    }
+
+    _smartInputCtrl.clear();
+    await HapticFeedback.lightImpact();
+    if (!mounted) return;
+    final transferAmount = command.amount.toStringAsFixed(
+      command.amount == command.amount.truncateToDouble() ? 0 : 2,
+    );
+    _showTransactionSuccess(
+      'Rs. ' +
+          transferAmount +
+          ' · ' +
+          source.name +
+          ' → ' +
+          destination.name,
+      title: 'Transfer completed',
+      actionLabel: 'Undo',
+      onAction: () async {
+        await ref
+            .read(expenseProvider.notifier)
+            .deleteTransferPair(transferId);
+        if (!mounted) return;
+        _showTransactionInfo(
+          'The transfer was reversed.',
+          title: 'Transfer undone',
         );
       },
     );
@@ -2772,10 +2938,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       String title;
       switch (command.intent) {
         case SmartEntryIntent.transfer:
-          title = 'Transfer command recognized';
-          message =
-              'Natural-language transfers are not enabled until their confirmation rules are approved.';
-          break;
+          await _handleSmartEntryTransferCommand(command);
+          return;
         case SmartEntryIntent.query:
           title = 'Question recognized';
           message =
