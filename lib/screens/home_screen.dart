@@ -52,6 +52,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _isScanningReceipt = false;
   final TextEditingController _smartInputCtrl = TextEditingController();
   Timer? _notificationUpdateTimer;
+  Timer? _messageTimer;
+  OverlayEntry? _activeMessageEntry;
 
   @override
   void initState() {
@@ -120,6 +122,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _speech.cancel();
     _fabController.dispose();
     _notificationUpdateTimer?.cancel();
+    _messageTimer?.cancel();
+    _activeMessageEntry?.remove();
+    _activeMessageEntry = null;
     _categoryScrollCtrl.dispose();
     _smartInputCtrl.dispose();
     super.dispose();
@@ -226,10 +231,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           .read(categoryProvider.notifier)
                           .addCategory(catCtrl.text.trim());
                       if (!added) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('That category already exists.'),
-                          ),
+                        _showTransactionError(
+                          'Choose a different name for this category.',
+                          title: 'Category already exists',
                         );
                         return;
                       }
@@ -295,18 +299,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_selectedCategoryTab == category) {
       setState(() => _selectedCategoryTab = 'All');
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Category '$category' deleted.")),
+    _showTransactionSuccess(
+      "Category '$category' was deleted.",
+      title: 'Category deleted',
     );
   }
 
   // ==================== TRANSACTION / TRANSFER MODAL ====================
   void _showAddOrEditModal({Expense? existing, String? prefilledAmount}) {
     if (existing?.category == 'Transfer') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transfers cannot be edited. Delete the transfer and create it again.'),
-        ),
+      _showTransactionInfo(
+        'Delete this transfer and create it again if its details need to change.',
+        title: 'Transfers cannot be edited',
       );
       return;
     }
@@ -470,7 +474,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                                 .firstWhere((w) => w.id == selectedWalletId)
                                 .name;
                             _showTransactionError(
-                              'Not enough money in $accountName. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amt.toStringAsFixed(0)}. Add money or enter a smaller amount.',
+                              'Available in $accountName: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amt.toStringAsFixed(0)}. Add money to this account or enter a smaller amount.',
+                              title: 'Insufficient balance',
                             );
                             return;
                           }
@@ -490,7 +495,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                               .getBalanceForWallet(selectedWalletId);
                           if (amt > available) {
                             _showTransactionError(
-                              'Insufficient balance. Available: Rs. ${available.toStringAsFixed(0)}',
+                              'Available in the source account: Rs. ${available.toStringAsFixed(0)}. Enter a smaller amount or add money first.',
+                              title: 'Insufficient balance',
                             );
                             return;
                           }
@@ -506,7 +512,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           ]);
                           if (!saved) {
                             _showTransactionError(
-                              'Transfer could not be saved because the source account balance is too low.',
+                              'The source account no longer has enough money for this transfer.',
+                              title: 'Transfer not saved',
                             );
                             return;
                           }
@@ -526,7 +533,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             final saved = await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
                             if (!saved) {
                               _showTransactionError(
-                                'Could not save this transaction. Check the account balance and try again.',
+                                'Check the selected account balance and try again.',
+                                title: 'Transaction not saved',
                               );
                               return;
                             }
@@ -556,11 +564,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  void _showTransactionError(String message) {
+  void _showTransactionError(
+    String message, {
+    String title = 'Unable to continue',
+  }) {
+    _showTopMessage(title: title, message: message, tone: _MessageTone.error);
+  }
+
+  void _showTransactionSuccess(
+    String message, {
+    String title = 'Completed',
+  }) {
+    _showTopMessage(title: title, message: message, tone: _MessageTone.success);
+  }
+
+  void _showTransactionInfo(
+    String message, {
+    String title = 'Information',
+  }) {
+    _showTopMessage(title: title, message: message, tone: _MessageTone.info);
+  }
+
+  void _showTopMessage({
+    required String title,
+    required String message,
+    required _MessageTone tone,
+  }) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+
+    _messageTimer?.cancel();
+    _activeMessageEntry?.remove();
+
+    late final OverlayEntry entry;
+    void dismiss() {
+      if (_activeMessageEntry != entry) return;
+      entry.remove();
+      _activeMessageEntry = null;
+      _messageTimer?.cancel();
+      _messageTimer = null;
+    }
+
+    entry = OverlayEntry(
+      builder: (overlayContext) => Positioned(
+        top: MediaQuery.paddingOf(overlayContext).top + 12,
+        left: 16,
+        right: 16,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: _TopMessageCard(
+            title: title,
+            message: message,
+            tone: tone,
+            onDismiss: dismiss,
+          ),
+        ),
+      ),
     );
+
+    _activeMessageEntry = entry;
+    Overlay.of(context, rootOverlay: true).insert(entry);
+    _messageTimer = Timer(const Duration(seconds: 5), dismiss);
   }
 
   Widget _buildSegment(String current, String type, String label, Color color, VoidCallback onTap) {
@@ -941,7 +1004,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           await ref.read(expenseProvider.notifier).deleteExpense(e.id);
         }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Deleted '${e.title}'", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.red, duration: const Duration(seconds: 2)));
+        _showTransactionSuccess(
+          "'${e.title}' was removed from your records.",
+          title: isTransfer ? 'Transfer deleted' : 'Transaction deleted',
+        );
       },
       child: GestureDetector(
         onTap: isTransfer ? null : () => _showAddOrEditModal(existing: e),
@@ -1354,17 +1420,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         debugPrint('STT Error: $error');
         if (!mounted) return;
         setState(() => _isListening = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Voice Log stopped. Please try again.')),
+        _showTransactionError(
+          'Voice Log stopped before an entry could be saved. Please try again.',
+          title: 'Voice Log stopped',
         );
       },
     );
     if (!mounted) return;
     if (!available) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Microphone or speech-recognition permission was denied.'),
-        ),
+      _showTransactionError(
+        'Allow microphone and speech-recognition access in phone settings, then try again.',
+        title: 'Permission required',
       );
       return;
     }
@@ -1406,8 +1472,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _smartInputCtrl.selection = TextSelection.collapsed(
         offset: _smartInputCtrl.text.length,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Receipt read. Review it, then tap the arrow to save.')),
+      _showTransactionInfo(
+        'Review the detected details, then tap the arrow to save.',
+        title: 'Receipt scanned',
       );
     } finally {
       if (mounted) setState(() => _isScanningReceipt = false);
@@ -1445,7 +1512,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           .getBalanceForWallet(defaultWalletId);
       if (amount.toDouble() > available) {
         _showTransactionError(
-          'Not enough money in ${defaultWallet.name}. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amount.toStringAsFixed(0)}. Add money or use manual entry to choose another account.',
+          'Available in ${defaultWallet.name}: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amount.toStringAsFixed(0)}. Add money or use manual entry to choose another account.',
+          title: 'Insufficient balance',
         );
         return;
       }
@@ -1455,16 +1523,160 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (!mounted) return;
       if (!saved) {
         _showTransactionError(
-          'Could not save this entry because the account balance is too low.',
+          'The selected account no longer has enough money for this entry.',
+          title: 'Entry not saved',
         );
         return;
       }
       _smartInputCtrl.clear();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("  Saved: ${result['title']} (Rs. ${amount.toStringAsFixed(0)})", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green));
+      _showTransactionSuccess(
+        "${result['title']} — Rs. ${amount.toStringAsFixed(0)}",
+        title: 'Expense saved',
+      );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("  Could not detect amount. Try: '500 for biryani'.", style: TextStyle(fontSize: 13)), backgroundColor: Colors.red));
+      _showTransactionError(
+        "Include an amount in your entry, for example: '500 for biryani'.",
+        title: 'Amount not detected',
+      );
     }
     if (mounted) FocusScope.of(context).unfocus();
+  }
+}
+
+
+enum _MessageTone { error, success, info }
+
+class _TopMessageCard extends StatelessWidget {
+  final String title;
+  final String message;
+  final _MessageTone tone;
+  final VoidCallback onDismiss;
+
+  const _TopMessageCard({
+    required this.title,
+    required this.message,
+    required this.tone,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final Color accent;
+    final Color background;
+    final Color foreground;
+    final IconData icon;
+
+    switch (tone) {
+      case _MessageTone.error:
+        accent = scheme.error;
+        background = scheme.errorContainer;
+        foreground = scheme.onErrorContainer;
+        icon = Icons.error_outline_rounded;
+      case _MessageTone.success:
+        accent = const Color(0xFF16A34A);
+        background = isDark ? const Color(0xFF123524) : const Color(0xFFF0FDF4);
+        foreground = isDark ? const Color(0xFFDCFCE7) : const Color(0xFF14532D);
+        icon = Icons.check_circle_outline_rounded;
+      case _MessageTone.info:
+        accent = scheme.primary;
+        background = scheme.primaryContainer;
+        foreground = scheme.onPrimaryContainer;
+        icon = Icons.info_outline_rounded;
+    }
+
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      tween: Tween(begin: 0, end: 1),
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, -14 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Material(
+          color: Colors.transparent,
+          child: Semantics(
+            container: true,
+            liveRegion: true,
+            label: '$title. $message',
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 13, 8, 13),
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: accent.withValues(alpha: 0.28)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.14),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: accent, size: 21),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            color: foreground,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          message,
+                          style: TextStyle(
+                            color: foreground.withValues(alpha: 0.82),
+                            fontSize: 13,
+                            height: 1.35,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Dismiss message',
+                    onPressed: onDismiss,
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: foreground.withValues(alpha: 0.65),
+                      size: 19,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
