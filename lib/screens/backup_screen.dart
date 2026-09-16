@@ -360,7 +360,6 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
               TextFormField(
                 controller: _password,
                 obscureText: _obscure,
-                autofocus: true,
                 decoration: InputDecoration(
                   labelText: 'Passphrase',
                   helperText: widget.confirmPassword
