@@ -1,5 +1,90 @@
 import 'dart:math';
 
+enum SmartEntryIntent {
+  addExpense,
+  addIncome,
+  deleteEntry,
+  editEntry,
+  transfer,
+  query,
+  unknown,
+}
+
+extension SmartEntryIntentDetails on SmartEntryIntent {
+  String get wireName {
+    switch (this) {
+      case SmartEntryIntent.addExpense:
+        return 'add_expense';
+      case SmartEntryIntent.addIncome:
+        return 'add_income';
+      case SmartEntryIntent.deleteEntry:
+        return 'delete_entry';
+      case SmartEntryIntent.editEntry:
+        return 'edit_entry';
+      case SmartEntryIntent.transfer:
+        return 'transfer';
+      case SmartEntryIntent.query:
+        return 'query';
+      case SmartEntryIntent.unknown:
+        return 'unknown';
+    }
+  }
+
+  bool get isTransactionAddition {
+    return this == SmartEntryIntent.addExpense ||
+        this == SmartEntryIntent.addIncome;
+  }
+}
+
+class ParsedSmartEntryCommand {
+  final String rawInput;
+  final SmartEntryIntent intent;
+  final double amount;
+  final String title;
+  final String category;
+  final DateTime date;
+  final double confidence;
+  final Map<String, double> confidenceByField;
+  final List<String> clarificationReasons;
+
+  const ParsedSmartEntryCommand({
+    required this.rawInput,
+    required this.intent,
+    required this.amount,
+    required this.title,
+    required this.category,
+    required this.date,
+    required this.confidence,
+    required this.confidenceByField,
+    required this.clarificationReasons,
+  });
+
+  bool get needsClarification => clarificationReasons.isNotEmpty;
+
+  Map<String, dynamic> toLegacyMap() {
+    final transactionType = intent == SmartEntryIntent.addIncome
+        ? 'income'
+        : intent == SmartEntryIntent.addExpense
+            ? 'expense'
+            : intent.wireName;
+
+    return {
+      'amount': amount,
+      'category': category,
+      'title': title,
+      'date': date,
+      'type': transactionType,
+      'intent': intent.wireName,
+      'confidence': confidence,
+      'fieldConfidence':
+          Map<String, double>.unmodifiable(confidenceByField),
+      'clarificationReasons':
+          List<String>.unmodifiable(clarificationReasons),
+      'needsReview': needsClarification || confidence < 0.75,
+    };
+  }
+}
+
 class LocalNlpService {
   // Singleton pattern
   static final LocalNlpService _instance = LocalNlpService._internal();
@@ -99,33 +184,44 @@ class LocalNlpService {
     'paisa', 'mani', 'money', 'subah', 'shaam', 'raat', 'rupay', 'pkr',
     'received', 'receive', 'credited', 'credit', 'deposit', 'aayi', 'ayi',
     'aya', 'mila', 'mili', 'hui', 'hue', 'from', 'via', 'using', 'through',
-    'account', 'wallet'
+    'account', 'wallet', 'add', 'save', 'record', 'note', 'enter',
+    'expense', 'income', 'transaction', 'entry', 'delete', 'remove',
+    'hatao', 'hata', 'nikalo', 'edit', 'change', 'update', 'modify',
+    'badlo', 'badal', 'transfer', 'move', 'shift', 'send', 'bhejo',
+    'show', 'list', 'find', 'search', 'please', 'plz'
   ];
 
   // ==========================================
   // 🔢 ROMAN URDU NUMBER WORDS
   // ==========================================
   static const Map<String, int> _units = {
-    'ek': 1, 'aik': 1, 'do': 2, 'teen': 3, 'tin': 3, 'char': 4, 'chaar': 4,
-    'panch': 5, 'paanch': 5, 'che': 6, 'choh': 6, 'chhay': 6, 'saat': 7,
-    'aath': 8, 'ath': 8, 'nau': 9,
+    'ek': 1, 'aik': 1, 'one': 1, 'do': 2, 'two': 2,
+    'teen': 3, 'tin': 3, 'three': 3, 'char': 4, 'chaar': 4, 'four': 4,
+    'panch': 5, 'paanch': 5, 'five': 5, 'che': 6, 'choh': 6, 'chhay': 6,
+    'six': 6, 'saat': 7, 'seven': 7, 'aath': 8, 'ath': 8, 'eight': 8,
+    'nau': 9, 'nine': 9,
   };
 
   static const Map<String, int> _teens = {
-    'das': 10, 'dus': 10, 'gyarah': 11, 'barah': 12, 'terah': 13, 'chaudah': 14,
-    'pandrah': 15, 'solah': 16, 'satrah': 17, 'atharah': 18, 'unnees': 19,
+    'das': 10, 'dus': 10, 'ten': 10, 'gyarah': 11, 'eleven': 11,
+    'barah': 12, 'twelve': 12, 'terah': 13, 'thirteen': 13,
+    'chaudah': 14, 'fourteen': 14, 'pandrah': 15, 'fifteen': 15,
+    'solah': 16, 'sixteen': 16, 'satrah': 17, 'seventeen': 17,
+    'atharah': 18, 'eighteen': 18, 'unnees': 19, 'nineteen': 19,
   };
 
   static const Map<String, int> _tens = {
-    'bees': 20, 'tees': 30, 'chalees': 40, 'pachas': 50,
-    'saath': 60, 'sattar': 70, 'assi': 80, 'nabbe': 90,
+    'bees': 20, 'twenty': 20, 'tees': 30, 'thirty': 30,
+    'chalees': 40, 'forty': 40, 'pachas': 50, 'fifty': 50,
+    'saath': 60, 'sixty': 60, 'sattar': 70, 'seventy': 70,
+    'assi': 80, 'eighty': 80, 'nabbe': 90, 'ninety': 90,
   };
 
   static const Map<String, int> _multipliers = {
-    'sau': 100, 'so': 100, 'sou': 100, 'saw': 100,
-    'hazar': 1000, 'hazaar': 1000, 'k': 1000,
+    'sau': 100, 'so': 100, 'sou': 100, 'saw': 100, 'hundred': 100,
+    'hazar': 1000, 'hazaar': 1000, 'k': 1000, 'thousand': 1000,
     'lakh': 100000, 'lac': 100000,
-    'crore': 10000000,
+    'million': 1000000, 'crore': 10000000,
   };
 
   static const Map<String, double> _fusedOverrides = {
@@ -311,145 +407,269 @@ class LocalNlpService {
       if (pendingUnitToken != null) consumed.add(pendingUnitToken);
     }
 
-    if (!matchedAnyScale || amount <= 0) return null;
+    if (consumed.isEmpty || amount <= 0) return null;
     return _WordAmountResult(amount, consumed);
   }
 
   // ==========================================
   // 🧠 MAIN PARSING ENGINE
   // ==========================================
-  Map<String, dynamic> parseExpense(String input, List<String> activeCategories) {
-    String lowerInput = input.toLowerCase();
+  SmartEntryIntent _detectIntent(String input) {
+    bool has(String pattern) => RegExp(pattern).hasMatch(input);
+
+    if (has(r'\b(delete|remove|erase|hata|hatao|nikal|nikalo)\b')) {
+      return SmartEntryIntent.deleteEntry;
+    }
+    if (has(r'\b(edit|change|update|modify|correct|badal|badlo|theek)\b')) {
+      return SmartEntryIntent.editEntry;
+    }
+    if (has(r'\b(transfer|move|shift|send|bhej|bhejo)\b')) {
+      return SmartEntryIntent.transfer;
+    }
+    if (has(r'\b(how much|show|list|find|search|kitna|kitni|balance|total)\b')) {
+      return SmartEntryIntent.query;
+    }
+    if (has(
+      r'\b(income|salary|allowance|received|receive|credited|credit|deposit|kamai|earning|earned|bonus|refund|cashback|profit|aayi|ayi|aya|mila|mili|jama|wasool)\b',
+    )) {
+      return SmartEntryIntent.addIncome;
+    }
+    return input.trim().isEmpty
+        ? SmartEntryIntent.unknown
+        : SmartEntryIntent.addExpense;
+  }
+
+  double _intentConfidence(String input, SmartEntryIntent intent) {
+    if (intent == SmartEntryIntent.unknown) return 0.0;
+    if (intent != SmartEntryIntent.addExpense) return 0.98;
+
+    final explicitExpense = RegExp(
+      r'\b(expense|spent|paid|bought|purchased|kharch|kharcha|diye|diya|kharida)\b',
+    ).hasMatch(input);
+    return explicitExpense ? 0.96 : 0.84;
+  }
+
+  ParsedSmartEntryCommand parseCommand(
+    String input,
+    List<String> activeCategories,
+  ) {
+    final rawInput = input.trim();
+    String lowerInput = rawInput.toLowerCase().replaceAll(
+          RegExp(r'\s+'),
+          ' ',
+        );
+    final intent = _detectIntent(lowerInput);
+    final isIncome = intent == SmartEntryIntent.addIncome;
+
     double amount = 0.0;
+    double amountConfidence = 0.0;
     String category = 'General';
     DateTime transactionDate = DateTime.now();
-    List<String> consumedTokens = [];
-    final isIncome = RegExp(
-      r'\b(income|salary|allowance|received|credited|deposit|kamai|earning|earned|bonus|refund|aayi|ayi|aya|mila|mili|jama)\b',
-    ).hasMatch(lowerInput);
-    final transactionType = isIncome ? 'income' : 'expense';
+    final consumedTokens = <String>[];
+    bool explicitDate = false;
 
-    // 1. Extract Temporal Elements (Dates)
     if (RegExp(r'\b(aaj|today)\b').hasMatch(lowerInput)) {
       consumedTokens.addAll(['aaj', 'today']);
+      explicitDate = true;
     } else if (RegExp(r'\b(kal|yesterday)\b').hasMatch(lowerInput)) {
       transactionDate = transactionDate.subtract(const Duration(days: 1));
       consumedTokens.addAll(['kal', 'yesterday']);
-    } else if (RegExp(r'\b(parso|parson)\b').hasMatch(lowerInput)) {
+      explicitDate = true;
+    } else if (RegExp(r'\b(parso|parson|day before yesterday)\b')
+        .hasMatch(lowerInput)) {
       transactionDate = transactionDate.subtract(const Duration(days: 2));
-      consumedTokens.addAll(['parso', 'parson']);
+      consumedTokens.addAll(
+        ['parso', 'parson', 'day', 'before', 'yesterday'],
+      );
+      explicitDate = true;
     }
 
-    // 2. Extract Amount
     final amountRegExp = RegExp(
-      r'\b(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k|thousand|hazar|hazaar|lakh|lac)?\b',
+      r'\b(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k|thousand|hazar|hazaar|lakh|lac|million|crore)?\b',
     );
+    final containsNegativeAmount = RegExp(
+      r'(^|\s)(-|minus)\s*\d',
+    ).hasMatch(lowerInput);
     final digitMatch = amountRegExp.firstMatch(lowerInput);
-    if (digitMatch != null) {
+    if (digitMatch != null && !containsNegativeAmount) {
       final base = double.tryParse(
             digitMatch.group(1)!.replaceAll(',', ''),
           ) ??
           0.0;
       final scale = digitMatch.group(2);
       var multiplier = 1.0;
-      if (scale == 'k' || scale == 'thousand' ||
-          scale == 'hazar' || scale == 'hazaar') {
+      if (scale == 'k' ||
+          scale == 'thousand' ||
+          scale == 'hazar' ||
+          scale == 'hazaar') {
         multiplier = 1000;
       } else if (scale == 'lakh' || scale == 'lac') {
         multiplier = 100000;
+      } else if (scale == 'million') {
+        multiplier = 1000000;
+      } else if (scale == 'crore') {
+        multiplier = 10000000;
       }
       amount = base * multiplier;
-    } else {
-      final tokens = lowerInput.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+      amountConfidence = amount > 0 ? 0.99 : 0.0;
+    } else if (!containsNegativeAmount) {
+      final tokens = lowerInput
+          .split(RegExp(r'\s+'))
+          .where((token) => token.isNotEmpty)
+          .toList();
       final wordResult = _parseWordAmount(tokens);
       if (wordResult != null) {
         amount = wordResult.amount;
+        amountConfidence = 0.92;
         consumedTokens.addAll(wordResult.consumedTokens);
       }
     }
 
-    final lowerActiveCategories = activeCategories.map((c) => c.toLowerCase()).toList();
-
-    // 3. Extract Category
+    final lowerActiveCategories =
+        activeCategories.map((category) => category.toLowerCase()).toList();
     bool categoryFound = false;
-    List<String> matchedCategoryTokens = [];
-    final words = lowerInput.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final matchedCategoryTokens = <String>[];
+    final words = lowerInput
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .toList();
 
     final candidates = <String>[];
-    for (var i = 0; i < words.length - 1; i++) {
-      candidates.add('${words[i]} ${words[i + 1]}');
+    for (var index = 0; index < words.length - 1; index++) {
+      candidates.add(words[index] + ' ' + words[index + 1]);
     }
     candidates.addAll(words);
 
     for (final candidate in candidates) {
-      final norm = _normalize(candidate);
-      String? mappedCategory = _normalizedLexicon[norm];
-      mappedCategory ??= candidate.length >= 4 ? _fuzzyLookup(norm, _normalizedLexicon) : null;
+      final normalizedCandidate = _normalize(candidate);
+      String? mappedCategory = _normalizedLexicon[normalizedCandidate];
+      mappedCategory ??= candidate.length >= 4
+          ? _fuzzyLookup(normalizedCandidate, _normalizedLexicon)
+          : null;
 
-      if (mappedCategory != null && lowerActiveCategories.contains(mappedCategory.toLowerCase())) {
-        category = activeCategories.firstWhere((c) => c.toLowerCase() == mappedCategory!.toLowerCase());
+      if (mappedCategory != null &&
+          lowerActiveCategories.contains(mappedCategory.toLowerCase())) {
+        category = activeCategories.firstWhere(
+          (active) => active.toLowerCase() == mappedCategory!.toLowerCase(),
+        );
         categoryFound = true;
-        matchedCategoryTokens = candidate.split(' ');
+        matchedCategoryTokens.addAll(candidate.split(' '));
         break;
       }
     }
 
     if (!categoryFound) {
-      for (var cat in activeCategories) {
-        if (RegExp(r'\b' + RegExp.escape(cat.toLowerCase()) + r'\b').hasMatch(lowerInput)) {
-          category = cat;
+      for (final activeCategory in activeCategories) {
+        if (RegExp(
+          r'\b' + RegExp.escape(activeCategory.toLowerCase()) + r'\b',
+        ).hasMatch(lowerInput)) {
+          category = activeCategory;
+          categoryFound = true;
+          matchedCategoryTokens.addAll(
+            activeCategory.toLowerCase().split(' '),
+          );
           break;
         }
       }
     }
 
-    // 4. Clean Title
-    String cleanTitle = lowerInput.replaceAll(amountRegExp, '');
-
-    // 🚀 FIXED: Strict word boundary replacement to prevent mutilation
+    String cleanTitle = lowerInput.replaceAll(amountRegExp, ' ');
     for (final token in consumedTokens) {
-      cleanTitle = cleanTitle.replaceFirst(RegExp(r'\b' + RegExp.escape(token) + r'\b'), ' ');
+      cleanTitle = cleanTitle.replaceFirst(
+        RegExp(r'\b' + RegExp.escape(token) + r'\b'),
+        ' ',
+      );
     }
-    for (String stopWord in _stopWords) {
-      cleanTitle = cleanTitle.replaceAll(RegExp(r'\b' + RegExp.escape(stopWord) + r'\b'), '');
+    for (final stopWord in _stopWords) {
+      cleanTitle = cleanTitle.replaceAll(
+        RegExp(r'\b' + RegExp.escape(stopWord) + r'\b'),
+        ' ',
+      );
     }
 
-    cleanTitle = cleanTitle.replaceAll(RegExp(r'[^\w\s]'), '').trim();
-    cleanTitle = cleanTitle.replaceAll(RegExp(r'\s+'), ' ');
+    cleanTitle = cleanTitle
+        .replaceAll(RegExp(r'[^\w\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    cleanTitle = cleanTitle
+        .split(' ')
+        .where((word) => word.length > 1)
+        .join(' ')
+        .trim();
 
-    cleanTitle = cleanTitle.split(' ').where((w) => w.length > 1).join(' ').trim();
-
-    _lastUnmatchedTokens = words.where((w) {
-      return !_stopWords.contains(w) &&
-          !consumedTokens.contains(w) &&
-          !matchedCategoryTokens.contains(w) &&
-          w.length > 1;
+    _lastUnmatchedTokens = words.where((word) {
+      return !_stopWords.contains(word) &&
+          !consumedTokens.contains(word) &&
+          !matchedCategoryTokens.contains(word) &&
+          word.length > 1;
     }).toList();
 
+    final usedFallbackTitle = cleanTitle.isEmpty;
     if (cleanTitle.isEmpty) {
-      cleanTitle = categoryFound ? category : 'Quick Expense';
+      if (isIncome) {
+        cleanTitle = 'Income / Allowance';
+      } else if (intent == SmartEntryIntent.addExpense) {
+        cleanTitle = categoryFound ? category : 'Quick Expense';
+      } else {
+        cleanTitle = 'Transaction';
+      }
     } else {
       cleanTitle = cleanTitle.split(' ').map((word) {
-        if (word.isEmpty) return '';
         return word[0].toUpperCase() + word.substring(1).toLowerCase();
       }).join(' ');
     }
 
-    var confidence = 0.25;
-    if (amount > 0) confidence += 0.4;
-    if (categoryFound) confidence += 0.2;
-    if (cleanTitle != 'Quick Expense') confidence += 0.1;
-    if (isIncome) confidence += 0.05;
-
-    return {
-      'amount': amount,
-      'category': isIncome ? 'Income / Allowance' : category,
-      'title': cleanTitle,
-      'date': transactionDate,
-      'type': transactionType,
-      'confidence': confidence.clamp(0.0, 1.0).toDouble(),
-      'needsReview': confidence < 0.75,
+    final intentConfidence = _intentConfidence(lowerInput, intent);
+    final categoryConfidence =
+        isIncome ? 0.98 : categoryFound ? 0.94 : 0.35;
+    final titleConfidence = usedFallbackTitle ? 0.35 : 0.9;
+    final dateConfidence = explicitDate ? 0.98 : 0.85;
+    final fieldConfidence = <String, double>{
+      'intent': intentConfidence,
+      'amount': amountConfidence,
+      'title': titleConfidence,
+      'category': categoryConfidence,
+      'date': dateConfidence,
     };
+
+    final confidence = (
+      intentConfidence * 0.30 +
+      amountConfidence * 0.35 +
+      titleConfidence * 0.15 +
+      categoryConfidence * 0.10 +
+      dateConfidence * 0.10
+    ).clamp(0.0, 1.0).toDouble();
+
+    final clarificationReasons = <String>[];
+    if (intent.isTransactionAddition && amount <= 0) {
+      clarificationReasons.add(
+        containsNegativeAmount
+            ? 'Amount must be greater than zero.'
+            : 'A positive amount is required.',
+      );
+    }
+    if (intent == SmartEntryIntent.unknown) {
+      clarificationReasons.add('The command intent was not recognized.');
+    }
+
+    return ParsedSmartEntryCommand(
+      rawInput: rawInput,
+      intent: intent,
+      amount: amount,
+      title: cleanTitle,
+      category: isIncome ? 'Income / Allowance' : category,
+      date: transactionDate,
+      confidence: confidence,
+      confidenceByField: fieldConfidence,
+      clarificationReasons: clarificationReasons,
+    );
+  }
+
+  Map<String, dynamic> parseExpense(
+    String input,
+    List<String> activeCategories,
+  ) {
+    return parseCommand(input, activeCategories).toLegacyMap();
   }
 }
 
@@ -506,14 +726,21 @@ bool _accountMentioned(String input, SmartEntryAccount account) {
   return false;
 }
 
+Set<String> _mentionedSmartEntryAccountIds(
+  String input,
+  Iterable<SmartEntryAccount> accounts,
+) {
+  return accounts
+      .where((account) => _accountMentioned(input, account))
+      .map((account) => account.id)
+      .toSet();
+}
+
 String? findMentionedSmartEntryAccountId(
   String input,
   Iterable<SmartEntryAccount> accounts,
 ) {
-  final matches = accounts
-      .where((account) => _accountMentioned(input, account))
-      .map((account) => account.id)
-      .toSet();
+  final matches = _mentionedSmartEntryAccountIds(input, accounts);
   return matches.length == 1 ? matches.single : null;
 }
 
@@ -525,8 +752,11 @@ String? resolveSmartEntryAccount({
   String? preferredAccountId,
 }) {
   final availableAccounts = accounts.toList(growable: false);
+  final mentionedIds =
+      _mentionedSmartEntryAccountIds(input, availableAccounts);
+  if (mentionedIds.length > 1) return null;
   final mentionedId =
-      findMentionedSmartEntryAccountId(input, availableAccounts);
+      mentionedIds.length == 1 ? mentionedIds.single : null;
 
   bool canUse(SmartEntryAccount account, {required bool explicitlySelected}) {
     if (transactionType == 'income') {
