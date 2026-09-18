@@ -652,7 +652,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         } catch (e) {
                           debugPrint("Notification reset failed: $e");
                         }
-                        if (ctx.mounted) Navigator.pop(ctx, true);
+                        if (ctx.mounted){
+                          Color bgColor = Colors.red.shade400; // Light Red
+                          if (transactionType == 'transfer') bgColor = Colors.blue.shade600;
+                          else if (transactionType == 'income') bgColor = Colors.green.shade600;
+
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text("Transaction saved successfully", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                            backgroundColor: bgColor,
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                          Navigator.pop(ctx, true);
+                        }
                       },
                       child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
@@ -737,7 +748,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _activeMessageEntry = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
     _messageTimer = Timer(
-      Duration(seconds: actionLabel == null ? 5 : 10),
+      Duration(seconds: actionLabel == null ? 3 : 5),
       dismiss,
     );
   }
@@ -1159,10 +1170,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           await ref.read(expenseProvider.notifier).deleteExpense(e.id);
         }
         if (!mounted) return;
-        _showTransactionSuccess(
-          "'${e.title}' was removed from your records.",
-          title: isTransfer ? 'Transfer deleted' : 'Transaction deleted',
-        );
+
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              isTransfer ? "Transfer deleted" : "Deleted '${e.title}'",
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)
+          ),
+          backgroundColor: Colors.red.shade800, // Bold Red
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ));
       },
       child: GestureDetector(
         onTap: isTransfer ? null : () => _showAddOrEditModal(existing: e),
@@ -1860,16 +1877,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           Row(
             children: [
               Expanded(
-                child: _buildBalanceMetric(
-                  label: 'Spent this month',
-                  value: 'Rs. ${spent.toStringAsFixed(0)}',
+                child: GestureDetector(
+                  onTap: () => _changeView('Stats'),
+                  child: _buildBalanceMetric(
+                    label: 'Spent this month',
+                    value: 'Rs. ${spent.toStringAsFixed(0)}',
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _buildBalanceMetric(
-                  label: 'All wallets',
-                  value: '${wallets.length}',
+                child: GestureDetector(
+                  onTap: _openIncomeAccounts,
+                  child: _buildBalanceMetric(
+                    label: 'All wallets',
+                    value: '${wallets.length}',
+                  ),
                 ),
               ),
             ],
@@ -2260,8 +2283,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           cancelOnError: true,
           partialResults: true,
           listenMode: stt.ListenMode.search,
-          pauseFor: const Duration(seconds: 2),
-          listenFor: const Duration(seconds: 12),
+          pauseFor: const Duration(seconds: 3),
+          listenFor: const Duration(seconds: 30),
         ),
         onResult: (result) async {
           if (!mounted) return;
