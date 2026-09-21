@@ -32,6 +32,106 @@ void main() {
       expect(controller.state, SpeechSessionState.finalizing);
     });
 
+    test('continues instead of executing an incomplete normal stop', () {
+      final controller = SpeechSessionController(maxRetries: 2)..start();
+      controller.recordTranscript('open', isFinal: false);
+
+      final stopped = controller.onRecognizerStopped(isComplete: false);
+
+      expect(stopped.action, SpeechSessionAction.retry);
+      expect(stopped.transcript, 'open');
+      expect(controller.state, SpeechSessionState.listening);
+      expect(controller.retryCount, 1);
+    });
+
+    test('merges a continuation and executes the complete command once', () {
+      final controller = SpeechSessionController(maxRetries: 2)..start();
+      controller.recordTranscript('open', isFinal: false);
+      controller.onRecognizerStopped(isComplete: false);
+
+      final completed = controller.recordTranscript(
+        'wallets',
+        isFinal: true,
+        isComplete: true,
+      );
+
+      expect(completed.action, SpeechSessionAction.processFinal);
+      expect(completed.transcript, 'open wallets');
+      expect(controller.onRecognizerStopped().action, SpeechSessionAction.none);
+    });
+
+    test('seeds a new mic attempt with the preserved draft', () {
+      final controller = SpeechSessionController(maxRetries: 2)
+        ..start(initialTranscript: 'open');
+
+      final completed = controller.recordTranscript(
+        'wallets',
+        isFinal: true,
+        isComplete: true,
+      );
+
+      expect(completed.action, SpeechSessionAction.processFinal);
+      expect(completed.transcript, 'open wallets');
+    });
+
+    test('retries an empty premature stop before failing visibly', () {
+      final controller = SpeechSessionController(maxRetries: 1)..start();
+
+      final firstStop = controller.onRecognizerStopped(
+        isComplete: false,
+        retryWhenEmpty: true,
+      );
+      final secondStop = controller.onRecognizerStopped(
+        isComplete: false,
+        retryWhenEmpty: true,
+      );
+
+      expect(firstStop.action, SpeechSessionAction.retry);
+      expect(secondStop.action, SpeechSessionAction.none);
+      expect(controller.state, SpeechSessionState.failed);
+    });
+
+    test('deduplicates overlapping words between continuation segments', () {
+      final controller = SpeechSessionController(maxRetries: 2)..start();
+      controller.recordTranscript(
+        'transfer 500 from cash',
+        isFinal: false,
+      );
+      controller.onRecognizerStopped(isComplete: false);
+
+      final completed = controller.recordTranscript(
+        'cash to jazzcash',
+        isFinal: true,
+        isComplete: true,
+      );
+
+      expect(completed.transcript, 'transfer 500 from cash to jazzcash');
+    });
+
+    test('stable partial only executes when semantic command is complete', () {
+      final controller = SpeechSessionController()..start();
+      controller.recordTranscript('open', isFinal: false);
+
+      final incomplete = controller.onStableTranscript(isComplete: false);
+      final complete = controller.onStableTranscript(isComplete: true);
+
+      expect(incomplete.action, SpeechSessionAction.none);
+      expect(complete.action, SpeechSessionAction.processFinal);
+      expect(complete.transcript, 'open');
+    });
+
+    test('session deadline preserves an incomplete draft without retrying', () {
+      final controller = SpeechSessionController(maxRetries: 2)..start();
+      controller.recordTranscript('transfer 500 from cash', isFinal: false);
+
+      final expired = controller.onSessionExpired(isComplete: false);
+
+      expect(expired.action, SpeechSessionAction.preserveDraft);
+      expect(expired.transcript, 'transfer 500 from cash');
+      expect(controller.retryCount, 0);
+      expect(controller.state, SpeechSessionState.failed);
+    });
+
     test('a normal stop without any transcript creates no work', () {
       final controller = SpeechSessionController()..start();
 
@@ -104,6 +204,20 @@ void main() {
 
       controller.markCompleted();
       expect(controller.state, SpeechSessionState.completed);
+    });
+  });
+
+  group('mergeSpeechTranscripts', () {
+    test('handles empty and fully repeated segments', () {
+      expect(mergeSpeechTranscripts('', 'open wallets'), 'open wallets');
+      expect(
+        mergeSpeechTranscripts('open wallets', 'open wallets'),
+        'open wallets',
+      );
+    });
+
+    test('joins segments without overlap', () {
+      expect(mergeSpeechTranscripts('open', 'wallets'), 'open wallets');
     });
   });
 }

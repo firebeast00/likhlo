@@ -128,7 +128,10 @@ class DeviceSpeechRecognitionProvider implements SpeechRecognitionProvider {
         localeId: options.localeId,
         cancelOnError: true,
         partialResults: options.partialResults,
-        listenMode: stt.ListenMode.search,
+        // Smart Entry commands are short sentences rather than isolated
+        // search terms. This improves phrase continuity on iOS; Android
+        // recognizers currently ignore ListenMode and use pauseFor below.
+        listenMode: stt.ListenMode.dictation,
         pauseFor: options.pauseFor,
         listenFor: options.listenFor,
       ),
