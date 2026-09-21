@@ -45,12 +45,13 @@ bool matchesSmartEntryTimeRange(
     case SmartEntryTimeRange.yesterday:
       return day == today.subtract(const Duration(days: 1));
     case SmartEntryTimeRange.thisWeek:
-      final start = today.subtract(Duration(days: today.weekday - 1));
-      return !day.isBefore(start) && day.isBefore(start.add(const Duration(days: 7)));
+      final thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
+      return !day.isBefore(thisWeekStart) &&
+          day.isBefore(thisWeekStart.add(const Duration(days: 7)));
     case SmartEntryTimeRange.lastWeek:
       final thisWeek = today.subtract(Duration(days: today.weekday - 1));
-      final start = thisWeek.subtract(const Duration(days: 7));
-      return !day.isBefore(start) && day.isBefore(thisWeek);
+      final lastWeekStart = thisWeek.subtract(const Duration(days: 7));
+      return !day.isBefore(lastWeekStart) && day.isBefore(thisWeek);
     case SmartEntryTimeRange.thisMonth:
       return day.year == today.year && day.month == today.month;
     case SmartEntryTimeRange.lastMonth:
@@ -755,8 +756,8 @@ class LocalNlpService {
       return SmartEntryIntent.navigate;
     }
     final asksFinancialQuestion =
-        has(r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining)\b') ||
-        has(r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining)\b') ||
+        has(r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net)\b') ||
+        has(r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining|net)\b') ||
         (has(r'\b(show|tell|calculate|summary|report|dikhao|batao)\b') &&
             has(r'\b(spent|spending|expense|expenses|income|earned|received|kamai)\b'));
     if (asksFinancialQuestion) {
@@ -849,7 +850,7 @@ class LocalNlpService {
         .hasMatch(input)) {
       return 'income';
     }
-    if (RegExp(r'\b(expense|expenses|spent|spending|kharch)\b')
+    if (RegExp(r'\b(expense|expenses|spend|spent|spending|kharch)\b')
         .hasMatch(input)) {
       return 'expense';
     }

@@ -3092,6 +3092,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       'Transaction',
       'Quick Expense',
       'Income Allowance',
+      'Income / Allowance',
     };
     return generic.contains(normalized) ? '' : normalized;
   }
@@ -3510,9 +3511,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
             : learnedWalletId != null
                 ? 'The wallet previously used for this entry cannot cover it. Choose another funded wallet.'
-            : defaultsAreEmpty
-                ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
-                : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
+                : defaultsAreEmpty
+                    ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
+                    : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
 
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
