@@ -15,6 +15,15 @@ class SmartInputPlan {
 
   String get normalizedText => normalization.normalized;
   ParsedSmartEntryCommand get parsed => command.parsed;
+
+  bool get requiresAsrReview =>
+      command.source == SmartInputSource.voice &&
+      normalization.appliedRules.any(
+        (rule) => const {
+          'spent_asr_context',
+          'pen_asr_context',
+        }.contains(rule),
+      );
 }
 
 class SmartInputEngine {
@@ -32,7 +41,10 @@ class SmartInputEngine {
     List<String> activeCategories, {
     SmartInputSource source = SmartInputSource.typed,
   }) {
-    final normalization = normalizer.normalize(input);
+    final normalization = normalizer.normalize(
+      input,
+      enableContextualAsrRepairs: source == SmartInputSource.voice,
+    );
     final parsed = nlp.parseCommand(
       normalization.normalized,
       activeCategories,
@@ -108,10 +120,16 @@ class SmartInputEngine {
 
     final titlePatterns = [
       RegExp(
+        r'^(?:change|edit|update)\s+(?:the\s+)?(?:title|name|naam)\s+(?:of\s+)?(.+?)\s+(?:to\s+)?(.+?)\s*(?:karo|kar\s+do|badlo)?$',
+      ),
+      RegExp(
         r'^(?:change|edit|update)?\s*(?:\d+(?:\.\d+)?\s+(?:ki|ka|ke)\s+)?(.+?)\s+(?:ka|ki|ke)?\s*(?:naam|name)\s+(?:to\s+)?(.+?)\s+(?:karo|kar\s+do|badlo|change|update)$',
       ),
       RegExp(
         r'^(?:change|edit|update)\s+(.+?)\s+(?:name|naam)\s+to\s+(.+)$',
+      ),
+      RegExp(
+        r'^(.+?)\s+ko\s+(.+?)\s+kar\s+do$',
       ),
     ];
     for (final pattern in titlePatterns) {

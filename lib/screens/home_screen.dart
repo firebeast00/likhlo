@@ -3489,6 +3489,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       categories,
       source: source,
     );
+    _debugSmartInputPlan(plan);
     final command = plan.parsed;
     final canonicalInput = plan.normalizedText;
     if (!command.intent.isTransactionAddition) {
@@ -3599,8 +3600,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             (command.confidenceByField['amount'] ?? 0) >= 0.9,
       ),
     );
+    assert(() {
+      debugPrint(
+        '[SmartEntry confidence] '
+        'disposition=${semanticConfidence.disposition} '
+        'score=${semanticConfidence.score.toStringAsFixed(3)} '
+        'reasons=${semanticConfidence.reasons.join(' | ')}',
+      );
+      return true;
+    }());
 
-    if (semanticConfidence.canAutoExecute &&
+    if (!plan.requiresAsrReview &&
+        semanticConfidence.canAutoExecute &&
         shouldAutoSaveSmartEntry(
       result,
       hasResolvedWallet: resolvedWalletId != null,
@@ -3669,7 +3680,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }).toList(growable: false);
     final defaultsAreEmpty = defaultAccounts.isEmpty ||
         defaultAccounts.every((account) => account.availableBalance <= 0);
-    final reviewMessage = resolvedWalletId != null &&
+    final reviewMessage = plan.requiresAsrReview
+        ? 'Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.'
+        : resolvedWalletId != null &&
             !semanticConfidence.canAutoExecute
         ? 'Review the detected title, amount, category, date, and wallet before saving.'
         : mentionedWalletId != null
@@ -3707,6 +3720,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
     }
     if (mounted) FocusScope.of(context).unfocus();
+  }
+
+  void _debugSmartInputPlan(SmartInputPlan plan) {
+    assert(() {
+      final smartCommand = plan.command;
+      var selector = 'none';
+      var patch = 'none';
+      if (smartCommand is MutationCommand) {
+        selector = '{title: ${smartCommand.selector.title}, '
+            'amount: ${smartCommand.selector.amount}, '
+            'date: ${smartCommand.selector.date}, '
+            'type: ${smartCommand.selector.transactionType}}';
+        patch = '{title: ${smartCommand.patch.title}, '
+            'amount: ${smartCommand.patch.amount}, '
+            'category: ${smartCommand.patch.category}, '
+            'date: ${smartCommand.patch.date}, '
+            'wallet: ${smartCommand.patch.walletId}}';
+      }
+      debugPrint(
+        '[SmartEntry parse] original="${plan.originalText}" '
+        'normalized="${plan.normalizedText}" '
+        'intent=${plan.parsed.intent.wireName} '
+        'selector=$selector patch=$patch '
+        'amount=${plan.parsed.amount} title="${plan.parsed.title}" '
+        'confidence=${plan.parsed.confidence.toStringAsFixed(3)} '
+        'requiresAsrReview=${plan.requiresAsrReview}',
+      );
+      return true;
+    }());
   }
 
   String _smartEntryTitle(

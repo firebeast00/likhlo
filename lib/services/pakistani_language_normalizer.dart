@@ -75,7 +75,10 @@ class PakistaniLanguageNormalizer {
     'کروڑ': 'crore',
   };
 
-  PakistaniNormalizationResult normalize(String input) {
+  PakistaniNormalizationResult normalize(
+    String input, {
+    bool enableContextualAsrRepairs = false,
+  }) {
     var value = input.trim().toLowerCase();
     final applied = <String>[];
 
@@ -116,6 +119,37 @@ class PakistaniLanguageNormalizer {
       applied,
       'amount_alias',
     );
+
+    final hasAmountContext = RegExp(
+      r'\b(?:\d+(?:[,.]\d+)?|aik|ek|do|teen|tin|chaar|char|paanch|panch|chhay|saat|aath|nau|das|bees|tees|chalees|pachas|saath|sattar|assi|nabbe|hundred|sau|hazar|hazaar|thousand|lakh|crore)\b',
+    ).hasMatch(value);
+    final hasRetailContext = RegExp(
+      r'\b(?:pen|pencil|marker|book|books|milk|food|burger|biryani|petrol|fuel|grocery|groceries|medicine|fee|fees|bill|ticket|shoes|jute)\b',
+    ).hasMatch(value);
+    if (enableContextualAsrRepairs &&
+        hasAmountContext &&
+        hasRetailContext) {
+      value = _replace(
+        value,
+        RegExp(r'\bspain\b'),
+        'spent',
+        applied,
+        'spent_asr_context',
+      );
+    }
+    if (enableContextualAsrRepairs &&
+        hasAmountContext &&
+        RegExp(
+          r'\bpain\b\s+(?:kharida|khareeda|khareed|liya|bought|purchased|add|dalo|daalo|record)\b',
+        ).hasMatch(value)) {
+      value = _replace(
+        value,
+        RegExp(r'\bpain\b'),
+        'pen',
+        applied,
+        'pen_asr_context',
+      );
+    }
 
     const amountLead =
         r'(aik|ek|do|teen|tin|chaar|char|paanch|panch|chhay|saat|aath|nau|\d+)';

@@ -12,5 +12,7 @@ Pakistani speakers, devices, accents, networks, and noise conditions. Add
 audio/provider results without storing names, account identifiers, or complete
 transaction histories.
 
-Primary acceptance metrics are exact amount, intent, wallet/direction, complete
-semantic command accuracy, unsafe execution rate, cutoff rate, and latency.
+Primary acceptance metrics are exact intent, amount and title, wallet/direction,
+complete semantic command accuracy, unsafe execution rate, cutoff rate, and
+latency. Samples may set `allow_auto_execute` to assert that an incomplete or
+ambiguous financial command remains in review instead of touching the ledger.
