@@ -2271,7 +2271,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
-    _speechSession.start();
+    _speechSession.reset();
     _handlingSpeechError = false;
     _restartingSpeech = false;
     _smartInputCtrl.clear();
@@ -2298,6 +2298,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _speechLocaleCandidateIndex = 0;
     if (!mounted) return;
 
+    _speechSession.start();
     setState(() => _isListening = true);
     await HapticFeedback.mediumImpact();
     await _startSpeechListening();

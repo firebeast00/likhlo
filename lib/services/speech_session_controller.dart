@@ -82,6 +82,10 @@ class SpeechSessionController {
 
   SpeechSessionDecision onRecognizerStopped() {
     if (_decisionIssued) return SpeechSessionDecision.none;
+    if (_state != SpeechSessionState.listening &&
+        _state != SpeechSessionState.finalizing) {
+      return SpeechSessionDecision.none;
+    }
     if (_finalTranscript.isNotEmpty) return _emitFinal();
 
     _state = SpeechSessionState.failed;
@@ -91,6 +95,10 @@ class SpeechSessionController {
 
   SpeechSessionDecision onRecognizerError({required bool retryable}) {
     if (_decisionIssued) return SpeechSessionDecision.none;
+    if (_state != SpeechSessionState.listening &&
+        _state != SpeechSessionState.finalizing) {
+      return SpeechSessionDecision.none;
+    }
     if (_finalTranscript.isNotEmpty) return _emitFinal();
 
     if (retryable && _retryCount < maxRetries) {

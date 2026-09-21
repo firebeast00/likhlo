@@ -3,6 +3,18 @@ import 'package:student_expense_manager/services/speech_session_controller.dart'
 
 void main() {
   group('SpeechSessionController', () {
+    test('ignores recognizer callbacks before a session starts', () {
+      final controller = SpeechSessionController();
+
+      final stopped = controller.onRecognizerStopped();
+      final error = controller.onRecognizerError(retryable: true);
+
+      expect(stopped.action, SpeechSessionAction.none);
+      expect(error.action, SpeechSessionAction.none);
+      expect(controller.state, SpeechSessionState.idle);
+      expect(controller.retryCount, 0);
+    });
+
     test('never executes a partial transcript when recognition stops', () {
       final controller = SpeechSessionController()..start();
 
