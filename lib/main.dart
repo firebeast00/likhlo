@@ -18,9 +18,6 @@ import "./services/notification_service.dart";
 import 'providers/settings_provider.dart';
 import 'widgets/app_lock_gate.dart';
 
-
-
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -32,7 +29,8 @@ void main() async {
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
     if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(DebtEntryAdapter());
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(MessEntryAdapter());
-    if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(WalletAdapter()); // 🚀 ADDED (TypeId 8)
+    if (!Hive.isAdapterRegistered(8))
+      Hive.registerAdapter(WalletAdapter()); // 🚀 ADDED (TypeId 8)
 
     await Future.wait([
       Hive.openBox<Expense>('expenses'),
@@ -40,7 +38,6 @@ void main() async {
       Hive.openBox('preferences'),
       Hive.openBox<Wallet>('wallets'),
     ]);
-
   } catch (e) {
     storageError = e;
     debugPrint("Hive Initialization Error: $e");
@@ -91,8 +88,10 @@ class LikhloApp extends ConsumerWidget {
     final primaryColor = Color(themeSettings.$2);
 
     // DYNAMIC THEME TINTING: Mix your active theme color into the dark background and cards
-    final Color darkScaffoldBg = Color.lerp(const Color(0xFF05070B), primaryColor, 0.10)!;
-    final Color darkCardBg = Color.lerp(const Color(0xFF0E1422), primaryColor, 0.18)!;
+    final Color darkScaffoldBg =
+        Color.lerp(const Color(0xFF05070B), primaryColor, 0.10)!;
+    final Color darkCardBg =
+        Color.lerp(const Color(0xFF0E1422), primaryColor, 0.18)!;
 
     return MaterialApp(
       title: 'Likhlo',
@@ -106,7 +105,8 @@ class LikhloApp extends ConsumerWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: primaryColor, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: primaryColor, brightness: Brightness.light),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -142,10 +142,10 @@ class LikhloApp extends ConsumerWidget {
         );
       },
 
-      home: (Hive.box('preferences')
-                  .get('has_onboarded', defaultValue: false) as bool)
-              ? const HomeScreen()
-              : const OnboardingScreen(),
+      home: (Hive.box('preferences').get('has_onboarded', defaultValue: false)
+              as bool)
+          ? const HomeScreen()
+          : const OnboardingScreen(),
     );
   }
 }

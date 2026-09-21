@@ -18,7 +18,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   Widget build(BuildContext context) {
     final stats = ref.watch(statsProvider);
     final settings = ref.watch(settingsProvider);
-    final primaryColor = Color(settings.profileColorValue); // 🛡️ Guaranteed theme color support
+    final primaryColor =
+        Color(settings.profileColorValue); // 🛡️ Guaranteed theme color support
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -29,15 +30,14 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- HEADER ---
-            const Text(
-                "Spending Trends",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5)
-            ),
+            const Text("Spending Trends",
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5)),
             const SizedBox(height: 4),
-            Text(
-                "Your financial overview for the last 6 months",
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13)
-            ),
+            Text("Your financial overview for the last 6 months",
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
             const SizedBox(height: 28),
 
             // --- 6-MONTH BAR CHART CARD ---
@@ -47,88 +47,101 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.12)),
+                  border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.grey.withValues(alpha: 0.12)),
                   boxShadow: [
                     BoxShadow(
-                        color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.03),
+                        color: isDark
+                            ? Colors.black26
+                            : Colors.black.withValues(alpha: 0.03),
                         blurRadius: 15,
-                        offset: const Offset(0, 8)
-                    )
-                  ]
-              ),
-              child: BarChart(
-                  BarChartData(
-                      alignment: BarChartAlignment.spaceAround,
-                      maxY: stats.maxMonthTotal == 0 ? 100 : stats.maxMonthTotal * 1.2,
-                      barTouchData: BarTouchData(
-                        touchTooltipData: BarTouchTooltipData(
-                            tooltipBgColor: isDark ? Colors.grey.shade800 : Colors.black87,
-                            tooltipRoundedRadius: 12,
-                            tooltipMargin: 8,
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              return BarTooltipItem(
-                                  "Rs. ${rod.toY.toStringAsFixed(0)}",
-                                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
-                              );
-                            }
-                        ),
-                        touchCallback: (FlTouchEvent event, barTouchResponse) {
-                          setState(() {
-                            if (barTouchResponse != null && barTouchResponse.spot != null && event is FlTapUpEvent) {
-                              _touchedBarIndex = barTouchResponse.spot!.touchedBarGroupIndex;
-                            } else {
-                              _touchedBarIndex = -1;
-                            }
-                          });
+                        offset: const Offset(0, 8))
+                  ]),
+              child: BarChart(BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: stats.maxMonthTotal == 0
+                      ? 100
+                      : stats.maxMonthTotal * 1.2,
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                        tooltipBgColor:
+                            isDark ? Colors.grey.shade800 : Colors.black87,
+                        tooltipRoundedRadius: 12,
+                        tooltipMargin: 8,
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          return BarTooltipItem(
+                              "Rs. ${rod.toY.toStringAsFixed(0)}",
+                              const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13));
+                        }),
+                    touchCallback: (FlTouchEvent event, barTouchResponse) {
+                      setState(() {
+                        if (barTouchResponse != null &&
+                            barTouchResponse.spot != null &&
+                            event is FlTapUpEvent) {
+                          _touchedBarIndex =
+                              barTouchResponse.spot!.touchedBarGroupIndex;
+                        } else {
+                          _touchedBarIndex = -1;
+                        }
+                      });
+                    },
+                  ),
+                  titlesData: FlTitlesData(
+                      leftTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        interval: 1,
+                        getTitlesWidget: (val, meta) {
+                          if (val == val.roundToDouble() &&
+                              val.toInt() >= 0 &&
+                              val.toInt() < stats.monthLabels.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(stats.monthLabels[val.toInt()],
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade500)),
+                            );
+                          }
+                          return const SizedBox();
                         },
-                      ),
-                      titlesData: FlTitlesData(
-                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 40,
-                                interval: 1,
-                                getTitlesWidget: (val, meta) {
-                                  if (val == val.roundToDouble() && val.toInt() >= 0 && val.toInt() < stats.monthLabels.length) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: Text(
-                                          stats.monthLabels[val.toInt()],
-                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade500)
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox();
-                                },
-                              )
-                          )
-                      ),
-                      borderData: FlBorderData(show: false),
-                      gridData: const FlGridData(show: false),
-                      barGroups: List.generate(stats.monthlyTotals.length, (i) {
-                        bool isTouched = i == _touchedBarIndex;
-                        return BarChartGroupData(
-                            x: i,
-                            barRods: [
-                              BarChartRodData(
-                                toY: stats.monthlyTotals[i],
-                                color: isTouched ? primaryColor : (i == 5 ? primaryColor.withValues(alpha: 0.8) : primaryColor.withValues(alpha: 0.25)),
-                                width: 14,
-                                borderRadius: BorderRadius.circular(8),
-                                backDrawRodData: BackgroundBarChartRodData(
-                                    show: true,
-                                    toY: stats.maxMonthTotal * 1.2,
-                                    color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.withValues(alpha: 0.08)
-                                ),
-                              )
-                            ]
-                        );
-                      })
-                  )
-              ),
+                      ))),
+                  borderData: FlBorderData(show: false),
+                  gridData: const FlGridData(show: false),
+                  barGroups: List.generate(stats.monthlyTotals.length, (i) {
+                    bool isTouched = i == _touchedBarIndex;
+                    return BarChartGroupData(x: i, barRods: [
+                      BarChartRodData(
+                        toY: stats.monthlyTotals[i],
+                        color: isTouched
+                            ? primaryColor
+                            : (i == 5
+                                ? primaryColor.withValues(alpha: 0.8)
+                                : primaryColor.withValues(alpha: 0.25)),
+                        width: 14,
+                        borderRadius: BorderRadius.circular(8),
+                        backDrawRodData: BackgroundBarChartRodData(
+                            show: true,
+                            toY: stats.maxMonthTotal * 1.2,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.03)
+                                : Colors.grey.withValues(alpha: 0.08)),
+                      )
+                    ]);
+                  }))),
             ),
             const SizedBox(height: 36),
 
@@ -137,14 +150,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text(
-                    "This Month",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.5)
-                ),
-                Text(
-                    "Rs. ${stats.totalSpentThisMonth.toStringAsFixed(0)}",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: primaryColor)
-                ),
+                const Text("This Month",
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5)),
+                Text("Rs. ${stats.totalSpentThisMonth.toStringAsFixed(0)}",
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: primaryColor)),
               ],
             ),
             const SizedBox(height: 8),
@@ -157,13 +172,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 40),
                       child: Column(
                         children: [
-                          Icon(Icons.pie_chart_outline_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
+                          Icon(Icons.pie_chart_outline_rounded,
+                              size: 60,
+                              color: Colors.grey.withValues(alpha: 0.3)),
                           const SizedBox(height: 12),
-                          Text("No data for this month", style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+                          Text("No data for this month",
+                              style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontWeight: FontWeight.w500)),
                         ],
-                      )
-                  )
-              ),
+                      ))),
 
             if (stats.totalSpentThisMonth > 0) ...[
               // --- SLEEK DONUT CHART ---
@@ -176,40 +194,57 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text("Total", style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                        Text("Total",
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12)),
                         const SizedBox(height: 4),
                         Text(
                             "Rs. ${stats.totalSpentThisMonth.toStringAsFixed(0)}",
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87)
-                        ),
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: isDark ? Colors.white : Colors.black87)),
                       ],
                     ),
                     PieChart(
                       PieChartData(
-                        pieTouchData: PieTouchData(touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                        pieTouchData: PieTouchData(touchCallback:
+                            (FlTouchEvent event, pieTouchResponse) {
                           setState(() {
-                            if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
+                            if (!event.isInterestedForInteractions ||
+                                pieTouchResponse == null ||
+                                pieTouchResponse.touchedSection == null) {
                               _touchedIndex = -1;
                               return;
                             }
-                            _touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                            _touchedIndex = pieTouchResponse
+                                .touchedSection!.touchedSectionIndex;
                           });
                         }),
                         borderData: FlBorderData(show: false),
                         sectionsSpace: 4,
-                        centerSpaceRadius: 75, // Large center space for elegant donut look
-                        sections: List.generate(stats.sortedCategories.length, (i) {
+                        centerSpaceRadius:
+                            75, // Large center space for elegant donut look
+                        sections:
+                            List.generate(stats.sortedCategories.length, (i) {
                           final isTouched = i == _touchedIndex;
                           final radius = isTouched ? 28.0 : 20.0;
-                          final double percent = (stats.sortedCategories[i].value / stats.totalSpentThisMonth) * 100;
-                          final Color color = _getCategoryColor(i, primaryColor);
+                          final double percent =
+                              (stats.sortedCategories[i].value /
+                                      stats.totalSpentThisMonth) *
+                                  100;
+                          final Color color =
+                              _getCategoryColor(i, primaryColor);
 
                           return PieChartSectionData(
                             color: color,
                             value: stats.sortedCategories[i].value,
                             title: "", // Hide default titles for a cleaner look
                             radius: radius,
-                            badgeWidget: isTouched ? _buildBadge(stats.sortedCategories[i].key, percent, color, isDark) : null,
+                            badgeWidget: isTouched
+                                ? _buildBadge(stats.sortedCategories[i].key,
+                                    percent, color, isDark)
+                                : null,
                             badgePositionPercentageOffset: 1.6,
                           );
                         }),
@@ -233,15 +268,18 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.12)),
+                      border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.grey.withValues(alpha: 0.12)),
                       boxShadow: [
                         BoxShadow(
-                            color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.02),
+                            color: isDark
+                                ? Colors.black26
+                                : Colors.black.withValues(alpha: 0.02),
                             blurRadius: 10,
-                            offset: const Offset(0, 4)
-                        )
-                      ]
-                  ),
+                            offset: const Offset(0, 4))
+                      ]),
                   child: Column(
                     children: [
                       Row(
@@ -249,26 +287,33 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           Container(
                               width: 14,
                               height: 14,
-                              decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 2))])
-                          ),
+                              decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: color.withValues(alpha: 0.4),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2))
+                                  ])),
                           const SizedBox(width: 14),
                           Expanded(
                               child: Text(
-                                category,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              )
-                          ),
-                          Text(
-                              "${(percent * 100).toStringAsFixed(1)}%",
-                              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade500, fontSize: 13)
-                          ),
+                            category,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 15),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )),
+                          Text("${(percent * 100).toStringAsFixed(1)}%",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade500,
+                                  fontSize: 13)),
                           const SizedBox(width: 12),
-                          Text(
-                              "Rs. ${amount.toStringAsFixed(0)}",
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)
-                          ),
+                          Text("Rs. ${amount.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900, fontSize: 15)),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -276,7 +321,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
                           value: percent,
-                          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : color.withValues(alpha: 0.1),
+                          backgroundColor: isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : color.withValues(alpha: 0.1),
                           valueColor: AlwaysStoppedAnimation(color),
                           minHeight: 6,
                         ),
@@ -305,18 +352,14 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           BoxShadow(
               color: color.withValues(alpha: 0.2),
               blurRadius: 8,
-              offset: const Offset(0, 4)
-          )
+              offset: const Offset(0, 4))
         ],
       ),
-      child: Text(
-          "$text (${percent.toStringAsFixed(0)}%)",
+      child: Text("$text (${percent.toStringAsFixed(0)}%)",
           style: TextStyle(
               color: isDark ? Colors.white : Colors.black87,
               fontSize: 11,
-              fontWeight: FontWeight.bold
-          )
-      ),
+              fontWeight: FontWeight.bold)),
     );
   }
 

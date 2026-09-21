@@ -15,10 +15,26 @@ class PakistaniNormalizationResult {
 /// substitutions such as replacing every occurrence of "show" with "so".
 class PakistaniLanguageNormalizer {
   static const _urduDigits = {
-    '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
-    '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
-    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
-    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+    '۰': '0',
+    '۱': '1',
+    '۲': '2',
+    '۳': '3',
+    '۴': '4',
+    '۵': '5',
+    '۶': '6',
+    '۷': '7',
+    '۸': '8',
+    '۹': '9',
+    '٠': '0',
+    '١': '1',
+    '٢': '2',
+    '٣': '3',
+    '٤': '4',
+    '٥': '5',
+    '٦': '6',
+    '٧': '7',
+    '٨': '8',
+    '٩': '9',
   };
 
   static const _urduPhrases = <String, String>{
@@ -75,9 +91,10 @@ class PakistaniLanguageNormalizer {
     'کروڑ': 'crore',
   };
 
-  static final List<MapEntry<String, String>> _sortedUrduPhrases =
-      _urduPhrases.entries.toList(growable: false)
-        ..sort((first, second) => second.key.length.compareTo(first.key.length));
+  static final List<MapEntry<String, String>> _sortedUrduPhrases = _urduPhrases
+      .entries
+      .toList(growable: false)
+    ..sort((first, second) => second.key.length.compareTo(first.key.length));
 
   PakistaniNormalizationResult normalize(
     String input, {
@@ -128,9 +145,7 @@ class PakistaniLanguageNormalizer {
     final hasRetailContext = RegExp(
       r'\b(?:pen|pencil|marker|book|books|milk|food|burger|biryani|petrol|fuel|grocery|groceries|medicine|fee|fees|bill|ticket|shoes|jute)\b',
     ).hasMatch(value);
-    if (enableContextualAsrRepairs &&
-        hasAmountContext &&
-        hasRetailContext) {
+    if (enableContextualAsrRepairs && hasAmountContext && hasRetailContext) {
       value = _replace(
         value,
         RegExp(r'\bspain\b'),

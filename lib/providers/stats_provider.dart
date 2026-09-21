@@ -25,8 +25,8 @@ final statsProvider = Provider<ExpenseStats>((ref) {
   final now = DateTime.now();
 
   final monthlyTotals = List<double>.filled(6, 0);
-  final monthLabels = List<String>.generate(6, (i) =>
-      DateFormat.MMM().format(DateTime(now.year, now.month - 5 + i, 1)));
+  final monthLabels = List<String>.generate(6,
+      (i) => DateFormat.MMM().format(DateTime(now.year, now.month - 5 + i, 1)));
   final categoryTotals = <String, double>{};
   double totalSpentThisMonth = 0;
   double maxMonthTotal = 0;

@@ -17,10 +17,8 @@ class VoicePrivacySettings {
 
   factory VoicePrivacySettings.read(Box box) {
     return VoicePrivacySettings(
-      cloudSpeechEnabled:
-          box.get(cloudSpeechKey, defaultValue: false) == true,
-      diagnosticsOptIn:
-          box.get(diagnosticsKey, defaultValue: false) == true,
+      cloudSpeechEnabled: box.get(cloudSpeechKey, defaultValue: false) == true,
+      diagnosticsOptIn: box.get(diagnosticsKey, defaultValue: false) == true,
       spokenFeedbackEnabled:
           box.get(spokenFeedbackKey, defaultValue: false) == true,
     );

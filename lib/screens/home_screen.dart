@@ -40,10 +40,10 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.likhlo/quick_tile');
-  static const _smartEntryDefaultAccountKey =
-      'smart_entry_default_wallet_id';
+  static const _smartEntryDefaultAccountKey = 'smart_entry_default_wallet_id';
   static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
   static const _smartEntryLearningKey = 'smart_entry_learning_v1';
   String _currentView = 'Dashboard';
@@ -100,7 +100,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             .toList(growable: false)
         : const [];
     _loadSmartEntryLearning();
-    _fabController = AnimationController(vsync: this, duration: const Duration(milliseconds: 200), lowerBound: 0.0, upperBound: 0.1);
+    _fabController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 200),
+        lowerBound: 0.0,
+        upperBound: 0.1);
     _fabScale = Tween<double>(begin: 1.0, end: 0.95).animate(_fabController);
 
     const QuickActions quickActions = QuickActions();
@@ -115,8 +119,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     });
 
     quickActions.setShortcutItems(<ShortcutItem>[
-      const ShortcutItem(type: 'action_voice_log', localizedTitle: 'Voice Log', icon: 'ic_mic'),
-      const ShortcutItem(type: 'action_add_expense', localizedTitle: 'Add Transaction', icon: 'ic_add'),
+      const ShortcutItem(
+          type: 'action_voice_log',
+          localizedTitle: 'Voice Log',
+          icon: 'ic_mic'),
+      const ShortcutItem(
+          type: 'action_add_expense',
+          localizedTitle: 'Add Transaction',
+          icon: 'ic_add'),
     ]);
     _setupNativeQuickTile();
 
@@ -144,7 +154,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   void _setupNativeQuickTile() {
     platform.invokeMethod<String>('getQuickAction').then((action) {
       if (action == 'add_expense') {
-        Future.delayed(const Duration(milliseconds: 500), () => _showAddOrEditModal());
+        Future.delayed(
+            const Duration(milliseconds: 500), () => _showAddOrEditModal());
       }
     }).catchError((Object error) {
       debugPrint("Quick Tile Error: $error");
@@ -185,7 +196,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
       final totalAvailable = wallets.fold<double>(
         0,
-            (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+        (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
       );
 
       double spentToday = 0;
@@ -243,9 +254,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (_learnedSmartEntryPreferences.length > 200) {
       final oldest = _learnedSmartEntryPreferences.entries.reduce(
-        (first, second) => first.value.updatedAt <= second.value.updatedAt
-            ? first
-            : second,
+        (first, second) =>
+            first.value.updatedAt <= second.value.updatedAt ? first : second,
       );
       _learnedSmartEntryPreferences.remove(oldest.key);
     }
@@ -274,10 +284,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   void _selectCategory(String category, int index) {
     _dismissKeyboard();
     setState(() => _selectedCategoryTab = category);
-    double offset = (index * 70.0) - (MediaQuery.of(context).size.width / 2) + 35;
+    double offset =
+        (index * 70.0) - (MediaQuery.of(context).size.width / 2) + 35;
     if (offset < 0) offset = 0;
     if (_categoryScrollCtrl.hasClients) {
-      _categoryScrollCtrl.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _categoryScrollCtrl.animateTo(offset,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     }
   }
 
@@ -323,21 +335,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(Icons.category_rounded, color: primaryColor, size: 20)),
+            Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle),
+                child: Icon(Icons.category_rounded,
+                    color: primaryColor, size: 20)),
             const SizedBox(width: 12),
-            const Expanded(child: Text("New Category", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+            const Expanded(
+                child: Text("New Category",
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
           ],
         ),
-        content: _buildModernInput(catCtrl, "Category Name", Icons.new_label_rounded, primaryColor),
+        content: _buildModernInput(
+            catCtrl, "Category Name", Icons.new_label_rounded, primaryColor),
         actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
           Row(
             children: [
-              Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey)))),
+              Expanded(
+                  child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("Cancel",
+                          style: TextStyle(color: Colors.grey)))),
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 12)),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12)),
                   onPressed: () {
                     if (catCtrl.text.trim().isNotEmpty) {
                       final added = ref
@@ -353,7 +384,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       Navigator.pop(ctx);
                       Future.delayed(const Duration(milliseconds: 300), () {
                         if (_categoryScrollCtrl.hasClients) {
-                          _categoryScrollCtrl.animateTo(_categoryScrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                          _categoryScrollCtrl.animateTo(
+                              _categoryScrollCtrl.position.maxScrollExtent,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut);
                         }
                       });
                     }
@@ -447,14 +481,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
     String selectedCategory =
         existing?.category ?? prefilledCategory ?? "General";
-    DateTime selectedDate =
-        existing?.date ?? prefilledDate ?? DateTime.now();
+    DateTime selectedDate = existing?.date ?? prefilledDate ?? DateTime.now();
 
     String transactionType = existing?.type ?? initialType;
 
     final wallets = ref.read(walletProvider);
-    String selectedWalletId =
-        existing?.walletId ?? preselectedWalletId ?? '';
+    String selectedWalletId = existing?.walletId ?? preselectedWalletId ?? '';
     String transferToWalletId = '';
 
     final categories = ref.read(categoryProvider);
@@ -466,19 +498,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (!wallets.any((w) => w.id == selectedWalletId) && wallets.isNotEmpty) {
       final cashWallet = wallets.cast<Wallet?>().firstWhere(
-            (w) => w != null && !w.isBackup && (w.walletType == 'cash' || w.name.toLowerCase().contains('cash')),
-        orElse: () => null,
-      );
+            (w) =>
+                w != null &&
+                !w.isBackup &&
+                (w.walletType == 'cash' ||
+                    w.name.toLowerCase().contains('cash')),
+            orElse: () => null,
+          );
 
       if (cashWallet != null) {
         selectedWalletId = cashWallet.id;
       } else {
-        selectedWalletId = wallets.firstWhere((w) => !w.isBackup, orElse: () => wallets.first).id;
+        selectedWalletId = wallets
+            .firstWhere((w) => !w.isBackup, orElse: () => wallets.first)
+            .id;
       }
     }
 
     if (wallets.length > 1) {
-      transferToWalletId = wallets.firstWhere((w) => w.id != selectedWalletId, orElse: () => wallets.last).id;
+      transferToWalletId = wallets
+          .firstWhere((w) => w.id != selectedWalletId,
+              orElse: () => wallets.last)
+          .id;
     }
 
     return showModalBottomSheet<bool>(
@@ -486,278 +527,425 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (ctx) => StatefulBuilder(
-          builder: (context, setModalState) => Container(
-            decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, -10))]
-            ),
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 24, left: 24, right: 24, top: 12),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(width: 48, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)), margin: const EdgeInsets.only(bottom: 24)),
-
-                  if (reviewMessage != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withValues(alpha: 0.09),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: primaryColor.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.fact_check_outlined,
-                            color: primaryColor,
-                            size: 21,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Review before saving',
-                                  style: TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  reviewMessage,
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                    fontSize: 12.5,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  Container(
-                    decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
-                    padding: const EdgeInsets.all(4),
-                    child: Row(
-                      children: [
-                        _buildSegment(transactionType, 'expense', "Expense", Colors.red, () => setModalState(() => transactionType = 'expense')),
-                        _buildSegment(transactionType, 'income', "Income", Colors.green, () => setModalState(() => transactionType = 'income')),
-                        _buildSegment(transactionType, 'transfer', "Transfer", Colors.blue, () => setModalState(() => transactionType = 'transfer')),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  if (transactionType != 'transfer')
-                    _buildModernInput(titleCtrl, "Title", Icons.title_rounded, primaryColor)
-                  else
-                    const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text("Moving money between wallets", style: TextStyle(color: Colors.grey, fontSize: 13)))),
-
-                  const SizedBox(height: 12),
-                  _buildModernInput(amountCtrl, "Amount", Icons.attach_money_rounded, primaryColor, isNumber: true),
-                  const SizedBox(height: 12),
-
-                  if (transactionType == 'transfer') ...[
-                    _buildWalletDropdown(wallets, selectedWalletId, "From Wallet", (v) => setModalState(() => selectedWalletId = v!)),
-                    const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Icon(Icons.arrow_downward_rounded, color: Colors.grey)),
-                    _buildWalletDropdown(wallets, transferToWalletId, "To Wallet", (v) => setModalState(() => transferToWalletId = v!)),
-                  ] else ...[
-                    _buildWalletDropdown(wallets, selectedWalletId, "Wallet", (v) => setModalState(() => selectedWalletId = v!)),
-                  ],
-                  const SizedBox(height: 12),
-
-                  Row(
+              builder: (context, setModalState) => Container(
+                decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(32)),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 30,
+                          offset: const Offset(0, -10))
+                    ]),
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+                    left: 24,
+                    right: 24,
+                    top: 12),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        flex: 1,
-                        child: GestureDetector(
-                          onTap: () async {
-                            final picked = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(2020), lastDate: DateTime(2030));
-                            if (picked != null) setModalState(() => selectedDate = picked);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
-                            child: Row(
-                              children: [
-                                Icon(Icons.calendar_today_rounded, color: Colors.grey.shade500, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(DateFormat.yMMMd().format(selectedDate), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis)),
-                              ],
+                      Container(
+                          width: 48,
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(2)),
+                          margin: const EdgeInsets.only(bottom: 24)),
+                      if (reviewMessage != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.09),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: primaryColor.withValues(alpha: 0.2),
                             ),
                           ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.fact_check_outlined,
+                                color: primaryColor,
+                                size: 21,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Review before saving',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      reviewMessage,
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                        fontSize: 12.5,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      Container(
+                        decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.all(4),
+                        child: Row(
+                          children: [
+                            _buildSegment(
+                                transactionType,
+                                'expense',
+                                "Expense",
+                                Colors.red,
+                                () => setModalState(
+                                    () => transactionType = 'expense')),
+                            _buildSegment(
+                                transactionType,
+                                'income',
+                                "Income",
+                                Colors.green,
+                                () => setModalState(
+                                    () => transactionType = 'income')),
+                            _buildSegment(
+                                transactionType,
+                                'transfer',
+                                "Transfer",
+                                Colors.blue,
+                                () => setModalState(
+                                    () => transactionType = 'transfer')),
+                          ],
                         ),
                       ),
-                      if (transactionType == 'expense') ...[
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 1,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: categories.contains(selectedCategory) ? selectedCategory : (categories.isNotEmpty ? categories.first : "General"),
-                                isExpanded: true,
-                                icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey.shade500),
-                                items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis))).toList(),
-                                onChanged: (v) => setModalState(() => selectedCategory = v!),
+                      const SizedBox(height: 20),
+                      if (transactionType != 'transfer')
+                        _buildModernInput(titleCtrl, "Title",
+                            Icons.title_rounded, primaryColor)
+                      else
+                        const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                                padding: EdgeInsets.only(left: 8, bottom: 8),
+                                child: Text("Moving money between wallets",
+                                    style: TextStyle(
+                                        color: Colors.grey, fontSize: 13)))),
+                      const SizedBox(height: 12),
+                      _buildModernInput(amountCtrl, "Amount",
+                          Icons.attach_money_rounded, primaryColor,
+                          isNumber: true),
+                      const SizedBox(height: 12),
+                      if (transactionType == 'transfer') ...[
+                        _buildWalletDropdown(
+                            wallets,
+                            selectedWalletId,
+                            "From Wallet",
+                            (v) => setModalState(() => selectedWalletId = v!)),
+                        const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Icon(Icons.arrow_downward_rounded,
+                                color: Colors.grey)),
+                        _buildWalletDropdown(
+                            wallets,
+                            transferToWalletId,
+                            "To Wallet",
+                            (v) =>
+                                setModalState(() => transferToWalletId = v!)),
+                      ] else ...[
+                        _buildWalletDropdown(
+                            wallets,
+                            selectedWalletId,
+                            "Wallet",
+                            (v) => setModalState(() => selectedWalletId = v!)),
+                      ],
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: GestureDetector(
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030));
+                                if (picked != null)
+                                  setModalState(() => selectedDate = picked);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                    color: Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(16)),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.calendar_today_rounded,
+                                        color: Colors.grey.shade500, size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                        child: Text(
+                                            DateFormat.yMMMd()
+                                                .format(selectedDate),
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13),
+                                            overflow: TextOverflow.ellipsis)),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
+                          if (transactionType == 'expense') ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 1,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                decoration: BoxDecoration(
+                                    color: Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(16)),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: categories.contains(selectedCategory)
+                                        ? selectedCategory
+                                        : (categories.isNotEmpty
+                                            ? categories.first
+                                            : "General"),
+                                    isExpanded: true,
+                                    icon: Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: Colors.grey.shade500),
+                                    items: categories
+                                        .map((c) => DropdownMenuItem(
+                                            value: c,
+                                            child: Text(c,
+                                                style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight:
+                                                        FontWeight.w500),
+                                                overflow:
+                                                    TextOverflow.ellipsis)))
+                                        .toList(),
+                                    onChanged: (v) => setModalState(
+                                        () => selectedCategory = v!),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: transactionType == 'transfer'
+                                  ? Colors.blue
+                                  : primaryColor,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16))),
+                          onPressed: () async {
+                            final amt = double.tryParse(amountCtrl.text.trim());
+                            if (amt == null || !amt.isFinite || amt <= 0) {
+                              _showTransactionError(
+                                  'Enter a valid amount above zero.');
+                              return;
+                            }
+                            if (wallets.isEmpty) {
+                              _showTransactionError('Create a wallet first.');
+                              return;
+                            }
+
+                            if (transactionType == 'expense') {
+                              final currentBalance = ref
+                                  .read(walletProvider.notifier)
+                                  .getBalanceForWallet(selectedWalletId);
+                              final reusableAmount = existing != null &&
+                                      existing.type == 'expense' &&
+                                      existing.walletId == selectedWalletId
+                                  ? existing.amount
+                                  : 0.0;
+                              final available = currentBalance + reusableAmount;
+                              if (amt > available) {
+                                final accountName = wallets
+                                    .firstWhere((w) => w.id == selectedWalletId)
+                                    .name;
+                                _showTransactionError(
+                                  'Available in $accountName: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amt.toStringAsFixed(0)}. Add money to this wallet or enter a smaller amount.',
+                                  title: 'Insufficient balance',
+                                );
+                                return;
+                              }
+                            }
+
+                            Expense? preferenceEntry;
+                            if (transactionType == 'transfer') {
+                              if (wallets.length < 2) {
+                                _showTransactionError(
+                                    'Create at least two wallets to transfer money.');
+                                return;
+                              }
+                              if (selectedWalletId == transferToWalletId) {
+                                _showTransactionError(
+                                    'Choose two different wallets.');
+                                return;
+                              }
+                              final available = ref
+                                  .read(walletProvider.notifier)
+                                  .getBalanceForWallet(selectedWalletId);
+                              if (amt > available) {
+                                _showTransactionError(
+                                  'Available in the source wallet: Rs. ${available.toStringAsFixed(0)}. Enter a smaller amount or add money first.',
+                                  title: 'Insufficient balance',
+                                );
+                                return;
+                              }
+                              final fromName = wallets
+                                  .firstWhere((w) => w.id == selectedWalletId)
+                                  .name;
+                              final toName = wallets
+                                  .firstWhere((w) => w.id == transferToWalletId)
+                                  .name;
+                              final transferId = const Uuid().v4();
+
+                              final transferResult = await ref
+                                  .read(transactionExecutorProvider)
+                                  .execute(CreateTransferCommand(
+                                    outgoing: Expense(
+                                        id: '${transferId}_out',
+                                        title: coreTransactionTitle(
+                                            "Transfer to $toName"),
+                                        amount: amt,
+                                        date: selectedDate,
+                                        category: "Transfer",
+                                        colorValue: Colors.blue.toARGB32(),
+                                        type: 'expense',
+                                        walletId: selectedWalletId),
+                                    incoming: Expense(
+                                        id: '${transferId}_in',
+                                        title: coreTransactionTitle(
+                                            "Transfer from $fromName"),
+                                        amount: amt,
+                                        date: selectedDate,
+                                        category: "Transfer",
+                                        colorValue: Colors.blue.toARGB32(),
+                                        type: 'income',
+                                        walletId: transferToWalletId),
+                                  ));
+                              if (!transferResult.succeeded) {
+                                _showTransactionError(
+                                  'The source wallet no longer has enough money for this transfer.',
+                                  title: 'Transfer not saved',
+                                );
+                                return;
+                              }
+                            } else {
+                              String finalTitle =
+                                  coreTransactionTitle(titleCtrl.text);
+                              if (finalTitle.isEmpty) {
+                                if (transactionType == 'income') {
+                                  finalTitle = 'Income / Allowance';
+                                } else {
+                                  _showTransactionError(
+                                      'Enter a transaction title.');
+                                  return;
+                                }
+                              }
+
+                              final finalCategory = transactionType == 'income'
+                                  ? 'Income / Allowance'
+                                  : selectedCategory;
+                              if (existing == null) {
+                                final newEntry = Expense(
+                                    id: const Uuid().v4(),
+                                    title: finalTitle,
+                                    amount: amt,
+                                    date: selectedDate,
+                                    category: finalCategory,
+                                    colorValue: primaryColor.toARGB32(),
+                                    type: transactionType,
+                                    walletId: selectedWalletId);
+                                final createResult = await ref
+                                    .read(transactionExecutorProvider)
+                                    .execute(
+                                        CreateTransactionCommand(newEntry));
+                                if (!createResult.succeeded) {
+                                  _showTransactionError(
+                                    'Check the selected wallet balance and try again.',
+                                    title: 'Transaction not saved',
+                                  );
+                                  return;
+                                }
+                                preferenceEntry = newEntry;
+                              } else {
+                                final editedEntry = Expense(
+                                    id: existing.id,
+                                    title: finalTitle,
+                                    amount: amt,
+                                    date: selectedDate,
+                                    category: finalCategory,
+                                    colorValue: existing.colorValue,
+                                    type: transactionType,
+                                    walletId: selectedWalletId);
+                                final updateResult = await ref
+                                    .read(transactionExecutorProvider)
+                                    .execute(UpdateTransactionCommand(
+                                      existingId: existing.id,
+                                      updated: editedEntry,
+                                    ));
+                                if (!updateResult.succeeded) {
+                                  _showTransactionError(
+                                      'This transaction no longer exists.');
+                                  return;
+                                }
+                                preferenceEntry = editedEntry;
+                              }
+                            }
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                            if (preferenceEntry != null) {
+                              unawaited(
+                                _rememberSmartEntryPreference(preferenceEntry),
+                              );
+                            }
+                            unawaited(_refreshSmartEntryReminders());
+                          },
+                          child: Text(
+                              transactionType == 'transfer'
+                                  ? "Complete Transfer"
+                                  : "Save Transaction",
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.bold)),
                         ),
-                      ]
+                      )
                     ],
                   ),
-
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: double.infinity, height: 52,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: transactionType == 'transfer' ? Colors.blue : primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                      onPressed: () async {
-                        final amt = double.tryParse(amountCtrl.text.trim());
-                        if (amt == null || !amt.isFinite || amt <= 0) {
-                          _showTransactionError('Enter a valid amount above zero.');
-                          return;
-                        }
-                        if (wallets.isEmpty) {
-                          _showTransactionError('Create a wallet first.');
-                          return;
-                        }
-
-                        if (transactionType == 'expense') {
-                          final currentBalance = ref
-                              .read(walletProvider.notifier)
-                              .getBalanceForWallet(selectedWalletId);
-                          final reusableAmount = existing != null &&
-                                  existing.type == 'expense' &&
-                                  existing.walletId == selectedWalletId
-                              ? existing.amount
-                              : 0.0;
-                          final available = currentBalance + reusableAmount;
-                          if (amt > available) {
-                            final accountName = wallets
-                                .firstWhere((w) => w.id == selectedWalletId)
-                                .name;
-                            _showTransactionError(
-                              'Available in $accountName: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amt.toStringAsFixed(0)}. Add money to this wallet or enter a smaller amount.',
-                              title: 'Insufficient balance',
-                            );
-                            return;
-                          }
-                        }
-
-                        Expense? preferenceEntry;
-                        if (transactionType == 'transfer') {
-                          if (wallets.length < 2) {
-                            _showTransactionError('Create at least two wallets to transfer money.');
-                            return;
-                          }
-                          if (selectedWalletId == transferToWalletId) {
-                            _showTransactionError('Choose two different wallets.');
-                            return;
-                          }
-                          final available = ref
-                              .read(walletProvider.notifier)
-                              .getBalanceForWallet(selectedWalletId);
-                          if (amt > available) {
-                            _showTransactionError(
-                              'Available in the source wallet: Rs. ${available.toStringAsFixed(0)}. Enter a smaller amount or add money first.',
-                              title: 'Insufficient balance',
-                            );
-                            return;
-                          }
-                          final fromName = wallets.firstWhere((w) => w.id == selectedWalletId).name;
-                          final toName = wallets.firstWhere((w) => w.id == transferToWalletId).name;
-                          final transferId = const Uuid().v4();
-
-                          final transferResult = await ref
-                              .read(transactionExecutorProvider)
-                              .execute(CreateTransferCommand(
-                                outgoing: Expense(id: '${transferId}_out', title: coreTransactionTitle("Transfer to $toName"), amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
-                                incoming: Expense(id: '${transferId}_in', title: coreTransactionTitle("Transfer from $fromName"), amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
-                              ));
-                          if (!transferResult.succeeded) {
-                            _showTransactionError(
-                              'The source wallet no longer has enough money for this transfer.',
-                              title: 'Transfer not saved',
-                            );
-                            return;
-                          }
-                        } else {
-                          String finalTitle =
-                              coreTransactionTitle(titleCtrl.text);
-                          if (finalTitle.isEmpty) {
-                            if (transactionType == 'income') {
-                              finalTitle = 'Income / Allowance';
-                            } else {
-                              _showTransactionError('Enter a transaction title.');
-                              return;
-                            }
-                          }
-
-                          final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
-                          if (existing == null) {
-                            final newEntry = Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId);
-                            final createResult = await ref
-                                .read(transactionExecutorProvider)
-                                .execute(CreateTransactionCommand(newEntry));
-                            if (!createResult.succeeded) {
-                              _showTransactionError(
-                                'Check the selected wallet balance and try again.',
-                                title: 'Transaction not saved',
-                              );
-                              return;
-                            }
-                            preferenceEntry = newEntry;
-                          } else {
-                            final editedEntry = Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId);
-                            final updateResult = await ref
-                                .read(transactionExecutorProvider)
-                                .execute(UpdateTransactionCommand(
-                                  existingId: existing.id,
-                                  updated: editedEntry,
-                                ));
-                            if (!updateResult.succeeded) {
-                              _showTransactionError('This transaction no longer exists.');
-                              return;
-                            }
-                            preferenceEntry = editedEntry;
-                          }
-                        }
-                        if (ctx.mounted) Navigator.pop(ctx, true);
-                        if (preferenceEntry != null) {
-                          unawaited(
-                            _rememberSmartEntryPreference(preferenceEntry),
-                          );
-                        }
-                        unawaited(_refreshSmartEntryReminders());
-                      },
-                      child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                    ),
-                  )
-                ],
+                ),
               ),
-            ),
-          ),
-        )
-    );
+            ));
   }
 
   void _showTransactionError(
@@ -837,7 +1025,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildSegment(String current, String type, String label, Color color, VoidCallback onTap) {
+  Widget _buildSegment(String current, String type, String label, Color color,
+      VoidCallback onTap) {
     bool isActive = current == type;
     return Expanded(
       child: GestureDetector(
@@ -845,34 +1034,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(color: isActive ? color.withValues(alpha: 0.15) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
-          child: Center(child: Text(label, style: TextStyle(color: isActive ? color : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))),
+          decoration: BoxDecoration(
+              color:
+                  isActive ? color.withValues(alpha: 0.15) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12)),
+          child: Center(
+              child: Text(label,
+                  style: TextStyle(
+                      color: isActive ? color : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12))),
         ),
       ),
     );
   }
 
-  Widget _buildWalletDropdown(List<Wallet> wallets, String value, String hint, Function(String?) onChanged) {
+  Widget _buildWalletDropdown(List<Wallet> wallets, String value, String hint,
+      Function(String?) onChanged) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.withValues(alpha: 0.1))),
+      decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.1))),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: wallets.any((w) => w.id == value) ? value : wallets.first.id,
           isExpanded: true,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey.shade500),
-          items: wallets.map((w) => DropdownMenuItem(value: w.id, child: Row(children: [
-            Icon(w.isBackup ? Icons.shield_rounded : Icons.account_balance_wallet_rounded, size: 18, color: Color(w.colorValue)),
-            const SizedBox(width: 12),
-            Text(w.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))
-          ]))).toList(),
+          icon: Icon(Icons.keyboard_arrow_down_rounded,
+              color: Colors.grey.shade500),
+          items: wallets
+              .map((w) => DropdownMenuItem(
+                  value: w.id,
+                  child: Row(children: [
+                    Icon(
+                        w.isBackup
+                            ? Icons.shield_rounded
+                            : Icons.account_balance_wallet_rounded,
+                        size: 18,
+                        color: Color(w.colorValue)),
+                    const SizedBox(width: 12),
+                    Text(w.name,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w500))
+                  ])))
+              .toList(),
           onChanged: onChanged,
         ),
       ),
     );
   }
 
-  Widget _buildModernInput(TextEditingController ctrl, String label, IconData icon, Color primaryColor, {bool isNumber = false}) {
+  Widget _buildModernInput(TextEditingController ctrl, String label,
+      IconData icon, Color primaryColor,
+      {bool isNumber = false}) {
     return TextField(
       controller: ctrl,
       keyboardType: isNumber
@@ -881,9 +1096,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       inputFormatters: isNumber
           ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))]
           : null,
-      textCapitalization: isNumber ? TextCapitalization.none : TextCapitalization.sentences,
+      textCapitalization:
+          isNumber ? TextCapitalization.none : TextCapitalization.sentences,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      decoration: InputDecoration(labelText: label, labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13), prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20), filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: primaryColor, width: 1.5)), contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16)),
+      decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
+          filled: true,
+          fillColor: Theme.of(context).cardColor,
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: primaryColor, width: 1.5)),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 14, horizontal: 16)),
     );
   }
 
@@ -939,7 +1168,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final categories = ref.watch(categoryProvider);
     final wallets = ref.watch(walletProvider);
 
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     final monthlyTransactions = ledger.transactions;
     final globalSpent = ledger.spent;
@@ -947,7 +1177,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final walletNotifier = ref.read(walletProvider.notifier);
     final totalAvailable = wallets.fold<double>(
       0,
-          (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+      (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
     );
 
     var displayExpenses = List<Expense>.from(
@@ -956,12 +1186,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           : monthlyTransactions,
     );
 
-    if (_selectedCategoryTab != 'All' && !categories.contains(_selectedCategoryTab)) {
+    if (_selectedCategoryTab != 'All' &&
+        !categories.contains(_selectedCategoryTab)) {
       _selectedCategoryTab = 'All';
     }
 
-    if (_selectedCategoryTab != 'All') displayExpenses = displayExpenses.where((e) => e.category == _selectedCategoryTab).toList();
-    if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    if (_selectedCategoryTab != 'All')
+      displayExpenses = displayExpenses
+          .where((e) => e.category == _selectedCategoryTab)
+          .toList();
+    if (_searchQuery.isNotEmpty)
+      displayExpenses = displayExpenses
+          .where(
+              (e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .toList();
     if (_smartEntryTypeFilter != null) {
       displayExpenses = displayExpenses
           .where((entry) => entry.type == _smartEntryTypeFilter)
@@ -984,7 +1222,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: _isSearching ? TextField(style: const TextStyle(fontSize: 15), decoration: InputDecoration(border: InputBorder.none, hintText: "Search transactions...", hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14)), onChanged: (v)=>setState(()=>_searchQuery=v)) : Text(_currentView, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        title: _isSearching
+            ? TextField(
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                    border: InputBorder.none,
+                    hintText: "Search transactions...",
+                    hintStyle:
+                        TextStyle(color: Colors.grey.shade400, fontSize: 14)),
+                onChanged: (v) => setState(() => _searchQuery = v))
+            : Text(_currentView,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         centerTitle: true,
         leading: Builder(
           builder: (context) => IconButton(
@@ -1035,19 +1284,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         displayExpenses,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: (_currentView == 'Dashboard') ? GestureDetector(
-        onTapDown: (_) => _fabController.forward(),
-        onTapUp: (_) { _fabController.reverse(); _showAddOrEditModal(); },
-        onTapCancel: () => _fabController.reverse(),
-        child: ScaleTransition(
-          scale: _fabScale,
-          child: Container(
-            height: 52, padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withValues(alpha: 0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))]),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text("Add Transaction", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))]),
-          ),
-        ),
-      ) : null,
+      floatingActionButton: (_currentView == 'Dashboard')
+          ? GestureDetector(
+              onTapDown: (_) => _fabController.forward(),
+              onTapUp: (_) {
+                _fabController.reverse();
+                _showAddOrEditModal();
+              },
+              onTapCancel: () => _fabController.reverse(),
+              child: ScaleTransition(
+                scale: _fabScale,
+                child: Container(
+                  height: 52,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [
+                        primaryColor,
+                        primaryColor.withValues(alpha: 0.8)
+                      ], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                            color: primaryColor.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6))
+                      ]),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                    SizedBox(width: 8),
+                    Text("Add Transaction",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14))
+                  ]),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -1177,20 +1451,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return const SizedBox.shrink();
   }
 
-  Widget _buildExpenseList(List<Expense> expenses, Color primaryColor, bool isDark, {required bool isSliver}) {
+  Widget _buildExpenseList(
+      List<Expense> expenses, Color primaryColor, bool isDark,
+      {required bool isSliver}) {
     if (expenses.isEmpty) {
-      final emptyState = Center(child: Padding(padding: const EdgeInsets.only(top: 40.0), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_rounded, size: 50, color: Colors.grey.withValues(alpha: 0.3)), const SizedBox(height: 12), Text("No transactions here yet.", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))])));
-      return isSliver ? SliverFillRemaining(hasScrollBody: false, child: emptyState) : emptyState;
+      final emptyState = Center(
+          child: Padding(
+              padding: const EdgeInsets.only(top: 40.0),
+              child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.receipt_long_rounded,
+                        size: 50, color: Colors.grey.withValues(alpha: 0.3)),
+                    const SizedBox(height: 12),
+                    Text("No transactions here yet.",
+                        style: TextStyle(
+                            color: Colors.grey.shade500, fontSize: 13))
+                  ])));
+      return isSliver
+          ? SliverFillRemaining(hasScrollBody: false, child: emptyState)
+          : emptyState;
     }
 
     final now = DateTime.now();
     final double todaySpend = expenses
         .where((e) =>
-    e.type == 'expense' &&
-        e.category != 'Transfer' &&
-        e.date.day == now.day &&
-        e.date.month == now.month &&
-        e.date.year == now.year)
+            e.type == 'expense' &&
+            e.category != 'Transfer' &&
+            e.date.day == now.day &&
+            e.date.month == now.month &&
+            e.date.year == now.year)
         .fold(0.0, (sum, e) => sum + e.amount);
 
     final hasTodaySummary = todaySpend > 0;
@@ -1259,15 +1549,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final isTransfer = e.category == 'Transfer';
 
     final amountSign = isTransfer ? "" : (isIncome ? "+" : "-");
-    final amountColor = isTransfer ? Colors.blue : (isIncome ? Colors.green : (isDark ? Colors.white : Colors.black87));
-    final displayIcon = isTransfer ? Icons.swap_horiz_rounded : (isIncome ? Icons.south_west_rounded : Icons.category_rounded);
+    final amountColor = isTransfer
+        ? Colors.blue
+        : (isIncome ? Colors.green : (isDark ? Colors.white : Colors.black87));
+    final displayIcon = isTransfer
+        ? Icons.swap_horiz_rounded
+        : (isIncome ? Icons.south_west_rounded : Icons.category_rounded);
 
     return Dismissible(
       key: Key(e.id),
       direction: DismissDirection.endToStart,
-      background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.delete_outline_rounded, color: Colors.white)),
+      background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+              color: Colors.red, borderRadius: BorderRadius.circular(18)),
+          child: const Icon(Icons.delete_outline_rounded, color: Colors.white)),
       confirmDismiss: (direction) async {
-        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), Text(isTransfer ? "Delete Transfer?" : "Delete Transaction?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(isTransfer ? "Delete this complete transfer? Both linked wallet entries will be removed." : "Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
+        return await showDialog(
+            context: context,
+            builder: (dialogCtx) => Dialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24)),
+                backgroundColor: Theme.of(context).cardColor,
+                child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.1),
+                              shape: BoxShape.circle),
+                          child: const Icon(Icons.delete_outline_rounded,
+                              color: Colors.red, size: 28)),
+                      const SizedBox(height: 16),
+                      Text(
+                          isTransfer
+                              ? "Delete Transfer?"
+                              : "Delete Transaction?",
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text(
+                          isTransfer
+                              ? "Delete this complete transfer? Both linked wallet entries will be removed."
+                              : "Are you sure you want to delete '${e.title}'? This action cannot be undone.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade500,
+                              height: 1.4)),
+                      const SizedBox(height: 24),
+                      Row(children: [
+                        Expanded(
+                            child: TextButton(
+                                style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed: () =>
+                                    Navigator.of(dialogCtx).pop(false),
+                                child: const Text("Cancel",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey)))),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed: () =>
+                                    Navigator.of(dialogCtx).pop(true),
+                                child: const Text("Delete",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold))))
+                      ])
+                    ]))));
       },
       onDismissed: (direction) async {
         if (isTransfer) {
@@ -1288,44 +1655,107 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       child: GestureDetector(
         onTap: isTransfer ? null : () => _showAddOrEditModal(existing: e),
         child: Container(
-            margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2)),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                    color: isDark
+                        ? primaryColor.withValues(alpha: 0.2)
+                        : Colors.grey.withValues(alpha: 0.12),
+                    width: 1.2)),
             child: Row(
               children: [
-                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: (isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor)).withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(displayIcon, color: isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor), size: 20)),
+                Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: (isTransfer
+                                ? Colors.blue
+                                : (isIncome ? Colors.green : eColor))
+                            .withValues(alpha: 0.15),
+                        shape: BoxShape.circle),
+                    child: Icon(displayIcon,
+                        color: isTransfer
+                            ? Colors.blue
+                            : (isIncome ? Colors.green : eColor),
+                        size: 20)),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(e.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(e.title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 4),
-                      Row(children: [Icon(Icons.schedule_rounded, size: 11, color: Colors.grey.shade500), const SizedBox(width: 4), Text(DateFormat.MMMEd().format(e.date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))]),
+                      Row(children: [
+                        Icon(Icons.schedule_rounded,
+                            size: 11, color: Colors.grey.shade500),
+                        const SizedBox(width: 4),
+                        Text(DateFormat.MMMEd().format(e.date),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade500))
+                      ]),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text("$amountSign Rs. ${e.amount.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: amountColor)),
+                Text("$amountSign Rs. ${e.amount.toStringAsFixed(0)}",
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        color: amountColor)),
               ],
-            )
-        ),
+            )),
       ),
     );
   }
 
-  Widget _buildCategoryTabsWidget(List<String> categories, Color primaryColor, bool isDark) {
+  Widget _buildCategoryTabsWidget(
+      List<String> categories, Color primaryColor, bool isDark) {
     return Container(
-      height: 40, margin: const EdgeInsets.only(top: 4, bottom: 8),
+      height: 40,
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
       child: ListView(
-          controller: _categoryScrollCtrl, scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 20),
-          children: [_buildTab('All', 0, isDark, primaryColor), ...List.generate(categories.length, (i) => _buildTab(categories[i], i + 1, isDark, primaryColor)), _buildAddCategoryBtn(primaryColor, isDark)]
-      ),
+          controller: _categoryScrollCtrl,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          children: [
+            _buildTab('All', 0, isDark, primaryColor),
+            ...List.generate(categories.length,
+                (i) => _buildTab(categories[i], i + 1, isDark, primaryColor)),
+            _buildAddCategoryBtn(primaryColor, isDark)
+          ]),
     );
   }
 
   Widget _buildAddCategoryBtn(Color primaryColor, bool isDark) {
     return GestureDetector(
       onTap: _showAddCategoryDialog,
-      child: Container(margin: const EdgeInsets.only(right: 8), padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(20), border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300, width: 1.2)), child: Row(children: [Icon(Icons.add_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black87), const SizedBox(width: 4), Text("New", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold, fontSize: 12))])),
+      child: Container(
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                  color: isDark ? Colors.white24 : Colors.grey.shade300,
+                  width: 1.2)),
+          child: Row(children: [
+            Icon(Icons.add_rounded,
+                size: 16, color: isDark ? Colors.white70 : Colors.black87),
+            const SizedBox(width: 4),
+            Text("New",
+                style: TextStyle(
+                    color: isDark ? Colors.white70 : Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12))
+          ])),
     );
   }
 
@@ -1333,7 +1763,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     bool isSelected = _selectedCategoryTab == label;
     return GestureDetector(
         onTap: () => _selectCategory(label, index),
-        onLongPress: label == 'All' ? null : () => _confirmDeleteCategory(label),
+        onLongPress:
+            label == 'All' ? null : () => _confirmDeleteCategory(label),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.only(right: 8),
@@ -1341,13 +1772,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           decoration: BoxDecoration(
             color: isSelected ? primaryColor : Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
-            border: isSelected ? null : Border.all(color: isDark ? primaryColor.withValues(alpha: 0.25) : Colors.grey.withValues(alpha: 0.15), width: 1.2),
+            border: isSelected
+                ? null
+                : Border.all(
+                    color: isDark
+                        ? primaryColor.withValues(alpha: 0.25)
+                        : Colors.grey.withValues(alpha: 0.15),
+                    width: 1.2),
           ),
           child: Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(label, style: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87), fontWeight: isSelected ? FontWeight.bold : FontWeight.w600, fontSize: 12)),
+                Text(label,
+                    style: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark ? Colors.white70 : Colors.black87),
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w600,
+                        fontSize: 12)),
                 if (isSelected && label != 'All') ...[
                   const SizedBox(width: 6),
                   GestureDetector(
@@ -1355,15 +1799,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     onTap: () => _confirmDeleteCategory(label),
                     child: const Padding(
                       padding: EdgeInsets.all(2),
-                      child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                      child: Icon(Icons.close_rounded,
+                          size: 14, color: Colors.white),
                     ),
                   ),
                 ],
               ],
             ),
           ),
-        )
-    );
+        ));
   }
 
   Widget _buildSmartInputBar(
@@ -1420,9 +1864,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               const SizedBox(width: 11),
               Expanded(
                 child: InkWell(
-                  onTap: _isListening
-                      ? null
-                      : _showSmartEntryAccountPicker,
+                  onTap: _isListening ? null : _showSmartEntryAccountPicker,
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1505,8 +1947,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 border: InputBorder.none,
                 contentPadding:
                     const EdgeInsets.only(left: 15, top: 17, bottom: 17),
-                suffixIconConstraints:
-                    const BoxConstraints(minHeight: 40),
+                suffixIconConstraints: const BoxConstraints(minHeight: 40),
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1533,8 +1974,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             ),
                     ),
                     IconButton(
-                      tooltip:
-                          _isListening ? 'Stop listening' : 'Voice input',
+                      tooltip: _isListening ? 'Stop listening' : 'Voice input',
                       visualDensity: VisualDensity.compact,
                       constraints:
                           const BoxConstraints.tightFor(width: 38, height: 40),
@@ -1558,8 +1998,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       child: IconButton(
                         tooltip: 'Save Smart Entry',
                         padding: EdgeInsets.zero,
-                        onPressed: () =>
-                            _processNLP(_smartInputCtrl.text),
+                        onPressed: () => _processNLP(_smartInputCtrl.text),
                         icon: const Icon(
                           Icons.arrow_upward_rounded,
                           size: 19,
@@ -1638,14 +2077,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   children: [
                     ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: Theme.of(sheetContext)
-                            .colorScheme
-                            .primaryContainer,
+                        backgroundColor:
+                            Theme.of(sheetContext).colorScheme.primaryContainer,
                         child: Icon(
                           Icons.auto_awesome_rounded,
-                          color: Theme.of(sheetContext)
-                              .colorScheme
-                              .primary,
+                          color: Theme.of(sheetContext).colorScheme.primary,
                         ),
                       ),
                       title: const Text(
@@ -1672,8 +2108,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     for (final wallet in wallets)
                       ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Color(wallet.colorValue)
-                              .withValues(alpha: 0.14),
+                          backgroundColor:
+                              Color(wallet.colorValue).withValues(alpha: 0.14),
                           child: Icon(
                             _walletIcon(wallet),
                             color: Color(wallet.colorValue),
@@ -2234,7 +2670,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         dialogContext,
                         DateTime(selectedYear, month, 1),
                       ),
-                      child: Text(DateFormat.MMM().format(DateTime(2000, month))),
+                      child:
+                          Text(DateFormat.MMM().format(DateTime(2000, month))),
                     );
                   },
                 ),
@@ -2373,8 +2810,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   Future<void> _startSpeechListening() async {
     if (!mounted) return;
-    final localeId =
-        _speechLocaleCandidates[_speechLocaleCandidateIndex];
+    final localeId = _speechLocaleCandidates[_speechLocaleCandidateIndex];
 
     try {
       await _speech.listen(
@@ -2426,8 +2862,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final recoverableEnd = normalized.contains('error_speech_timeout') ||
         normalized.contains('error_no_match') ||
         normalized.contains('error_client');
-    final languageFailure =
-        normalized.contains('error_language_unavailable') ||
+    final languageFailure = normalized.contains('error_language_unavailable') ||
         normalized.contains('error_language_not_supported');
     final canTryAnotherLocale = languageFailure &&
         _speechLocaleCandidateIndex + 1 < _speechLocaleCandidates.length;
@@ -2463,8 +2898,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _speechInitialized = false;
     }
 
-    final networkFailure =
-        normalized.contains('error_network') ||
+    final networkFailure = normalized.contains('error_network') ||
         normalized.contains('error_server') ||
         normalized.contains('error_too_many_requests');
 
@@ -2549,18 +2983,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
 
       final title = receiptData['title']?.toString().trim() ?? '';
-      final confidence =
-          (receiptData['confidence'] as num?)?.toDouble() ?? 0.0;
+      final confidence = (receiptData['confidence'] as num?)?.toDouble() ?? 0.0;
       final confidencePercent = (confidence * 100).round();
       final reviewMessage = confidence < 0.7
           ? 'Scan confidence is $confidencePercent%. Carefully verify the amount, wallet, category, and date.'
           : 'Receipt details were detected with $confidencePercent% confidence. Verify every field before saving.';
 
       final confirmed = await _showAddOrEditModal(
-        prefilledAmount: amount.toDouble() ==
-                amount.toDouble().truncateToDouble()
-            ? amount.toStringAsFixed(0)
-            : amount.toStringAsFixed(2),
+        prefilledAmount:
+            amount.toDouble() == amount.toDouble().truncateToDouble()
+                ? amount.toStringAsFixed(0)
+                : amount.toStringAsFixed(2),
         prefilledTitle: title.isEmpty ? 'Receipt purchase' : title,
         prefilledCategory: receiptData['category']?.toString(),
         initialType: 'expense',
@@ -2700,16 +3133,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       final dateLabel =
                           DateFormat('dd MMM, h:mm a').format(entry.date);
                       final amountLabel = entry.amount.toStringAsFixed(
-                        entry.amount == entry.amount.truncateToDouble()
-                            ? 0
-                            : 2,
+                        entry.amount == entry.amount.truncateToDouble() ? 0 : 2,
                       );
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: (isIncome
-                                  ? Colors.green
-                                  : Colors.red)
-                              .withValues(alpha: 0.12),
+                          backgroundColor:
+                              (isIncome ? Colors.green : Colors.red)
+                                  .withValues(alpha: 0.12),
                           child: Icon(
                             isIncome
                                 ? Icons.south_west_rounded
@@ -2734,8 +3164,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        onTap: () =>
-                            Navigator.of(sheetContext).pop(entry),
+                        onTap: () => Navigator.of(sheetContext).pop(entry),
                       );
                     },
                   ),
@@ -2775,8 +3204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             id: wallet.id,
             name: wallet.name,
             type: wallet.walletType,
-            availableBalance:
-                walletNotifier.getBalanceForWallet(wallet.id),
+            availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
             isBackup: wallet.isBackup,
           ),
         )
@@ -3149,8 +3577,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         ? command.category
         : 'All';
     var query = _smartQueryTitle(command.title);
-    if (category != 'All' &&
-        query.toLowerCase() == category.toLowerCase()) {
+    if (category != 'All' && query.toLowerCase() == category.toLowerCase()) {
       query = '';
     }
     setState(() {
@@ -3248,8 +3675,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             id: wallet.id,
             name: wallet.name,
             type: wallet.walletType,
-            availableBalance:
-                walletNotifier.getBalanceForWallet(wallet.id),
+            availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
             isBackup: wallet.isBackup,
           ),
         )
@@ -3266,9 +3692,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
-    final mentionedWalletId = mentionedWalletIds.isEmpty
-        ? null
-        : mentionedWalletIds.single;
+    final mentionedWalletId =
+        mentionedWalletIds.isEmpty ? null : mentionedWalletIds.single;
     SmartEntryAccount? mentionedAccount;
     if (mentionedWalletId != null) {
       for (final account in smartAccounts) {
@@ -3354,8 +3779,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (deleting) {
       if (target.type == 'income') {
-        final available =
-            walletNotifier.getBalanceForWallet(target.walletId);
+        final available = walletNotifier.getBalanceForWallet(target.walletId);
         if (available + 0.000001 < target.amount) {
           _showTransactionError(
             'Deleting this income would make the wallet balance negative.',
@@ -3379,8 +3803,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
       _smartInputCtrl.clear();
       final deletedEntry = target;
-      final deletedAmount =
-          deletedEntry.amount.toStringAsFixed(0);
+      final deletedAmount = deletedEntry.amount.toStringAsFixed(0);
       _showTransactionSuccess(
         '${deletedEntry.title} — Rs. $deletedAmount',
         title: 'Entry deleted',
@@ -3415,8 +3838,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (updatedCategory != null) {
       final categories = ref.read(categoryProvider);
       final matches = categories.where(
-        (category) =>
-            category.toLowerCase() == updatedCategory!.toLowerCase(),
+        (category) => category.toLowerCase() == updatedCategory!.toLowerCase(),
       );
       if (matches.isEmpty) {
         _showTransactionError(
@@ -3583,16 +4005,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             id: wallet.id,
             name: wallet.name,
             type: wallet.walletType,
-            availableBalance:
-                walletNotifier.getBalanceForWallet(wallet.id),
+            availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
             isBackup: wallet.isBackup,
           ),
         )
         .toList(growable: false);
     final mentionedWalletId =
         findMentionedSmartEntryAccountId(canonicalInput, smartAccounts);
-    final configuredDefaultWallet =
-        _selectedSmartEntryWallet(wallets);
+    final configuredDefaultWallet = _selectedSmartEntryWallet(wallets);
     String? learnedWalletId;
     if (mentionedWalletId == null && configuredDefaultWallet == null) {
       final candidateId = learnedPreference?.walletId;
@@ -3613,8 +4033,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       plan.command,
       context: ConfidenceContext(
         hasResolvedWallet: resolvedWalletId != null,
-        hasExactAmount:
-            (command.confidenceByField['amount'] ?? 0) >= 0.9,
+        hasExactAmount: (command.confidenceByField['amount'] ?? 0) >= 0.9,
       ),
     );
     assert(() {
@@ -3630,10 +4049,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (!plan.requiresAsrReview &&
         semanticConfidence.canAutoExecute &&
         shouldAutoSaveSmartEntry(
-      result,
-      hasResolvedWallet: resolvedWalletId != null,
-      semanticConfidence: semanticConfidence.score,
-    )) {
+          result,
+          hasResolvedWallet: resolvedWalletId != null,
+          semanticConfidence: semanticConfidence.score,
+        )) {
       final wallet = wallets.firstWhere(
         (item) => item.id == resolvedWalletId,
       );
@@ -3698,32 +4117,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         defaultAccounts.every((account) => account.availableBalance <= 0);
     final reviewMessage = plan.requiresAsrReview
         ? 'Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.'
-        : resolvedWalletId != null &&
-            !semanticConfidence.canAutoExecute
-        ? 'Review the detected title, amount, category, date, and wallet before saving.'
-        : mentionedWalletId != null
-        ? 'The named wallet cannot cover this expense. Choose another wallet before saving.'
-        : configuredDefaultWallet != null
-            ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
-            : learnedWalletId != null
-                ? 'The wallet previously used for this entry cannot cover it. Choose another funded wallet.'
-                : defaultsAreEmpty
-                    ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
-                    : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
+        : resolvedWalletId != null && !semanticConfidence.canAutoExecute
+            ? 'Review the detected title, amount, category, date, and wallet before saving.'
+            : mentionedWalletId != null
+                ? 'The named wallet cannot cover this expense. Choose another wallet before saving.'
+                : configuredDefaultWallet != null
+                    ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
+                    : learnedWalletId != null
+                        ? 'The wallet previously used for this entry cannot cover it. Choose another funded wallet.'
+                        : defaultsAreEmpty
+                            ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
+                            : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
 
     final confirmed = await _showAddOrEditModal(
-      prefilledAmount:
-          amountValue == amountValue.truncateToDouble()
-              ? amountValue.toStringAsFixed(0)
-              : amountValue.toStringAsFixed(2),
+      prefilledAmount: amountValue == amountValue.truncateToDouble()
+          ? amountValue.toStringAsFixed(0)
+          : amountValue.toStringAsFixed(2),
       prefilledTitle: result['title']?.toString(),
       prefilledCategory: result['category']?.toString(),
       prefilledDate: result['date'] is DateTime
           ? result['date'] as DateTime
           : DateTime.now(),
-      preselectedWalletId: mentionedWalletId ??
-          configuredDefaultWallet?.id ??
-          learnedWalletId,
+      preselectedWalletId:
+          mentionedWalletId ?? configuredDefaultWallet?.id ?? learnedWalletId,
       initialType: type,
       reviewMessage: reviewMessage,
     );
@@ -3807,7 +4223,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
     return coreTransactionTitle(title);
   }
-
 }
 
 String _normalizeLearningTitle(String value) {
@@ -3861,7 +4276,6 @@ class _LearnedSmartEntryPreference {
         'updatedAt': updatedAt,
       };
 }
-
 
 enum _MessageTone { error, success, info }
 
@@ -3986,8 +4400,7 @@ class _TopMessageCard extends StatelessWidget {
                               foregroundColor: accent,
                               padding: EdgeInsets.zero,
                               minimumSize: const Size(0, 30),
-                              tapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             onPressed: () async {
                               onDismiss();
@@ -4029,9 +4442,19 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double minHeight;
   final double maxHeight;
   final Widget child;
-  _StickyHeaderDelegate({required this.minHeight, required this.maxHeight, required this.child});
-  @override double get minExtent => minHeight;
-  @override double get maxExtent => maxHeight;
-  @override Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => SizedBox.expand(child: child);
-  @override bool shouldRebuild(_StickyHeaderDelegate oldDelegate) => maxHeight != oldDelegate.maxHeight || minHeight != oldDelegate.minHeight || child != oldDelegate.child;
+  _StickyHeaderDelegate(
+      {required this.minHeight, required this.maxHeight, required this.child});
+  @override
+  double get minExtent => minHeight;
+  @override
+  double get maxExtent => maxHeight;
+  @override
+  Widget build(
+          BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      SizedBox.expand(child: child);
+  @override
+  bool shouldRebuild(_StickyHeaderDelegate oldDelegate) =>
+      maxHeight != oldDelegate.maxHeight ||
+      minHeight != oldDelegate.minHeight ||
+      child != oldDelegate.child;
 }

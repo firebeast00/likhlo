@@ -84,19 +84,18 @@ class ConfidenceEvaluator {
           reasons: reasons,
         );
       }
-      final score = (
-        (parsed.confidenceByField['intent'] ?? 0) * 0.35 +
-        (parsed.confidenceByField['amount'] ?? 0) * 0.40 +
-        (parsed.confidenceByField['title'] ?? 0) * 0.25
-      ).clamp(0.0, 1.0).toDouble();
+      final score = ((parsed.confidenceByField['intent'] ?? 0) * 0.35 +
+              (parsed.confidenceByField['amount'] ?? 0) * 0.40 +
+              (parsed.confidenceByField['title'] ?? 0) * 0.25)
+          .clamp(0.0, 1.0)
+          .toDouble();
       return SemanticConfidence(
         score: score,
         disposition: score >= 0.94
             ? ConfidenceDisposition.autoExecute
             : ConfidenceDisposition.review,
-        reasons: score >= 0.94
-            ? const []
-            : const ['Review fields before saving.'],
+        reasons:
+            score >= 0.94 ? const [] : const ['Review fields before saving.'],
       );
     }
 
@@ -114,13 +113,13 @@ class ConfidenceEvaluator {
       if (context.transferDirectionConfidence < 0.97) {
         reasons.add('Transfer direction is ambiguous.');
       }
-      final score = (
-        (parsed.confidenceByField['intent'] ?? 0) * 0.25 +
-        (parsed.confidenceByField['amount'] ?? 0) * 0.30 +
-        (context.hasResolvedTransferSource ? 1 : 0) * 0.15 +
-        (context.hasResolvedTransferDestination ? 1 : 0) * 0.15 +
-        context.transferDirectionConfidence * 0.15
-      ).clamp(0.0, 1.0).toDouble();
+      final score = ((parsed.confidenceByField['intent'] ?? 0) * 0.25 +
+              (parsed.confidenceByField['amount'] ?? 0) * 0.30 +
+              (context.hasResolvedTransferSource ? 1 : 0) * 0.15 +
+              (context.hasResolvedTransferDestination ? 1 : 0) * 0.15 +
+              context.transferDirectionConfidence * 0.15)
+          .clamp(0.0, 1.0)
+          .toDouble();
       return SemanticConfidence(
         score: score,
         disposition: reasons.isEmpty && score >= 0.97

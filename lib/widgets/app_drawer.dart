@@ -6,17 +6,22 @@ class AppDrawer extends ConsumerWidget {
   final String currentView;
   final Function(String) onViewChanged;
 
-  const AppDrawer({super.key, required this.currentView, required this.onViewChanged});
+  const AppDrawer(
+      {super.key, required this.currentView, required this.onViewChanged});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final primaryColor = Color(settings.profileColorValue); // 🛡️ Guaranteed theme color support
+    final primaryColor =
+        Color(settings.profileColorValue); // 🛡️ Guaranteed theme color support
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // ✅ SAFE FALLBACKS
-    final String displayName = (settings.userName.isNotEmpty) ? settings.userName : "Welcome!";
-    final String displayProf = (settings.userProfession.isNotEmpty) ? settings.userProfession : "Student";
+    final String displayName =
+        (settings.userName.isNotEmpty) ? settings.userName : "Welcome!";
+    final String displayProf = (settings.userProfession.isNotEmpty)
+        ? settings.userProfession
+        : "Student";
 
     return Drawer(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -25,7 +30,8 @@ class AppDrawer extends ConsumerWidget {
           // 🌟 Elegant Profile Header with Gradient
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(top: 60, bottom: 24, left: 24, right: 24),
+            padding:
+                const EdgeInsets.only(top: 60, bottom: 24, left: 24, right: 24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
@@ -51,7 +57,8 @@ class AppDrawer extends ConsumerWidget {
                   child: CircleAvatar(
                     radius: 30,
                     backgroundColor: primaryColor.withValues(alpha: 0.1),
-                    child: Icon(Icons.person_rounded, size: 36, color: primaryColor),
+                    child: Icon(Icons.person_rounded,
+                        size: 36, color: primaryColor),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -61,14 +68,20 @@ class AppDrawer extends ConsumerWidget {
                     children: [
                       Text(
                         displayName,
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         displayProf,
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -85,16 +98,26 @@ class AppDrawer extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               children: [
-                _buildDrawerItem(context, 'Dashboard', Icons.dashboard_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'Mess Khata', Icons.money_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'Udhaar', Icons.handshake_rounded, primaryColor, isDark),
+                _buildDrawerItem(context, 'Dashboard', Icons.dashboard_rounded,
+                    primaryColor, isDark),
+                _buildDrawerItem(context, 'Mess Khata', Icons.money_rounded,
+                    primaryColor, isDark),
+                _buildDrawerItem(context, 'Udhaar', Icons.handshake_rounded,
+                    primaryColor, isDark),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Divider(height: 20, thickness: 1, color: Colors.grey.withValues(alpha: 0.15)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Divider(
+                      height: 20,
+                      thickness: 1,
+                      color: Colors.grey.withValues(alpha: 0.15)),
                 ),
-                _buildDrawerItem(context, 'Stats', Icons.bar_chart_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'Settings', Icons.settings_rounded, primaryColor, isDark),
-                _buildDrawerItem(context, 'About', Icons.info_outline_rounded, primaryColor, isDark),
+                _buildDrawerItem(context, 'Stats', Icons.bar_chart_rounded,
+                    primaryColor, isDark),
+                _buildDrawerItem(context, 'Settings', Icons.settings_rounded,
+                    primaryColor, isDark),
+                _buildDrawerItem(context, 'About', Icons.info_outline_rounded,
+                    primaryColor, isDark),
               ],
             ),
           ),
@@ -103,13 +126,18 @@ class AppDrawer extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.04),
-              border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.1))),
+              color:
+                  isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.04),
+              border: Border(
+                  top: BorderSide(color: Colors.grey.withValues(alpha: 0.1))),
             ),
             child: SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              title: const Text("Dark Mode", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              secondary: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, color: primaryColor),
+              title: const Text("Dark Mode",
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              secondary: Icon(
+                  isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  color: primaryColor),
               activeThumbColor: primaryColor,
               value: settings.themeMode == 'dark',
               onChanged: (val) {
@@ -126,12 +154,15 @@ class AppDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildDrawerItem(BuildContext context, String title, IconData icon, Color primaryColor, bool isDark) {
+  Widget _buildDrawerItem(BuildContext context, String title, IconData icon,
+      Color primaryColor, bool isDark) {
     bool isSelected = currentView == title;
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: isSelected ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.12) : Colors.transparent,
+        color: isSelected
+            ? primaryColor.withValues(alpha: isDark ? 0.25 : 0.12)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
       ),
       child: ListTile(
@@ -145,12 +176,18 @@ class AppDrawer extends ConsumerWidget {
           title,
           style: TextStyle(
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: isSelected ? primaryColor : (isDark ? Colors.white70 : Colors.black87),
+            color: isSelected
+                ? primaryColor
+                : (isDark ? Colors.white70 : Colors.black87),
             fontSize: 14,
           ),
         ),
         trailing: isSelected
-            ? Container(width: 6, height: 6, decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle))
+            ? Container(
+                width: 6,
+                height: 6,
+                decoration:
+                    BoxDecoration(color: primaryColor, shape: BoxShape.circle))
             : null,
         onTap: () {
           Navigator.pop(context);

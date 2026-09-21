@@ -3,26 +3,53 @@ import 'package:student_expense_manager/models/expense_model.dart';
 import 'package:student_expense_manager/providers/expense_provider.dart';
 
 Expense entry(String id, String type, String wallet, {double amount = 100}) =>
-    Expense(id: id, title: id, amount: amount, date: DateTime(2026, 9, 15),
-      category: 'Transfer', colorValue: 0, type: type, walletId: wallet);
+    Expense(
+        id: id,
+        title: id,
+        amount: amount,
+        date: DateTime(2026, 9, 15),
+        category: 'Transfer',
+        colorValue: 0,
+        type: type,
+        walletId: wallet);
 
 void main() {
-  test('global history collapses a pair without changing account movements', () {
-    final records = [entry('a_in', 'income', 'bank'),
-      entry('a_out', 'expense', 'cash')];
+  test('global history collapses a pair without changing account movements',
+      () {
+    final records = [
+      entry('a_in', 'income', 'bank'),
+      entry('a_out', 'expense', 'cash')
+    ];
     expect(visibleTransactions(records).map((e) => e.id), ['a_out']);
     expect(records.length, 2);
-    expect(records.fold<double>(0, (v, e) =>
-        v + (e.type == 'income' ? e.amount : -e.amount)), 0);
+    expect(
+        records.fold<double>(
+            0, (v, e) => v + (e.type == 'income' ? e.amount : -e.amount)),
+        0);
   });
 
   test('transaction batches reject invalid and duplicate records', () {
-    final valid = Expense(id: 'one', title: 'Food', amount: 100,
-      date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0);
-    final duplicate = Expense(id: 'one', title: 'Travel', amount: 200,
-      date: DateTime(2026, 9, 15), category: 'Travel', colorValue: 0);
-    final invalid = Expense(id: 'invalid', title: 'Invalid', amount: 0,
-      date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0);
+    final valid = Expense(
+        id: 'one',
+        title: 'Food',
+        amount: 100,
+        date: DateTime(2026, 9, 15),
+        category: 'Food',
+        colorValue: 0);
+    final duplicate = Expense(
+        id: 'one',
+        title: 'Travel',
+        amount: 200,
+        date: DateTime(2026, 9, 15),
+        category: 'Travel',
+        colorValue: 0);
+    final invalid = Expense(
+        id: 'invalid',
+        title: 'Invalid',
+        amount: 0,
+        date: DateTime(2026, 9, 15),
+        category: 'Food',
+        colorValue: 0);
 
     expect(isValidTransactionBatch([valid]), isTrue);
     expect(isValidTransactionBatch([valid, duplicate]), isFalse);
@@ -43,96 +70,161 @@ void main() {
 
   test('expense and income produce correct wallet deltas', () {
     final records = [
-      Expense(id: 'expense', title: 'Food', amount: 120,
-        date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0,
-        type: 'expense', walletId: 'cash'),
-      Expense(id: 'income', title: 'Salary', amount: 500,
-        date: DateTime(2026, 9, 15), category: 'Income', colorValue: 0,
-        type: 'income', walletId: 'cash'),
+      Expense(
+          id: 'expense',
+          title: 'Food',
+          amount: 120,
+          date: DateTime(2026, 9, 15),
+          category: 'Food',
+          colorValue: 0,
+          type: 'expense',
+          walletId: 'cash'),
+      Expense(
+          id: 'income',
+          title: 'Salary',
+          amount: 500,
+          date: DateTime(2026, 9, 15),
+          category: 'Income',
+          colorValue: 0,
+          type: 'income',
+          walletId: 'cash'),
     ];
     expect(calculateWalletMovements(records)['cash'], 380);
   });
 
   test('unpaired or mismatched transfers remain visible', () {
-    final records = [entry('a_in', 'income', 'bank'),
+    final records = [
+      entry('a_in', 'income', 'bank'),
       entry('b_out', 'expense', 'cash'),
-      entry('b_in', 'income', 'bank', amount: 50)];
+      entry('b_in', 'income', 'bank', amount: 50)
+    ];
     expect(visibleTransactions(records).length, 3);
   });
 
-  test('wallet guard rejects overdrafts and accepts exact available amount', () {
+  test('wallet guard rejects overdrafts and accepts exact available amount',
+      () {
     final existing = [
-      Expense(id: 'old', title: 'Food', amount: 200,
-        date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0,
-        type: 'expense', walletId: 'cash'),
+      Expense(
+          id: 'old',
+          title: 'Food',
+          amount: 200,
+          date: DateTime(2026, 9, 15),
+          category: 'Food',
+          colorValue: 0,
+          type: 'expense',
+          walletId: 'cash'),
     ];
-    final exact = Expense(id: 'exact', title: 'Travel', amount: 300,
-      date: DateTime(2026, 9, 15), category: 'Travel', colorValue: 0,
-      type: 'expense', walletId: 'cash');
+    final exact = Expense(
+        id: 'exact',
+        title: 'Travel',
+        amount: 300,
+        date: DateTime(2026, 9, 15),
+        category: 'Travel',
+        colorValue: 0,
+        type: 'expense',
+        walletId: 'cash');
     final tooMuch = exact.copyWith(id: 'too-much', amount: 301);
 
-    expect(keepsWalletBalancesNonNegative(
-      openingBalances: {'cash': 500},
-      existingEntries: existing,
-      proposedEntries: [exact],
-    ), isTrue);
-    expect(keepsWalletBalancesNonNegative(
-      openingBalances: {'cash': 500},
-      existingEntries: existing,
-      proposedEntries: [tooMuch],
-    ), isFalse);
+    expect(
+        keepsWalletBalancesNonNegative(
+          openingBalances: {'cash': 500},
+          existingEntries: existing,
+          proposedEntries: [exact],
+        ),
+        isTrue);
+    expect(
+        keepsWalletBalancesNonNegative(
+          openingBalances: {'cash': 500},
+          existingEntries: existing,
+          proposedEntries: [tooMuch],
+        ),
+        isFalse);
   });
 
   test('editing income cannot create a negative account balance', () {
-    final income = Expense(id: 'income', title: 'Income', amount: 100,
-      date: DateTime(2026, 9, 15), category: 'Income', colorValue: 0,
-      type: 'income', walletId: 'cash');
-    final spending = Expense(id: 'spending', title: 'Spending', amount: 100,
-      date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0,
-      type: 'expense', walletId: 'cash');
+    final income = Expense(
+        id: 'income',
+        title: 'Income',
+        amount: 100,
+        date: DateTime(2026, 9, 15),
+        category: 'Income',
+        colorValue: 0,
+        type: 'income',
+        walletId: 'cash');
+    final spending = Expense(
+        id: 'spending',
+        title: 'Spending',
+        amount: 100,
+        date: DateTime(2026, 9, 15),
+        category: 'Food',
+        colorValue: 0,
+        type: 'expense',
+        walletId: 'cash');
 
-    expect(keepsWalletBalancesNonNegative(
-      openingBalances: {'cash': 0},
-      existingEntries: [income, spending],
-      proposedEntries: [income.copyWith(amount: 50)],
-      replacedIds: {'income'},
-    ), isFalse);
+    expect(
+        keepsWalletBalancesNonNegative(
+          openingBalances: {'cash': 0},
+          existingEntries: [income, spending],
+          proposedEntries: [income.copyWith(amount: 50)],
+          replacedIds: {'income'},
+        ),
+        isFalse);
   });
 
   test('legacy negative balance can improve but cannot get worse', () {
-    final income = Expense(id: 'income', title: 'Income', amount: 50,
-      date: DateTime(2026, 9, 15), category: 'Income', colorValue: 0,
-      type: 'income', walletId: 'cash');
-    final expense = income.copyWith(
-      id: 'expense', title: 'Expense', type: 'expense');
+    final income = Expense(
+        id: 'income',
+        title: 'Income',
+        amount: 50,
+        date: DateTime(2026, 9, 15),
+        category: 'Income',
+        colorValue: 0,
+        type: 'income',
+        walletId: 'cash');
+    final expense =
+        income.copyWith(id: 'expense', title: 'Expense', type: 'expense');
 
-    expect(keepsWalletBalancesNonNegative(
-      openingBalances: {'cash': -100},
-      existingEntries: const [],
-      proposedEntries: [income],
-    ), isTrue);
-    expect(keepsWalletBalancesNonNegative(
-      openingBalances: {'cash': -100},
-      existingEntries: const [],
-      proposedEntries: [expense],
-    ), isFalse);
+    expect(
+        keepsWalletBalancesNonNegative(
+          openingBalances: {'cash': -100},
+          existingEntries: const [],
+          proposedEntries: [income],
+        ),
+        isTrue);
+    expect(
+        keepsWalletBalancesNonNegative(
+          openingBalances: {'cash': -100},
+          existingEntries: const [],
+          proposedEntries: [expense],
+        ),
+        isFalse);
   });
 
   test('wallet guard credits the old expense while editing', () {
-    final old = Expense(id: 'edit', title: 'Food', amount: 400,
-      date: DateTime(2026, 9, 15), category: 'Food', colorValue: 0,
-      type: 'expense', walletId: 'cash');
+    final old = Expense(
+        id: 'edit',
+        title: 'Food',
+        amount: 400,
+        date: DateTime(2026, 9, 15),
+        category: 'Food',
+        colorValue: 0,
+        type: 'expense',
+        walletId: 'cash');
     final updated = old.copyWith(amount: 450);
 
-    expect(keepsWalletBalancesNonNegative(
-      openingBalances: {'cash': 500},
-      existingEntries: [old],
-      proposedEntries: [updated],
-      replacedIds: {'edit'},
-    ), isTrue);
+    expect(
+        keepsWalletBalancesNonNegative(
+          openingBalances: {'cash': 500},
+          existingEntries: [old],
+          proposedEntries: [updated],
+          replacedIds: {'edit'},
+        ),
+        isTrue);
   });
 
-  test('PDF report totals count transfer pairs once and exclude them from income', () {
+  test(
+      'PDF report totals count transfer pairs once and exclude them from income',
+      () {
     final records = [
       entry('move_out', 'expense', 'cash', amount: 350),
       entry('move_in', 'income', 'bank', amount: 350),
@@ -168,6 +260,4 @@ void main() {
     expect(report.expenseCount, 1);
     expect(report.expenseTotal, 250);
   });
-
-
 }

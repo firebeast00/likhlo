@@ -73,7 +73,8 @@ class BackupService {
   }
 
   ValidatedBackup validate(Map<String, dynamic> payload) {
-    if (payload['schemaVersion'] != schemaVersion || payload['app'] != 'Likhlo') {
+    if (payload['schemaVersion'] != schemaVersion ||
+        payload['app'] != 'Likhlo') {
       throw const BackupException(
         'This backup version is not supported by this Likhlo release.',
       );
@@ -423,7 +424,8 @@ class BackupService {
 
   static void _requireUnique(Iterable<String> ids, String label) {
     final all = ids.toList(growable: false);
-    if (all.any((id) => id.trim().isEmpty) || all.toSet().length != all.length) {
+    if (all.any((id) => id.trim().isEmpty) ||
+        all.toSet().length != all.length) {
       throw BackupException('The backup contains duplicate $label IDs.');
     }
   }

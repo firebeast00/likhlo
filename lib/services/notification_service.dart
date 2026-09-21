@@ -10,7 +10,8 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
 
   // Notification ID Partitioning
   static const int persistentBarId = 700;
@@ -34,7 +35,8 @@ class NotificationService {
     tz.initializeTimeZones();
 
     // Android Initialization Settings
-    const androidSettings = AndroidInitializationSettings('@drawable/ic_notification');
+    const androidSettings =
+        AndroidInitializationSettings('@drawable/ic_notification');
     const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -51,8 +53,10 @@ class NotificationService {
       settings,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final actionId = (response.actionId?.isNotEmpty ?? false)
-            ? response.actionId! : response.payload ?? '';
-        debugPrint("🔔 Notification Response Received: actionId='$actionId', payload='${response.payload}'");
+            ? response.actionId!
+            : response.payload ?? '';
+        debugPrint(
+            "🔔 Notification Response Received: actionId='$actionId', payload='${response.payload}'");
         if (actionId.isNotEmpty) {
           if (onActionTriggered != null) {
             onActionTriggered!(actionId);
@@ -68,7 +72,8 @@ class NotificationService {
     if (launchDetails?.didNotificationLaunchApp ?? false) {
       final response = launchDetails?.notificationResponse;
       final actionId = (response?.actionId?.isNotEmpty ?? false)
-          ? response!.actionId! : response?.payload ?? '';
+          ? response!.actionId!
+          : response?.payload ?? '';
       if (actionId.isNotEmpty) {
         final handler = onActionTriggered;
         if (handler != null) {
@@ -80,8 +85,9 @@ class NotificationService {
     }
 
     // Request Permissions on Android 13+
-    final androidImplementation = _notifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidImplementation =
+        _notifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
     if (androidImplementation != null) {
       await androidImplementation.requestNotificationsPermission();
       await androidImplementation.requestExactAlarmsPermission();
@@ -104,8 +110,10 @@ class NotificationService {
 
     String? customPath = prefBox?.get('custom_ringtone');
 
-    String channelId = isPersistent ? 'likhlo_persistent_v1' : 'likhlo_alerts_v1';
-    String channelName = isPersistent ? 'Quick Ledger Widget' : 'Reminders & Alerts';
+    String channelId =
+        isPersistent ? 'likhlo_persistent_v1' : 'likhlo_alerts_v1';
+    String channelName =
+        isPersistent ? 'Quick Ledger Widget' : 'Reminders & Alerts';
     String channelDesc = isPersistent
         ? 'Persistent quick-entry shortcuts in notification bar'
         : 'Expense entry and payment reminders';
@@ -117,7 +125,9 @@ class NotificationService {
       if (file.existsSync()) {
         channelId = 'likhlo_custom_${customPath.hashCode}';
         channelName = 'Custom Tone Alerts';
-        String uriPath = customPath.startsWith('file://') ? customPath : 'file://$customPath';
+        String uriPath = customPath.startsWith('file://')
+            ? customPath
+            : 'file://$customPath';
         sound = UriAndroidNotificationSound(uriPath);
       }
     }
@@ -135,7 +145,9 @@ class NotificationService {
         sound: isPersistent ? null : sound,
         enableVibration: !isPersistent,
         actions: actions,
-        category: isPersistent ? AndroidNotificationCategory.service : AndroidNotificationCategory.reminder,
+        category: isPersistent
+            ? AndroidNotificationCategory.service
+            : AndroidNotificationCategory.reminder,
         styleInformation: const BigTextStyleInformation(''),
       ),
       iOS: DarwinNotificationDetails(
@@ -158,7 +170,8 @@ class NotificationService {
       if (Hive.isBoxOpen('preferences')) {
         prefBox = Hive.box('preferences');
       }
-      final bool isEnabled = prefBox?.get('persistent_bar_enabled', defaultValue: true) ?? true;
+      final bool isEnabled =
+          prefBox?.get('persistent_bar_enabled', defaultValue: true) ?? true;
 
       if (!isEnabled) {
         await cancelNotification(persistentBarId);
@@ -204,7 +217,8 @@ class NotificationService {
       prefBox = Hive.box('preferences');
     }
 
-    final bool remindersEnabled = prefBox?.get('daily_reminder_enabled', defaultValue: true) ?? true;
+    final bool remindersEnabled =
+        prefBox?.get('daily_reminder_enabled', defaultValue: true) ?? true;
     if (!remindersEnabled) {
       await cancelNotification(middayReminderId);
       await cancelNotification(eveningReminderId);
@@ -212,8 +226,10 @@ class NotificationService {
       return;
     }
 
-    final int eveningHour = prefBox?.get('reminder_hour', defaultValue: 20) ?? 20; // Default: 8 PM
-    final int eveningMinute = prefBox?.get('reminder_minute', defaultValue: 0) ?? 0;
+    final int eveningHour =
+        prefBox?.get('reminder_hour', defaultValue: 20) ?? 20; // Default: 8 PM
+    final int eveningMinute =
+        prefBox?.get('reminder_minute', defaultValue: 0) ?? 0;
 
     // 1. Midday Pulse (2:00 PM) - Great for logging lunch, transport, coffee
     await _scheduleDailyRepeating(
@@ -229,7 +245,8 @@ class NotificationService {
     await _scheduleDailyRepeating(
       id: eveningReminderId,
       title: "Daily Spending Wrap-up 🌙",
-      body: "Close out your daily ledger! Take 10 seconds to review today's expenses.",
+      body:
+          "Close out your daily ledger! Take 10 seconds to review today's expenses.",
       hour: eveningHour,
       minute: eveningMinute,
       payload: 'action_add_expense',
@@ -265,12 +282,14 @@ class NotificationService {
   }) async {
     final details = await _getDetails(
       actions: const [
-        AndroidNotificationAction('action_add_expense', '➕ Log Now', showsUserInterface: true),
+        AndroidNotificationAction('action_add_expense', '➕ Log Now',
+            showsUserInterface: true),
       ],
     );
 
     final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    var scheduledDate =
+        tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
 
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
@@ -283,7 +302,8 @@ class NotificationService {
       scheduledDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
       payload: payload,
     );
@@ -299,12 +319,14 @@ class NotificationService {
   }
   // ==================== ⏰ GENERIC SCHEDULING (Used by Udhaar) ====================
 
-  Future<void> scheduleNotification(int id, String title, String body, DateTime scheduledTime) async {
+  Future<void> scheduleNotification(
+      int id, String title, String body, DateTime scheduledTime) async {
     try {
       final details = await _getDetails(); // Uses the updated robust details
 
       if (scheduledTime.isBefore(DateTime.now())) {
-        debugPrint("⚠️ Warning: Schedule time is in the past. Notification skipped.");
+        debugPrint(
+            "⚠️ Warning: Schedule time is in the past. Notification skipped.");
         return;
       }
 
@@ -314,7 +336,8 @@ class NotificationService {
         body,
         tz.TZDateTime.from(scheduledTime, tz.local),
         details,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
       debugPrint("⏰ Generic Notification Scheduled for $scheduledTime");
@@ -323,7 +346,8 @@ class NotificationService {
     }
   }
 
-  Future<void> cancelNotification(int id) async => await _notifications.cancel(id);
+  Future<void> cancelNotification(int id) async =>
+      await _notifications.cancel(id);
 
   Future<void> cancelAll() async => await _notifications.cancelAll();
 }

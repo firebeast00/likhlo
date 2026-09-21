@@ -47,7 +47,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
           (_box.get('brightnessLevel', defaultValue: 0.0) as num).toDouble(),
       userName: _box.get('userName', defaultValue: ''),
       userProfession: _box.get('userProfession', defaultValue: ''),
-      profileColorValue: _box.get('profileColorValue', defaultValue: 0xFF009688),
+      profileColorValue:
+          _box.get('profileColorValue', defaultValue: 0xFF009688),
     );
   }
 
@@ -70,6 +71,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     _box.put('userProfession', prof);
     state = state.copyWith(userProfession: prof);
   }
+
   // ✅ Restored method for your Onboarding Screen
   void updateProfile(String name, String prof) {
     _box.put('userName', name);
@@ -84,6 +86,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
 }
 
 // ✅ Updated Provider definition to use SettingsState
-final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
+final settingsProvider =
+    StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
   return SettingsNotifier();
 });

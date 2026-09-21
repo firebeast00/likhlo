@@ -39,110 +39,115 @@ class IncomeAccountsScreen extends ConsumerWidget {
         controllers: [controller, balanceController],
         child: StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-          scrollable: true,
-          title: Text(existing == null ? 'New wallet' : 'Update wallet'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  labelText: 'Wallet name',
-                  errorText: nameError,
-                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
-                ),
-                onChanged: (_) {
-                  if (nameError != null) {
-                    setDialogState(() => nameError = null);
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: balanceController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true, signed: false),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d*\.?\d{0,2}'),
+            scrollable: true,
+            title: Text(existing == null ? 'New wallet' : 'Update wallet'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'Wallet name',
+                    errorText: nameError,
+                    prefixIcon:
+                        const Icon(Icons.account_balance_wallet_outlined),
                   ),
-                ],
-                decoration: InputDecoration(
-                  labelText: 'Current balance',
-                  hintText: 'Amount currently available',
-                  prefixText: 'Rs. ',
-                  errorText: balanceError,
+                  onChanged: (_) {
+                    if (nameError != null) {
+                      setDialogState(() => nameError = null);
+                    }
+                  },
                 ),
-                onChanged: (_) {
-                  if (balanceError != null) {
-                    setDialogState(() => balanceError = null);
+                const SizedBox(height: 12),
+                TextField(
+                  controller: balanceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true, signed: false),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Current balance',
+                    hintText: 'Amount currently available',
+                    prefixText: 'Rs. ',
+                    errorText: balanceError,
+                  ),
+                  onChanged: (_) {
+                    if (balanceError != null) {
+                      setDialogState(() => balanceError = null);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This amount is included automatically in the total shown on the Home screen.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Reserve wallet'),
+                  subtitle:
+                      const Text('Mark money that you prefer to keep aside.'),
+                  value: isBackup,
+                  onChanged: (value) => setDialogState(() => isBackup = value),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final name = controller.text.trim();
+                  final balance =
+                      double.tryParse(balanceController.text.trim());
+                  if (name.isEmpty) {
+                    setDialogState(() => nameError = 'Enter a wallet name.');
+                    return;
                   }
+                  if (balance == null || !balance.isFinite || balance < 0) {
+                    setDialogState(() => balanceError =
+                        'Enter a valid balance of zero or more.');
+                    return;
+                  }
+
+                  final notifier = ref.read(walletProvider.notifier);
+                  final saved = existing == null
+                      ? await notifier.addWallet(
+                          Wallet(
+                            id: const Uuid().v4(),
+                            name: name,
+                            balance: balance,
+                            isBackup: isBackup,
+                            colorValue:
+                                ref.read(settingsProvider).profileColorValue,
+                            walletType: 'custom',
+                          ),
+                        )
+                      : await notifier.updateWallet(
+                          existing.copyWith(name: name, isBackup: isBackup),
+                          currentBalance: balance,
+                        );
+
+                  if (!dialogContext.mounted) return;
+                  if (!saved) {
+                    setDialogState(
+                      () =>
+                          nameError = 'A wallet with this name already exists.',
+                    );
+                    return;
+                  }
+                  Navigator.pop(dialogContext);
                 },
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'This amount is included automatically in the total shown on the Home screen.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Reserve wallet'),
-                subtitle: const Text('Mark money that you prefer to keep aside.'),
-                value: isBackup,
-                onChanged: (value) => setDialogState(() => isBackup = value),
+                child: Text(existing == null ? 'Create' : 'Update'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final name = controller.text.trim();
-                final balance = double.tryParse(balanceController.text.trim());
-                if (name.isEmpty) {
-                  setDialogState(() => nameError = 'Enter a wallet name.');
-                  return;
-                }
-                if (balance == null || !balance.isFinite || balance < 0) {
-                  setDialogState(() => balanceError = 'Enter a valid balance of zero or more.');
-                  return;
-                }
-
-                final notifier = ref.read(walletProvider.notifier);
-                final saved = existing == null
-                    ? await notifier.addWallet(
-                        Wallet(
-                          id: const Uuid().v4(),
-                          name: name,
-                          balance: balance,
-                          isBackup: isBackup,
-                          colorValue:
-                              ref.read(settingsProvider).profileColorValue,
-                          walletType: 'custom',
-                        ),
-                      )
-                    : await notifier.updateWallet(
-                        existing.copyWith(name: name, isBackup: isBackup),
-                        currentBalance: balance,
-                      );
-
-                if (!dialogContext.mounted) return;
-                if (!saved) {
-                  setDialogState(
-                    () => nameError = 'A wallet with this name already exists.',
-                  );
-                  return;
-                }
-                Navigator.pop(dialogContext);
-              },
-              child: Text(existing == null ? 'Create' : 'Update'),
-            ),
-          ],
           ),
         ),
       ),
@@ -155,8 +160,9 @@ class IncomeAccountsScreen extends ConsumerWidget {
 
     final titleController = TextEditingController();
     final amountController = TextEditingController();
-    String walletId =
-        wallets.firstWhere((wallet) => !wallet.isBackup, orElse: () => wallets.first).id;
+    String walletId = wallets
+        .firstWhere((wallet) => !wallet.isBackup, orElse: () => wallets.first)
+        .id;
     String? error;
 
     await showDialog<void>(
@@ -165,98 +171,99 @@ class IncomeAccountsScreen extends ConsumerWidget {
         controllers: [titleController, amountController],
         child: StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add income'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Income title',
-                  hintText: 'Salary, allowance, freelance…',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true, signed: false),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d*\.?\d{0,2}'),
+            title: const Text('Add income'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Income title',
+                    hintText: 'Salary, allowance, freelance…',
                   ),
-                ],
-                decoration: InputDecoration(
-                  labelText: 'Amount',
-                  prefixText: 'Rs. ',
-                  errorText: error,
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true, signed: false),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Amount',
+                    prefixText: 'Rs. ',
+                    errorText: error,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: walletId,
+                  decoration: const InputDecoration(labelText: 'Wallet'),
+                  items: wallets
+                      .map(
+                        (wallet) => DropdownMenuItem(
+                          value: wallet.id,
+                          child: Text(wallet.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => walletId = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This income increases the selected wallet and the total available balance.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: walletId,
-                decoration: const InputDecoration(labelText: 'Wallet'),
-                items: wallets
-                    .map(
-                      (wallet) => DropdownMenuItem(
-                        value: wallet.id,
-                        child: Text(wallet.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setDialogState(() => walletId = value);
+              FilledButton(
+                onPressed: () async {
+                  final amount = double.tryParse(amountController.text.trim());
+                  if (amount == null || !amount.isFinite || amount <= 0) {
+                    setDialogState(
+                        () => error = 'Enter a valid amount above zero.');
+                    return;
                   }
+
+                  final result = await ref
+                      .read(transactionExecutorProvider)
+                      .execute(CreateTransactionCommand(
+                        Expense(
+                          id: const Uuid().v4(),
+                          title: titleController.text.trim().isEmpty
+                              ? 'Income / Allowance'
+                              : titleController.text.trim(),
+                          amount: amount,
+                          date: DateTime.now(),
+                          category: 'Income / Allowance',
+                          colorValue: Colors.green.toARGB32(),
+                          type: 'income',
+                          walletId: walletId,
+                        ),
+                      ));
+                  if (!dialogContext.mounted) return;
+                  if (!result.succeeded) {
+                    setDialogState(() => error = 'Could not save this income.');
+                    return;
+                  }
+                  Navigator.pop(dialogContext);
                 },
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'This income increases the selected wallet and the total available balance.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                child: const Text('Add income'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final amount = double.tryParse(amountController.text.trim());
-                if (amount == null || !amount.isFinite || amount <= 0) {
-                  setDialogState(() => error = 'Enter a valid amount above zero.');
-                  return;
-                }
-
-                final result = await ref
-                    .read(transactionExecutorProvider)
-                    .execute(CreateTransactionCommand(
-                      Expense(
-                        id: const Uuid().v4(),
-                        title: titleController.text.trim().isEmpty
-                            ? 'Income / Allowance'
-                            : titleController.text.trim(),
-                        amount: amount,
-                        date: DateTime.now(),
-                        category: 'Income / Allowance',
-                        colorValue: Colors.green.toARGB32(),
-                        type: 'income',
-                        walletId: walletId,
-                      ),
-                    ));
-                if (!dialogContext.mounted) return;
-                if (!result.succeeded) {
-                  setDialogState(() => error = 'Could not save this income.');
-                  return;
-                }
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Add income'),
-            ),
-          ],
           ),
         ),
       ),
@@ -309,7 +316,8 @@ class IncomeAccountsScreen extends ConsumerWidget {
 
     final fallback = wallets.firstWhere(
       (candidate) => candidate.id != wallet.id && !candidate.isBackup,
-      orElse: () => wallets.firstWhere((candidate) => candidate.id != wallet.id),
+      orElse: () =>
+          wallets.firstWhere((candidate) => candidate.id != wallet.id),
     );
     final confirmed = await showDialog<bool>(
           context: context,
@@ -412,8 +420,10 @@ class IncomeAccountsScreen extends ConsumerWidget {
                       }
                     },
                     itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Rename / update')),
-                      PopupMenuItem(value: 'clear', child: Text('Clear balance')),
+                      PopupMenuItem(
+                          value: 'edit', child: Text('Rename / update')),
+                      PopupMenuItem(
+                          value: 'clear', child: Text('Clear balance')),
                       PopupMenuItem(value: 'delete', child: Text('Delete')),
                     ],
                   ),
@@ -442,8 +452,7 @@ class _DialogControllerScope extends StatefulWidget {
   });
 
   @override
-  State<_DialogControllerScope> createState() =>
-      _DialogControllerScopeState();
+  State<_DialogControllerScope> createState() => _DialogControllerScopeState();
 }
 
 class _DialogControllerScopeState extends State<_DialogControllerScope> {

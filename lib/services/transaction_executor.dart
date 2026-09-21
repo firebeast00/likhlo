@@ -159,9 +159,8 @@ class TransactionExecutor {
               ? TransactionResultStatus.succeeded
               : TransactionResultStatus.rejected,
           action: TransactionAction.transfer,
-          affectedIds: saved
-              ? [command.outgoing.id, command.incoming.id]
-              : const [],
+          affectedIds:
+              saved ? [command.outgoing.id, command.incoming.id] : const [],
           reason: saved ? null : 'Ledger validation rejected the transfer.',
         );
       case UpdateTransactionCommand():

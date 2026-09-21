@@ -78,14 +78,14 @@ class ScannedReceipt {
   /// 'description') so existing call sites don't break, and adds the new
   /// itemized/raw/confidence fields on top.
   Map<String, dynamic> toJson() => {
-    'title': vendor,
-    'amount': total,
-    'category': category,
-    'description': description,
-    'items': items.map((e) => e.toJson()).toList(),
-    'rawText': rawText,
-    'confidence': confidence,
-  };
+        'title': vendor,
+        'amount': total,
+        'category': category,
+        'description': description,
+        'items': items.map((e) => e.toJson()).toList(),
+        'rawText': rawText,
+        'confidence': confidence,
+      };
 }
 
 class OcrScannerService {
@@ -97,12 +97,31 @@ class OcrScannerService {
   final ImagePicker _picker = ImagePicker();
 
   static const _totalKeywords = [
-    'total', 'amount', 'sum', 'net', 'due', 'balance', 'grand',
-    'bill', 'hisab', 'hisaab', 'kul', 'jama', 'payable', 'paid',
+    'total',
+    'amount',
+    'sum',
+    'net',
+    'due',
+    'balance',
+    'grand',
+    'bill',
+    'hisab',
+    'hisaab',
+    'kul',
+    'jama',
+    'payable',
+    'paid',
   ];
 
   static const _ignoreWords = [
-    'cash', 'change', 'tax', 'gst', 'date', 'time', 'qty', 'no',
+    'cash',
+    'change',
+    'tax',
+    'gst',
+    'date',
+    'time',
+    'qty',
+    'no',
   ];
 
   /// Launches the camera (or gallery), processes the image, and returns
@@ -244,9 +263,9 @@ class OcrScannerService {
     // (checked below), so plain words like "So" or "Oil" are never
     // mistaken for prices.
     final numberCandidateRegex =
-    RegExp(r'[0-9OoIiLlSsBbZz]+(?:[.,][0-9OoIiLlSsBbZz]+)?');
+        RegExp(r'[0-9OoIiLlSsBbZz]+(?:[.,][0-9OoIiLlSsBbZz]+)?');
     final currencyMarkers =
-    RegExp(r'(rs\.?|pkr|inr|rupees|rupya|/-|/=)', caseSensitive: false);
+        RegExp(r'(rs\.?|pkr|inr|rupees|rupya|/-|/=)', caseSensitive: false);
 
     final items = <ReceiptItem>[];
     final allPrices = <double>[];
@@ -288,7 +307,7 @@ class OcrScannerService {
       allPrices.add(linePrice);
 
       final isTotalLine =
-      _fuzzyContainsAny(lower, _totalKeywords, maxDistance: 1);
+          _fuzzyContainsAny(lower, _totalKeywords, maxDistance: 1);
       final isIgnoreLine =
           _fuzzyContainsAny(lower, _ignoreWords, maxDistance: 1) &&
               !isTotalLine;
@@ -342,7 +361,7 @@ class OcrScannerService {
     final descriptionText = items.isEmpty
         ? 'Quick Scan'
         : (items.take(3).map((e) => e.name).join(', ') +
-        (items.length > 3 ? '...' : ''));
+            (items.length > 3 ? '...' : ''));
 
     // --- STEP 4: CONFIDENCE HEURISTIC ---
     // Structural, not a true ML confidence score — capped below 0.95
@@ -370,10 +389,10 @@ class OcrScannerService {
   /// to [maxDistance] character edits per word — catches OCR misspellings
   /// of keywords like "total" reading as "t0tal" or "toial".
   bool _fuzzyContainsAny(
-      String haystack,
-      List<String> needles, {
-        int maxDistance = 0,
-      }) {
+    String haystack,
+    List<String> needles, {
+    int maxDistance = 0,
+  }) {
     for (final needle in needles) {
       if (haystack.contains(needle)) return true;
       if (maxDistance > 0) {

@@ -105,9 +105,10 @@ class PrimaryIntentRouter {
       );
     }
 
-    final asksFinancialQuestion =
-        has(r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net)\b') ||
-        has(r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining|net)\b') ||
+    final asksFinancialQuestion = has(
+            r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net)\b') ||
+        has(
+            r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining|net)\b') ||
         (has(r'\b(show|tell|calculate|summary|report|dikhao|batao)\b') &&
             has(r'\b(spent|spending|expense|expenses|income|earned|received|kamai)\b'));
     if (asksFinancialQuestion) {
@@ -178,8 +179,7 @@ class PrimaryIntentRouter {
   }
 
   bool _hasAmountSignal(String input) {
-    if (RegExp(r'(^|\s)(?:rs\.?|pkr)?\s*\d+(?:[,.]\d+)?\b')
-        .hasMatch(input)) {
+    if (RegExp(r'(^|\s)(?:rs\.?|pkr)?\s*\d+(?:[,.]\d+)?\b').hasMatch(input)) {
       return true;
     }
     return RegExp(
@@ -189,17 +189,86 @@ class PrimaryIntentRouter {
 
   bool _hasCandidateItem(String input) {
     const nonItemWords = {
-      'rs', 'pkr', 'rupee', 'rupees', 'paisa', 'paise', 'rupay',
-      'aik', 'ek', 'do', 'teen', 'tin', 'chaar', 'char', 'paanch',
-      'panch', 'chhay', 'saat', 'aath', 'nau', 'das', 'bees', 'tees',
-      'chalees', 'pachas', 'saath', 'sattar', 'assi', 'nabbe', 'one',
-      'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
-      'ten', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy',
-      'eighty', 'ninety', 'hundred', 'sau', 'hazar', 'hazaar',
-      'thousand', 'lakh', 'lac', 'crore', 'million', 'paanso', 'paso',
-      'k', 'for', 'on', 'at', 'to', 'from', 'se', 'me', 'mein', 'ko',
-      'ka', 'ki', 'ke', 'cash', 'wallet', 'account', 'jazzcash',
-      'easypaisa', 'today', 'yesterday', 'aaj', 'kal',
+      'rs',
+      'pkr',
+      'rupee',
+      'rupees',
+      'paisa',
+      'paise',
+      'rupay',
+      'aik',
+      'ek',
+      'do',
+      'teen',
+      'tin',
+      'chaar',
+      'char',
+      'paanch',
+      'panch',
+      'chhay',
+      'saat',
+      'aath',
+      'nau',
+      'das',
+      'bees',
+      'tees',
+      'chalees',
+      'pachas',
+      'saath',
+      'sattar',
+      'assi',
+      'nabbe',
+      'one',
+      'two',
+      'three',
+      'four',
+      'five',
+      'six',
+      'seven',
+      'eight',
+      'nine',
+      'ten',
+      'twenty',
+      'thirty',
+      'forty',
+      'fifty',
+      'sixty',
+      'seventy',
+      'eighty',
+      'ninety',
+      'hundred',
+      'sau',
+      'hazar',
+      'hazaar',
+      'thousand',
+      'lakh',
+      'lac',
+      'crore',
+      'million',
+      'paanso',
+      'paso',
+      'k',
+      'for',
+      'on',
+      'at',
+      'to',
+      'from',
+      'se',
+      'me',
+      'mein',
+      'ko',
+      'ka',
+      'ki',
+      'ke',
+      'cash',
+      'wallet',
+      'account',
+      'jazzcash',
+      'easypaisa',
+      'today',
+      'yesterday',
+      'aaj',
+      'kal',
     };
     return input
         .split(RegExp(r'\s+'))

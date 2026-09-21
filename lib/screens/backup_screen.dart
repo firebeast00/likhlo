@@ -213,7 +213,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       if (mounted) _showMessage(error.message);
     } catch (error) {
       debugPrint('Backup operation failed: $error');
-      if (mounted) _showMessage('Backup operation failed. No data was deleted.');
+      if (mounted)
+        _showMessage('Backup operation failed. No data was deleted.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -248,7 +249,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                     SizedBox(height: 12),
                     Text(
                       'Your financial data stays private',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                     ),
                     SizedBox(height: 6),
                     Text(
@@ -274,7 +276,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                     ListTile(
                       leading: const Icon(Icons.restore_rounded),
                       title: const Text('Restore from backup'),
-                      subtitle: const Text('Validate and preview before replacing data'),
+                      subtitle: const Text(
+                          'Validate and preview before replacing data'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: _busy ? null : _restoreBackup,
                     ),
@@ -283,7 +286,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       ListTile(
                         leading: const Icon(Icons.history_rounded),
                         title: const Text('Recover data before last restore'),
-                        subtitle: const Text('Available until the next successful recovery'),
+                        subtitle: const Text(
+                            'Available until the next successful recovery'),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: _busy ? null : _restorePreviousData,
                       ),
@@ -349,7 +353,8 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(widget.confirmPassword ? 'Protect backup' : 'Unlock backup'),
+        title:
+            Text(widget.confirmPassword ? 'Protect backup' : 'Unlock backup'),
         content: Form(
           key: _formKey,
           child: Column(
@@ -365,7 +370,8 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
                       : null,
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _obscure = !_obscure),
-                    icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(
+                        _obscure ? Icons.visibility : Icons.visibility_off),
                   ),
                 ),
                 validator: (value) => (value ?? '').length < 8
@@ -377,7 +383,8 @@ class _BackupPasswordDialogState extends State<_BackupPasswordDialog> {
                 TextFormField(
                   controller: _confirmation,
                   obscureText: _obscure,
-                  decoration: const InputDecoration(labelText: 'Confirm passphrase'),
+                  decoration:
+                      const InputDecoration(labelText: 'Confirm passphrase'),
                   validator: (value) => value != _password.text
                       ? 'Passphrases do not match'
                       : null,

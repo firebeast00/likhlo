@@ -184,7 +184,8 @@ void main() {
       );
 
       expect(plan.normalizedText, '200 pain medicine');
-      expect(plan.normalization.appliedRules, isNot(contains('pen_asr_context')));
+      expect(
+          plan.normalization.appliedRules, isNot(contains('pen_asr_context')));
     });
   });
 
@@ -200,7 +201,8 @@ void main() {
 
     expect(plan.parsed.title, 'Quick Expense');
     expect(confidence.canAutoExecute, isFalse);
-    expect(confidence.reasons, contains('A specific expense title is required.'));
+    expect(
+        confidence.reasons, contains('A specific expense title is required.'));
     expect(
       shouldAutoSaveSmartEntry(
         plan.parsed.toLegacyMap(),

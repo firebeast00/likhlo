@@ -13,7 +13,13 @@ class CategoryNotifier extends StateNotifier<List<String>> {
     final box = Hive.box('preferences');
 
     final List<String> defaults = [
-      'General', 'Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Education'
+      'General',
+      'Food',
+      'Transport',
+      'Shopping',
+      'Entertainment',
+      'Health',
+      'Education'
     ];
 
     final saved = box.get('categories', defaultValue: defaults);
@@ -26,8 +32,8 @@ class CategoryNotifier extends StateNotifier<List<String>> {
     if (!Hive.isBoxOpen('preferences')) return false; // Safety
 
     final cleaned = name.trim();
-    final isDuplicate =
-        state.any((category) => category.toLowerCase() == cleaned.toLowerCase());
+    final isDuplicate = state
+        .any((category) => category.toLowerCase() == cleaned.toLowerCase());
     if (cleaned.isNotEmpty && !isDuplicate) {
       final updated = [...state, cleaned];
       final box = Hive.box('preferences');
@@ -72,6 +78,7 @@ class CategoryNotifier extends StateNotifier<List<String>> {
   }
 }
 
-final categoryProvider = StateNotifierProvider<CategoryNotifier, List<String>>((ref) {
+final categoryProvider =
+    StateNotifierProvider<CategoryNotifier, List<String>>((ref) {
   return CategoryNotifier();
 });

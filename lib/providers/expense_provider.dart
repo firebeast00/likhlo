@@ -105,8 +105,8 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     if (keyToEdit == null) return false;
     await _box.put(keyToEdit, updated);
 
-    final updatedExpenses = state.allExpenses
-        .map((entry) => entry.id == id ? updated : entry);
+    final updatedExpenses =
+        state.allExpenses.map((entry) => entry.id == id ? updated : entry);
     state = ExpenseState(allExpenses: _sortByNewest(updatedExpenses));
     return true;
   }
@@ -122,8 +122,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 
     // Updates the UI synchronously so Flutter knows the item is gone!
     state = ExpenseState(
-      allExpenses:
-          state.allExpenses.where((entry) => entry.id != id).toList(),
+      allExpenses: state.allExpenses.where((entry) => entry.id != id).toList(),
     );
     return true;
   }
@@ -146,15 +145,16 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     state = ExpenseState(
       allExpenses: state.allExpenses
           .where((entry) =>
-              entry.id != '${transferId}_out' &&
-              entry.id != '${transferId}_in')
+              entry.id != '${transferId}_out' && entry.id != '${transferId}_in')
           .toList(),
     );
   }
 
   Future<void> reassignWallet(String fromWalletId, String toWalletId) async {
     if (fromWalletId == toWalletId) return;
-    final entries = _box.toMap().entries
+    final entries = _box
+        .toMap()
+        .entries
         .where((entry) => entry.value.walletId == fromWalletId)
         .toList();
 
@@ -172,7 +172,8 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 }
 
-final expenseProvider = StateNotifierProvider<ExpenseNotifier, ExpenseState>((ref) {
+final expenseProvider =
+    StateNotifierProvider<ExpenseNotifier, ExpenseState>((ref) {
   return ExpenseNotifier();
 });
 
@@ -197,6 +198,7 @@ bool keepsWalletBalancesNonNegative({
             : 0.0;
     balances[entry.walletId] = balances[entry.walletId]! + delta;
   }
+
   for (final entry in existing) {
     if (!replacedIds.contains(entry.id)) apply(entry);
   }
@@ -287,11 +289,13 @@ List<Expense> visibleTransactions(Iterable<Expense> entries) {
   return records.where((e) {
     if (e.category != 'Transfer' || !e.id.endsWith('_in')) return true;
     final source = outgoing[e.id.substring(0, e.id.length - 3)];
-    return source == null || source.amount != e.amount ||
-        source.date != e.date || source.type != 'expense' || e.type != 'income';
+    return source == null ||
+        source.amount != e.amount ||
+        source.date != e.date ||
+        source.type != 'expense' ||
+        e.type != 'income';
   }).toList(growable: false);
 }
-
 
 class LedgerReportSummary {
   final List<Expense> transactions;
@@ -323,8 +327,7 @@ LedgerReportSummary calculateLedgerReportSummary(Iterable<Expense> entries) {
   var transferTotal = 0.0;
 
   for (final entry in transactions) {
-    final isTransfer =
-        entry.category.trim().toLowerCase() == 'transfer';
+    final isTransfer = entry.category.trim().toLowerCase() == 'transfer';
     if (isTransfer) {
       transferCount++;
       transferTotal += entry.amount;

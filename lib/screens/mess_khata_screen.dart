@@ -36,7 +36,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
           if (!mounted) return;
           if (val == 'done' || val == 'notListening') {
             setState(() => _isListening = false);
-            if (_smartInputCtrl.text.isNotEmpty && _smartInputCtrl.text != "Listening...") {
+            if (_smartInputCtrl.text.isNotEmpty &&
+                _smartInputCtrl.text != "Listening...") {
               _processNLP(_smartInputCtrl.text);
             }
           }
@@ -58,7 +59,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
           },
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Speech recognition unavailable.")));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Speech recognition unavailable.")));
       }
     } else {
       setState(() => _isListening = false);
@@ -68,14 +70,20 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
 
   void _processNLP(String text) {
     if (text.isEmpty || text == "Listening...") return;
-    final result = LocalNlpService().parseExpense(text, ["Hostel/Mess", "Groceries", "Food"]);
+    final result = LocalNlpService()
+        .parseExpense(text, ["Hostel/Mess", "Groceries", "Food"]);
 
     if (result['amount'] > 0) {
-      _showAddDialog(context, ref, initialTitle: result['title'], initialAmount: result['amount'].toString());
+      _showAddDialog(context, ref,
+          initialTitle: result['title'],
+          initialAmount: result['amount'].toString());
       _smartInputCtrl.clear();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ Could not detect amount. Try: '800 for Mess Lunch'"), backgroundColor: Colors.red),
+        const SnackBar(
+            content:
+                Text("❌ Could not detect amount. Try: '800 for Mess Lunch'"),
+            backgroundColor: Colors.red),
       );
     }
     FocusScope.of(context).unfocus();
@@ -88,13 +96,16 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
       builder: (ctx) => Center(
         child: Container(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(color: Theme.of(context).primaryColor),
               const SizedBox(height: 16),
-              const Text("Scanning Receipt...", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text("Scanning Receipt...",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -106,10 +117,14 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
     Navigator.pop(context);
 
     if (receiptData != null && receiptData['amount'] > 0) {
-      _showAddDialog(context, ref, initialTitle: receiptData['title'], initialAmount: receiptData['amount'].toString());
+      _showAddDialog(context, ref,
+          initialTitle: receiptData['title'],
+          initialAmount: receiptData['amount'].toString());
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ Could not read receipt clearly."), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text("❌ Could not read receipt clearly."),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -127,65 +142,91 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
     }
 
     final activePayers = paidMap.keys.toList();
-    final fairShare = activePayers.isNotEmpty ? grandTotal / (activePayers.length + 1) : 0.0;
+    final fairShare =
+        activePayers.isNotEmpty ? grandTotal / (activePayers.length + 1) : 0.0;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).cardColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)))),
+            Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 20),
-            const Text("Settlement Matrix", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-            const Text("AI breakdown of shared hostel liability", style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const Text("Settlement Matrix",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const Text("AI breakdown of shared hostel liability",
+                style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(
+                  color: Colors.teal.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // 🚀 FIX: Wrapped in Expanded to prevent text overflow
                   const Expanded(
-                    child: Text("Estimated Fair Share / Person", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    child: Text("Estimated Fair Share / Person",
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13)),
                   ),
                   const SizedBox(width: 8),
-                  Text("Rs. ${fairShare.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.teal)),
+                  Text("Rs. ${fairShare.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: Colors.teal)),
                 ],
               ),
             ),
             const SizedBox(height: 20),
-            const Text("Individual Contributions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const Text("Individual Contributions",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             const SizedBox(height: 10),
             if (paidMap.isEmpty)
-              const Text("No entries recorded yet to compute settlement.", style: TextStyle(color: Colors.grey, fontSize: 12))
+              const Text("No entries recorded yet to compute settlement.",
+                  style: TextStyle(color: Colors.grey, fontSize: 12))
             else
               ...paidMap.entries.map((entry) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // 🚀 FIX: Wrapped in Expanded with ellipsis
-                    Expanded(
-                      child: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // 🚀 FIX: Wrapped in Expanded with ellipsis
+                        Expanded(
+                          child: Text(entry.key,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 8),
+                        Text("Paid Rs. ${entry.value.toStringAsFixed(0)}",
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text("Paid Rs. ${entry.value.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              )),
+                  )),
           ],
         ),
       ),
     );
   }
 
-  void _showAddDialog(BuildContext context, WidgetRef ref, {String initialTitle = "", String initialAmount = ""}) {
+  void _showAddDialog(BuildContext context, WidgetRef ref,
+      {String initialTitle = "", String initialAmount = ""}) {
     final titleCtrl = TextEditingController(text: initialTitle);
     final amountCtrl = TextEditingController(text: initialAmount);
     final payerCtrl = TextEditingController(text: "Me");
@@ -198,14 +239,18 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
           backgroundColor: Theme.of(context).cardColor,
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle),
                 child: Icon(Icons.group_rounded, color: primaryColor),
               ),
               const SizedBox(width: 12),
@@ -227,28 +272,45 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 4),
-                  _buildDialogInput(titleCtrl, "Expense Title (e.g. Mess Lunch)", Icons.title_rounded, context, primaryColor),
+                  _buildDialogInput(
+                      titleCtrl,
+                      "Expense Title (e.g. Mess Lunch)",
+                      Icons.title_rounded,
+                      context,
+                      primaryColor),
                   const SizedBox(height: 14),
-                  _buildDialogInput(amountCtrl, "Total Amount (Rs.)", Icons.attach_money_rounded, context, primaryColor, isNumber: true),
+                  _buildDialogInput(amountCtrl, "Total Amount (Rs.)",
+                      Icons.attach_money_rounded, context, primaryColor,
+                      isNumber: true),
                   const SizedBox(height: 14),
 
                   // Quick Payer Selection Chips
-                  const Text("Paid By:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const Text("Paid By:",
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
                     children: ["Me", "Roommate", "Hostel Mess"].map((payer) {
                       final isSelected = payerCtrl.text == payer;
                       return ChoiceChip(
-                        label: Text(payer, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : null)),
+                        label: Text(payer,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: isSelected ? Colors.white : null)),
                         selected: isSelected,
                         selectedColor: primaryColor,
-                        onSelected: (_) => setDialogState(() => payerCtrl.text = payer),
+                        onSelected: (_) =>
+                            setDialogState(() => payerCtrl.text = payer),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 14),
-                  _buildDialogInput(countCtrl, "Split Among (People)", Icons.people_outline_rounded, context, primaryColor, isNumber: true),
+                  _buildDialogInput(countCtrl, "Split Among (People)",
+                      Icons.people_outline_rounded, context, primaryColor,
+                      isNumber: true),
                 ],
               ),
             ),
@@ -261,10 +323,13 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                   child: TextButton(
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                    child: const Text("Cancel",
+                        style: TextStyle(
+                            color: Colors.grey, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -275,7 +340,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: () async {
                       final amt = double.tryParse(amountCtrl.text) ?? 0;
@@ -284,19 +350,17 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                         final expenseId = const Uuid().v4();
 
                         await ref.read(messProvider.notifier).addEntry(
-                          MessEntry(
-                            id: expenseId,
-                            title: titleCtrl.text,
-                            totalAmount: amt,
-                            paidBy: payerCtrl.text,
-                            splitCount: count,
-                            date: DateTime.now(),
-                          ),
-                        );
+                              MessEntry(
+                                id: expenseId,
+                                title: titleCtrl.text,
+                                totalAmount: amt,
+                                paidBy: payerCtrl.text,
+                                splitCount: count,
+                                date: DateTime.now(),
+                              ),
+                            );
 
-                        await ref
-                            .read(transactionExecutorProvider)
-                            .execute(
+                        await ref.read(transactionExecutorProvider).execute(
                               CreateTransactionCommand(
                                 Expense(
                                   id: expenseId,
@@ -314,7 +378,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                         Navigator.pop(ctx);
                       }
                     },
-                    child: const Text("Save & Sync", style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text("Save & Sync",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -325,7 +390,9 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
     );
   }
 
-  Widget _buildDialogInput(TextEditingController ctrl, String label, IconData icon, BuildContext context, Color primaryColor, {bool isNumber = false}) {
+  Widget _buildDialogInput(TextEditingController ctrl, String label,
+      IconData icon, BuildContext context, Color primaryColor,
+      {bool isNumber = false}) {
     return TextField(
       controller: ctrl,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
@@ -335,10 +402,17 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
         labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
         prefixIcon: Icon(icon, color: Colors.grey, size: 20),
         filled: true,
-        fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.black26 : Colors.grey.shade50,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: primaryColor, width: 1.5)),
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black26
+            : Colors.grey.shade50,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: primaryColor, width: 1.5)),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       ),
     );
   }
@@ -350,8 +424,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    double totalMessSpend =
-        entries.fold(0.0, (sum, e) => sum + e.totalAmount);
+    double totalMessSpend = entries.fold(0.0, (sum, e) => sum + e.totalAmount);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -362,7 +435,11 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Hostel & Mess Khata", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+              const Text("Hostel & Mess Khata",
+                  style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5)),
               IconButton(
                 icon: const Icon(Icons.analytics_outlined),
                 tooltip: "Settlement Breakdown",
@@ -384,7 +461,10 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
               ),
               borderRadius: BorderRadius.circular(32),
               boxShadow: [
-                BoxShadow(color: primaryColor.withValues(alpha: isDark ? 0.3 : 0.4), blurRadius: 20, offset: const Offset(0, 10))
+                BoxShadow(
+                    color: primaryColor.withValues(alpha: isDark ? 0.3 : 0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10))
               ],
             ),
             child: Column(
@@ -393,21 +473,41 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Total Shared Pool", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 14)),
+                    const Text("Total Shared Pool",
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14)),
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
-                      child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
+                      decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle),
+                      child: const Icon(Icons.account_balance_wallet_rounded,
+                          color: Colors.white, size: 18),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text("Rs. ${totalMessSpend.toStringAsFixed(0)}", style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1.0)),
+                Text("Rs. ${totalMessSpend.toStringAsFixed(0)}",
+                    style: const TextStyle(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -1.0)),
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                  child: const Text("🔗 Automatically synced with monthly budget", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Text(
+                      "🔗 Automatically synced with monthly budget",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -420,15 +520,25 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
             decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.12), width: 1.2),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
-            ),
+                border: Border.all(
+                    color: isDark
+                        ? primaryColor.withValues(alpha: 0.3)
+                        : Colors.grey.withValues(alpha: 0.12),
+                    width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4))
+                ]),
             child: Row(
               children: [
                 IconButton(
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.all(10),
-                  icon: Icon(_isListening ? Icons.mic : Icons.mic_none_rounded, color: _isListening ? Colors.red : primaryColor, size: 22),
+                  icon: Icon(_isListening ? Icons.mic : Icons.mic_none_rounded,
+                      color: _isListening ? Colors.red : primaryColor,
+                      size: 22),
                   onPressed: _listenForInput,
                 ),
                 Expanded(
@@ -436,11 +546,15 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                     controller: _smartInputCtrl,
                     style: const TextStyle(fontSize: 13),
                     decoration: InputDecoration(
-                      hintText: _isListening ? 'Listening...' : 'Speak/Type: "1200 for Dinner"',
+                      hintText: _isListening
+                          ? 'Listening...'
+                          : 'Speak/Type: "1200 for Dinner"',
                       border: InputBorder.none,
-                      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                      hintStyle:
+                          TextStyle(color: Colors.grey.shade400, fontSize: 12),
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
                     ),
                     onSubmitted: (val) => _processNLP(val),
                   ),
@@ -448,7 +562,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 IconButton(
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.all(10),
-                  icon: const Icon(Icons.document_scanner_rounded, color: Colors.blueAccent, size: 20),
+                  icon: const Icon(Icons.document_scanner_rounded,
+                      color: Colors.blueAccent, size: 20),
                   onPressed: _startReceiptScan,
                   tooltip: "Scan Receipt",
                 ),
@@ -467,8 +582,16 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Split History", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-              Text("${entries.length} records", style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text("Split History",
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5)),
+              Text("${entries.length} records",
+                  style: TextStyle(
+                      color: Colors.grey.shade500,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 12),
@@ -481,9 +604,12 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.receipt_long_rounded, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
+                    Icon(Icons.receipt_long_rounded,
+                        size: 60, color: Colors.grey.withValues(alpha: 0.3)),
                     const SizedBox(height: 12),
-                    const Text("No shared expenses logged yet.", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+                    const Text("No shared expenses logged yet.",
+                        style: TextStyle(
+                            color: Colors.grey, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -497,15 +623,26 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                 decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.1), width: 1.2),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
-                ),
+                    border: Border.all(
+                        color: isDark
+                            ? primaryColor.withValues(alpha: 0.2)
+                            : Colors.grey.withValues(alpha: 0.1),
+                        width: 1.2),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4))
+                    ]),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle),
-                      child: Icon(Icons.group_rounded, color: primaryColor, size: 20),
+                      decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.15),
+                          shape: BoxShape.circle),
+                      child: Icon(Icons.group_rounded,
+                          color: primaryColor, size: 20),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -514,14 +651,18 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                         children: [
                           Text(
                             item.title,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 15),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             "Paid by ${item.paidBy} • ${item.splitCount} people (Rs. ${perPerson.toStringAsFixed(0)}/ea)",
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade500,
+                                fontWeight: FontWeight.w500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -534,7 +675,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       children: [
                         Text(
                           "Rs. ${item.totalAmount.toStringAsFixed(0)}",
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900, fontSize: 15),
                         ),
                         const SizedBox(height: 4),
                         InkWell(
@@ -549,12 +691,16 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
 
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Deleted split expense & synced budget"), backgroundColor: Colors.red),
+                              const SnackBar(
+                                  content: Text(
+                                      "Deleted split expense & synced budget"),
+                                  backgroundColor: Colors.red),
                             );
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(2.0),
-                            child: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 18),
+                            child: Icon(Icons.delete_outline_rounded,
+                                color: Colors.red.shade400, size: 18),
                           ),
                         ),
                       ],

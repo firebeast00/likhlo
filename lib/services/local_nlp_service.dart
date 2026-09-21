@@ -148,10 +148,8 @@ class ParsedSmartEntryCommand {
       'type': transactionType,
       'intent': intent.wireName,
       'confidence': confidence,
-      'fieldConfidence':
-          Map<String, double>.unmodifiable(confidenceByField),
-      'clarificationReasons':
-          List<String>.unmodifiable(clarificationReasons),
+      'fieldConfidence': Map<String, double>.unmodifiable(confidenceByField),
+      'clarificationReasons': List<String>.unmodifiable(clarificationReasons),
       'queryMetric': queryMetric?.name,
       'timeRange': timeRange.name,
       'navigationTarget': navigationTarget,
@@ -228,15 +226,10 @@ int _smartEntryMatchDistance(String first, String second) {
 
   var previous = List<int>.generate(second.length + 1, (index) => index);
   var current = List<int>.filled(second.length + 1, 0);
-  for (var firstIndex = 0;
-      firstIndex < first.length;
-      firstIndex++) {
+  for (var firstIndex = 0; firstIndex < first.length; firstIndex++) {
     current[0] = firstIndex + 1;
-    for (var secondIndex = 0;
-        secondIndex < second.length;
-        secondIndex++) {
-      final substitution =
-          first[firstIndex] == second[secondIndex] ? 0 : 1;
+    for (var secondIndex = 0; secondIndex < second.length; secondIndex++) {
+      final substitution = first[firstIndex] == second[secondIndex] ? 0 : 1;
       current[secondIndex + 1] = min(
         current[secondIndex] + 1,
         min(
@@ -329,17 +322,15 @@ SmartEntryMatchResult matchSmartEntryTransaction({
 
   final scored = <_ScoredSmartEntryTransaction>[];
   for (final entry in entries) {
-    final isTransfer =
-        entry.category.trim().toLowerCase() == 'transfer' ||
+    final isTransfer = entry.category.trim().toLowerCase() == 'transfer' ||
         entry.id.endsWith('_out') ||
         entry.id.endsWith('_in');
     if (isTransfer) continue;
     if (walletId != null && entry.walletId != walletId) continue;
     if (requestedType != null && entry.type != requestedType) continue;
-    final requestedDate = selectorDate ??
-        (command.hasExplicitDate ? command.date : null);
-    if (requestedDate != null &&
-        !_sameCalendarDay(entry.date, requestedDate)) {
+    final requestedDate =
+        selectorDate ?? (command.hasExplicitDate ? command.date : null);
+    if (requestedDate != null && !_sameCalendarDay(entry.date, requestedDate)) {
       continue;
     }
     final requestedAmount = selectorAmount ??
@@ -347,8 +338,7 @@ SmartEntryMatchResult matchSmartEntryTransaction({
                 command.intent == SmartEntryIntent.repeatEntry)
             ? command.amount
             : 0.0);
-    if (requestedAmount > 0 &&
-        (entry.amount - requestedAmount).abs() > 0.005) {
+    if (requestedAmount > 0 && (entry.amount - requestedAmount).abs() > 0.005) {
       continue;
     }
 
@@ -451,112 +441,511 @@ class LocalNlpService {
   // ==========================================
   final Map<String, List<String>> _groupedLexicon = {
     'Food': [
-      'biryani', 'burger', 'burgers', 'kfc', 'mcdonalds', 'shawarma', 'roll', 'pizza',
-      'fries', 'chips', 'samosa', 'pakora', 'nimko', 'biscuit', 'cake', 'ice cream',
-      'zinger', 'broast', 'sandwich', 'patties', 'gol gappay', 'chaat', 'kachori',
-      'lunch', 'dinner', 'breakfast', 'nashta', 'khana', 'roti', 'naan', 'salan',
-      'karahi', 'daal', 'chawal', 'sabzi', 'gosht', 'mutton', 'beef', 'chicken', 'anda',
-      'chai', 'tea', 'coffee', 'water', 'pani', 'juice', 'shake', 'cold drink',
-      'pepsi', 'coke', 'sting', 'redbull', 'bottle', 'doodh', 'milk', 'lassi',
-      'groceries', 'rashan', 'fruit', 'phal', 'dahi', 'mithai', 'baking', 'masala'
+      'biryani',
+      'burger',
+      'burgers',
+      'kfc',
+      'mcdonalds',
+      'shawarma',
+      'roll',
+      'pizza',
+      'fries',
+      'chips',
+      'samosa',
+      'pakora',
+      'nimko',
+      'biscuit',
+      'cake',
+      'ice cream',
+      'zinger',
+      'broast',
+      'sandwich',
+      'patties',
+      'gol gappay',
+      'chaat',
+      'kachori',
+      'lunch',
+      'dinner',
+      'breakfast',
+      'nashta',
+      'khana',
+      'roti',
+      'naan',
+      'salan',
+      'karahi',
+      'daal',
+      'chawal',
+      'sabzi',
+      'gosht',
+      'mutton',
+      'beef',
+      'chicken',
+      'anda',
+      'chai',
+      'tea',
+      'coffee',
+      'water',
+      'pani',
+      'juice',
+      'shake',
+      'cold drink',
+      'pepsi',
+      'coke',
+      'sting',
+      'redbull',
+      'bottle',
+      'doodh',
+      'milk',
+      'lassi',
+      'groceries',
+      'rashan',
+      'fruit',
+      'phal',
+      'dahi',
+      'mithai',
+      'baking',
+      'masala'
     ],
     'Transport': [
-      'uber', 'careem', 'indrive', 'bykea', 'yango', 'rickshaw', 'auto', 'bike',
-      'bus', 'wagon', 'train', 'car', 'taxi', 'qinqi', 'chingchi',
-      'petrol', 'fuel', 'cng', 'diesel', 'fare', 'ticket', 'rent', 'kiraya',
-      'parking', 'toll', 'challan', 'mechanic', 'puncture', 'oil change', 'tuning'
+      'uber',
+      'careem',
+      'indrive',
+      'bykea',
+      'yango',
+      'rickshaw',
+      'auto',
+      'bike',
+      'bus',
+      'wagon',
+      'train',
+      'car',
+      'taxi',
+      'qinqi',
+      'chingchi',
+      'petrol',
+      'fuel',
+      'cng',
+      'diesel',
+      'fare',
+      'ticket',
+      'rent',
+      'kiraya',
+      'parking',
+      'toll',
+      'challan',
+      'mechanic',
+      'puncture',
+      'oil change',
+      'tuning'
     ],
     'Shopping': [
-      'shirt', 'shoes', 'clothes', 'shopping', 'jacket', 'pant', 'watch', 'glasses',
-      'bag', 'perfume', 'gift', 'tohfa', 'kapre', 'suit', 'kurta', 'shalwar',
-      'jootay', 'chappal', 'sneakers', 'wallet', 'belt', 'makeup', 'jewelry'
+      'shirt',
+      'shoes',
+      'clothes',
+      'shopping',
+      'jacket',
+      'pant',
+      'watch',
+      'glasses',
+      'bag',
+      'perfume',
+      'gift',
+      'tohfa',
+      'kapre',
+      'suit',
+      'kurta',
+      'shalwar',
+      'jootay',
+      'chappal',
+      'sneakers',
+      'wallet',
+      'belt',
+      'makeup',
+      'jewelry'
     ],
     'Bills': [
-      'bill', 'bijli', 'electric', 'electricity', 'gas', 'water bill', 'wapda',
-      'k-electric', 'k electric', 'ptcl', 'sui gas', 'maintenance', 'trash', 'kachra',
-      'recharge', 'easyload', 'balance', 'data plan', 'package', 'wifi', 'internet',
-      'cable', 'jazz', 'zong', 'telenor', 'ufone', 'card'
+      'bill',
+      'bijli',
+      'electric',
+      'electricity',
+      'gas',
+      'water bill',
+      'wapda',
+      'k-electric',
+      'k electric',
+      'ptcl',
+      'sui gas',
+      'maintenance',
+      'trash',
+      'kachra',
+      'recharge',
+      'easyload',
+      'balance',
+      'data plan',
+      'package',
+      'wifi',
+      'internet',
+      'cable',
+      'jazz',
+      'zong',
+      'telenor',
+      'ufone',
+      'card'
     ],
     'Health': [
-      'medicine', 'doctor', 'clinic', 'hospital', 'pharmacy', 'pills', 'dawa',
-      'dawai', 'test', 'lab', 'xray', 'blood', 'panadol', 'bandage', 'medical',
-      'checkup', 'dentist', 'fee', 'emergency'
+      'medicine',
+      'doctor',
+      'clinic',
+      'hospital',
+      'pharmacy',
+      'pills',
+      'dawa',
+      'dawai',
+      'test',
+      'lab',
+      'xray',
+      'blood',
+      'panadol',
+      'bandage',
+      'medical',
+      'checkup',
+      'dentist',
+      'fee',
+      'emergency'
     ],
     'Education': [
-      'fees', 'fee', 'book', 'books', 'pen', 'stationery', 'copy', 'register',
-      'tuition', 'print', 'photostat', 'assignment', 'project', 'notes',
-      'calculator', 'pencil', 'marker', 'paper', 'hostel', 'mess', 'canteen'
+      'fees',
+      'fee',
+      'book',
+      'books',
+      'pen',
+      'stationery',
+      'copy',
+      'register',
+      'tuition',
+      'print',
+      'photostat',
+      'assignment',
+      'project',
+      'notes',
+      'calculator',
+      'pencil',
+      'marker',
+      'paper',
+      'hostel',
+      'mess',
+      'canteen'
     ]
   };
 
   // 🚀 FIXED: Removed 'kal' and 'aaj' from here so we can parse them as dates
   final Set<String> _stopWords = {
-    'ki', 'ka', 'ke', 'liye', 'for', 'on', 'aur', 'the', 'a', 'an', 'to', 'mein',
-    'pe', 'jo', 'k', 'se', 'tak', 'par', 'wala', 'wali', 'wale',
-    'spend', 'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchase',
-    'purchased', 'khaan', 'khareed', 'khareeda', 'khareedi', 'when', 'went',
-    'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya',
-    'kha', 'pee', 'diya', 'kharida',
-    'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
-    'paisa', 'mani', 'money', 'subah', 'shaam', 'raat', 'rupay', 'pkr',
-    'received', 'receive', 'credited', 'credit', 'deposit', 'aayi', 'ayi',
-    'aya', 'mila', 'mili', 'hui', 'hue', 'from', 'via', 'using', 'through',
-    'account', 'wallet', 'add', 'save', 'record', 'note', 'enter',
-    'expense', 'income', 'transaction', 'entry', 'delete', 'remove',
-    'hatao', 'hata', 'nikalo', 'edit', 'change', 'update', 'modify',
-    'badlo', 'badal', 'transfer', 'move', 'shift', 'send', 'bhejo',
-    'show', 'list', 'find', 'search', 'please', 'plz', 'last', 'latest',
-    'recent', 'previous', 'akhri', 'pichli', 'me', 'ko', 'ye', 'yeh',
-    'isko', 'usko', 'iss', 'is', 'wo', 'woh', 'dalo', 'daalo', 'daldo',
-    'daaldo', 'repeat', 'again', 'same', 'dobara', 'phir', 'open', 'goto',
-    'go', 'take', 'screen', 'page', 'dashboard', 'home', 'stats',
-    'statistics', 'wallets', 'settings', 'about', 'udhaar', 'udhar', 'mess',
-    'khata', 'entries', 'transactions', 'expenses', 'spending',
-    'total', 'today', 'yesterday', 'week', 'month', 'this', 'current',
-    'pichlay', 'pichle', 'mahine', 'haftay', 'din', 'aaj', 'kal',
-    'how', 'much', 'many', 'tell', 'calculate', 'summary', 'report',
-    'dikhao', 'batao', 'dhoondo', 'kitna', 'kitni', 'kitne', 'did',
-    'what', 'balance', 'available', 'remaining', 'count'
+    'ki',
+    'ka',
+    'ke',
+    'liye',
+    'for',
+    'on',
+    'aur',
+    'the',
+    'a',
+    'an',
+    'to',
+    'mein',
+    'pe',
+    'jo',
+    'k',
+    'se',
+    'tak',
+    'par',
+    'wala',
+    'wali',
+    'wale',
+    'spend',
+    'spent',
+    'paid',
+    'gave',
+    'khaye',
+    'diye',
+    'bought',
+    'purchase',
+    'purchased',
+    'khaan',
+    'khareed',
+    'khareeda',
+    'khareedi',
+    'when',
+    'went',
+    'lag',
+    'gaye',
+    'ho',
+    'gaya',
+    'kar',
+    'karo',
+    'kardiye',
+    'karwa',
+    'liya',
+    'kha',
+    'pee',
+    'diya',
+    'kharida',
+    'rs',
+    'rupees',
+    'rupee',
+    'amount',
+    'kharch',
+    'kharcha',
+    'pese',
+    'paise',
+    'paisa',
+    'mani',
+    'money',
+    'subah',
+    'shaam',
+    'raat',
+    'rupay',
+    'pkr',
+    'received',
+    'receive',
+    'credited',
+    'credit',
+    'deposit',
+    'aayi',
+    'ayi',
+    'aya',
+    'mila',
+    'mili',
+    'hui',
+    'hue',
+    'from',
+    'via',
+    'using',
+    'through',
+    'account',
+    'wallet',
+    'add',
+    'save',
+    'record',
+    'note',
+    'enter',
+    'expense',
+    'income',
+    'transaction',
+    'entry',
+    'delete',
+    'remove',
+    'hatao',
+    'hata',
+    'nikalo',
+    'edit',
+    'change',
+    'update',
+    'modify',
+    'badlo',
+    'badal',
+    'transfer',
+    'move',
+    'shift',
+    'send',
+    'bhejo',
+    'show',
+    'list',
+    'find',
+    'search',
+    'please',
+    'plz',
+    'last',
+    'latest',
+    'recent',
+    'previous',
+    'akhri',
+    'pichli',
+    'me',
+    'ko',
+    'ye',
+    'yeh',
+    'isko',
+    'usko',
+    'iss',
+    'is',
+    'wo',
+    'woh',
+    'dalo',
+    'daalo',
+    'daldo',
+    'daaldo',
+    'repeat',
+    'again',
+    'same',
+    'dobara',
+    'phir',
+    'open',
+    'goto',
+    'go',
+    'take',
+    'screen',
+    'page',
+    'dashboard',
+    'home',
+    'stats',
+    'statistics',
+    'wallets',
+    'settings',
+    'about',
+    'udhaar',
+    'udhar',
+    'mess',
+    'khata',
+    'entries',
+    'transactions',
+    'expenses',
+    'spending',
+    'total',
+    'today',
+    'yesterday',
+    'week',
+    'month',
+    'this',
+    'current',
+    'pichlay',
+    'pichle',
+    'mahine',
+    'haftay',
+    'din',
+    'aaj',
+    'kal',
+    'how',
+    'much',
+    'many',
+    'tell',
+    'calculate',
+    'summary',
+    'report',
+    'dikhao',
+    'batao',
+    'dhoondo',
+    'kitna',
+    'kitni',
+    'kitne',
+    'did',
+    'what',
+    'balance',
+    'available',
+    'remaining',
+    'count'
   };
 
   // ==========================================
   // 🔢 ROMAN URDU NUMBER WORDS
   // ==========================================
   static const Map<String, int> _units = {
-    'ek': 1, 'aik': 1, 'one': 1, 'do': 2, 'two': 2,
-    'teen': 3, 'tin': 3, 'three': 3, 'char': 4, 'chaar': 4, 'four': 4,
-    'panch': 5, 'paanch': 5, 'five': 5, 'che': 6, 'choh': 6, 'chhay': 6,
-    'six': 6, 'saat': 7, 'seven': 7, 'aath': 8, 'ath': 8, 'eight': 8,
-    'nau': 9, 'nine': 9,
+    'ek': 1,
+    'aik': 1,
+    'one': 1,
+    'do': 2,
+    'two': 2,
+    'teen': 3,
+    'tin': 3,
+    'three': 3,
+    'char': 4,
+    'chaar': 4,
+    'four': 4,
+    'panch': 5,
+    'paanch': 5,
+    'five': 5,
+    'che': 6,
+    'choh': 6,
+    'chhay': 6,
+    'six': 6,
+    'saat': 7,
+    'seven': 7,
+    'aath': 8,
+    'ath': 8,
+    'eight': 8,
+    'nau': 9,
+    'nine': 9,
   };
 
   static const Map<String, int> _teens = {
-    'das': 10, 'dus': 10, 'ten': 10, 'gyarah': 11, 'eleven': 11,
-    'barah': 12, 'twelve': 12, 'terah': 13, 'thirteen': 13,
-    'chaudah': 14, 'fourteen': 14, 'pandrah': 15, 'fifteen': 15,
-    'solah': 16, 'sixteen': 16, 'satrah': 17, 'seventeen': 17,
-    'atharah': 18, 'eighteen': 18, 'unnees': 19, 'nineteen': 19,
+    'das': 10,
+    'dus': 10,
+    'ten': 10,
+    'gyarah': 11,
+    'eleven': 11,
+    'barah': 12,
+    'twelve': 12,
+    'terah': 13,
+    'thirteen': 13,
+    'chaudah': 14,
+    'fourteen': 14,
+    'pandrah': 15,
+    'fifteen': 15,
+    'solah': 16,
+    'sixteen': 16,
+    'satrah': 17,
+    'seventeen': 17,
+    'atharah': 18,
+    'eighteen': 18,
+    'unnees': 19,
+    'nineteen': 19,
   };
 
   static const Map<String, int> _tens = {
-    'bees': 20, 'twenty': 20, 'tees': 30, 'thirty': 30,
-    'chalees': 40, 'forty': 40, 'pachas': 50, 'fifty': 50,
-    'saath': 60, 'sixty': 60, 'sattar': 70, 'seventy': 70,
-    'assi': 80, 'eighty': 80, 'nabbe': 90, 'ninety': 90,
+    'bees': 20,
+    'twenty': 20,
+    'tees': 30,
+    'thirty': 30,
+    'chalees': 40,
+    'forty': 40,
+    'pachas': 50,
+    'fifty': 50,
+    'saath': 60,
+    'sixty': 60,
+    'sattar': 70,
+    'seventy': 70,
+    'assi': 80,
+    'eighty': 80,
+    'nabbe': 90,
+    'ninety': 90,
   };
 
   static const Map<String, int> _multipliers = {
-    'sau': 100, 'so': 100, 'sou': 100, 'saw': 100, 'hundred': 100,
-    'hazar': 1000, 'hazaar': 1000, 'k': 1000, 'thousand': 1000,
-    'lakh': 100000, 'lac': 100000,
-    'million': 1000000, 'crore': 10000000,
+    'sau': 100,
+    'so': 100,
+    'sou': 100,
+    'saw': 100,
+    'hundred': 100,
+    'hazar': 1000,
+    'hazaar': 1000,
+    'k': 1000,
+    'thousand': 1000,
+    'lakh': 100000,
+    'lac': 100000,
+    'million': 1000000,
+    'crore': 10000000,
   };
 
   static const Map<String, double> _fusedOverrides = {
-    'sou': 100, 'sow': 100, 'dosou': 200, 'doso': 200, 'tinsou': 300, 'teenso': 300,
-    'charsou': 400, 'chaarso': 400, 'panso': 500, 'paanso': 500, 'passo': 500, 'pansou': 500,
-    'chesou': 600, 'chhesou': 600, 'saatsou': 700, 'saatso': 700, 'aathsou': 800, 'aathso': 800,
-    'nosou': 900, 'nauso': 900,
+    'sou': 100,
+    'sow': 100,
+    'dosou': 200,
+    'doso': 200,
+    'tinsou': 300,
+    'teenso': 300,
+    'charsou': 400,
+    'chaarso': 400,
+    'panso': 500,
+    'paanso': 500,
+    'passo': 500,
+    'pansou': 500,
+    'chesou': 600,
+    'chhesou': 600,
+    'saatsou': 700,
+    'saatso': 700,
+    'aathsou': 800,
+    'aathso': 800,
+    'nosou': 900,
+    'nauso': 900,
   };
 
   // ==========================================
@@ -595,10 +984,10 @@ class LocalNlpService {
   }
 
   T? _fuzzyLookup<T>(
-      String normalizedToken,
-      Map<String, T> index, {
-        int? forceBudget,
-      }) {
+    String normalizedToken,
+    Map<String, T> index, {
+    int? forceBudget,
+  }) {
     final exact = index[normalizedToken];
     if (exact != null) return exact;
 
@@ -685,7 +1074,8 @@ class LocalNlpService {
         }
       }
 
-      final overrideVal = _fuzzyLookup(norm, _normalizedFusedOverrides, forceBudget: 1);
+      final overrideVal =
+          _fuzzyLookup(norm, _normalizedFusedOverrides, forceBudget: 1);
       if (overrideVal != null) {
         amount += overrideVal;
         consumed.add(raw);
@@ -822,11 +1212,13 @@ class LocalNlpService {
   }
 
   SmartEntryTimeRange _timeRange(String input) {
-    if (RegExp(r'\b(last\s+month|previous\s+month|pichlay\s+mahine|pichle\s+mahine)\b')
+    if (RegExp(
+            r'\b(last\s+month|previous\s+month|pichlay\s+mahine|pichle\s+mahine)\b')
         .hasMatch(input)) {
       return SmartEntryTimeRange.lastMonth;
     }
-    if (RegExp(r'\b(last\s+week|previous\s+week|pichlay\s+haftay|pichle\s+haftay)\b')
+    if (RegExp(
+            r'\b(last\s+week|previous\s+week|pichlay\s+haftay|pichle\s+haftay)\b')
         .hasMatch(input)) {
       return SmartEntryTimeRange.lastWeek;
     }
@@ -882,9 +1274,8 @@ class LocalNlpService {
     final intentRoute = const PrimaryIntentRouter().classify(lowerInput);
     final intent = _intentFromRoute(intentRoute.intent);
     final isIncome = intent == SmartEntryIntent.addIncome;
-    final queryMetric = intent == SmartEntryIntent.query
-        ? _queryMetric(lowerInput)
-        : null;
+    final queryMetric =
+        intent == SmartEntryIntent.query ? _queryMetric(lowerInput) : null;
     final timeRange = _timeRange(lowerInput);
     final navigationTarget = intent == SmartEntryIntent.navigate
         ? intentRoute.navigationTarget ?? _navigationTarget(lowerInput)
@@ -977,16 +1368,14 @@ class LocalNlpService {
 
     void applyCategory(String mappedCategory, String candidate) {
       category = activeCategories.firstWhere(
-        (active) =>
-            active.toLowerCase() == mappedCategory.toLowerCase(),
+        (active) => active.toLowerCase() == mappedCategory.toLowerCase(),
       );
       categoryFound = true;
       matchedCategoryTokens.addAll(candidate.split(' '));
     }
 
     for (final candidate in candidates) {
-      final mappedCategory =
-          _normalizedLexicon[_normalize(candidate)];
+      final mappedCategory = _normalizedLexicon[_normalize(candidate)];
       if (mappedCategory != null &&
           lowerActiveCategories.contains(mappedCategory.toLowerCase())) {
         applyCategory(mappedCategory, candidate);
@@ -1043,11 +1432,8 @@ class LocalNlpService {
         .replaceAll(RegExp(r'[^\w\s]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    cleanTitle = cleanTitle
-        .split(' ')
-        .where((word) => word.length > 1)
-        .join(' ')
-        .trim();
+    cleanTitle =
+        cleanTitle.split(' ').where((word) => word.length > 1).join(' ').trim();
 
     _lastUnmatchedTokens = words.where((word) {
       return !_stopWords.contains(word) &&
@@ -1073,8 +1459,11 @@ class LocalNlpService {
     }
 
     final intentConfidence = intentRoute.confidence;
-    final categoryConfidence =
-        isIncome ? 0.98 : categoryFound ? 0.94 : 0.35;
+    final categoryConfidence = isIncome
+        ? 0.98
+        : categoryFound
+            ? 0.94
+            : 0.35;
     final titleConfidence = usedFallbackTitle ? 0.35 : 0.9;
     final dateConfidence = explicitDate ? 0.98 : 0.85;
     final fieldConfidence = <String, double>{
@@ -1085,13 +1474,13 @@ class LocalNlpService {
       'date': dateConfidence,
     };
 
-    final confidence = (
-      intentConfidence * 0.30 +
-      amountConfidence * 0.35 +
-      titleConfidence * 0.15 +
-      categoryConfidence * 0.10 +
-      dateConfidence * 0.10
-    ).clamp(0.0, 1.0).toDouble();
+    final confidence = (intentConfidence * 0.30 +
+            amountConfidence * 0.35 +
+            titleConfidence * 0.15 +
+            categoryConfidence * 0.10 +
+            dateConfidence * 0.10)
+        .clamp(0.0, 1.0)
+        .toDouble();
 
     final clarificationReasons = <String>[];
     if (intent.isTransactionAddition && amount <= 0) {
@@ -1154,10 +1543,7 @@ class SmartEntryAccount {
 }
 
 String _normalizeAccountText(String value) {
-  return value
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-      .trim();
+  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
 }
 
 Set<String> _smartEntryAccountAliases(SmartEntryAccount account) {
@@ -1248,8 +1634,7 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
         );
         if (best == null ||
             mention.start < best.start ||
-            (mention.start == best.start &&
-                mention.end > best.end)) {
+            (mention.start == best.start && mention.end > best.end)) {
           best = mention;
         }
       }
@@ -1355,8 +1740,7 @@ String? resolveSmartEntryAccount({
   final mentionedIds =
       findMentionedSmartEntryAccountIds(input, availableAccounts);
   if (mentionedIds.length > 1) return null;
-  final mentionedId =
-      mentionedIds.length == 1 ? mentionedIds.single : null;
+  final mentionedId = mentionedIds.length == 1 ? mentionedIds.single : null;
 
   bool canUse(SmartEntryAccount account, {required bool explicitlySelected}) {
     if (transactionType == 'income') {
@@ -1382,9 +1766,7 @@ String? resolveSmartEntryAccount({
       }
     }
     if (preferred != null) {
-      return canUse(preferred, explicitlySelected: true)
-          ? preferred.id
-          : null;
+      return canUse(preferred, explicitlySelected: true) ? preferred.id : null;
     }
   }
 

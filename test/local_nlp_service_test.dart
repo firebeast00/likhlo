@@ -15,23 +15,22 @@ void main() {
     });
 
     test('uses an active category mentioned by the user', () {
-      final result =
-          LocalNlpService().parseExpense('1200 for education books', categories);
+      final result = LocalNlpService()
+          .parseExpense('1200 for education books', categories);
 
       expect(result['amount'], 1200);
       expect(result['category'], 'Education');
     });
 
     test('returns zero when no amount is present', () {
-      final result =
-          LocalNlpService().parseExpense('bought lunch', categories);
+      final result = LocalNlpService().parseExpense('bought lunch', categories);
 
       expect(result['amount'], 0);
     });
 
     test('parses comma-formatted and shorthand amounts', () {
-      final comma = LocalNlpService()
-          .parseExpense('Rs 1,250 for groceries', categories);
+      final comma =
+          LocalNlpService().parseExpense('Rs 1,250 for groceries', categories);
       final shorthand =
           LocalNlpService().parseExpense('1.5k petrol', categories);
 
@@ -49,8 +48,8 @@ void main() {
     });
 
     test('detects income intent without treating it as an expense', () {
-      final result = LocalNlpService()
-          .parseExpense('salary 50 hazar aayi', categories);
+      final result =
+          LocalNlpService().parseExpense('salary 50 hazar aayi', categories);
 
       expect(result['amount'], 50000);
       expect(result['type'], 'income');
@@ -89,7 +88,8 @@ void main() {
       );
     });
 
-    test('unknown categories still save instantly when an account is resolved', () {
+    test('unknown categories still save instantly when an account is resolved',
+        () {
       final parsed =
           LocalNlpService().parseExpense('500 something', categories);
 
@@ -304,7 +304,6 @@ void main() {
       );
     });
 
-
     test('returns a typed command with per-field confidence', () {
       final command =
           LocalNlpService().parseCommand('500 burger cash', categories);
@@ -312,9 +311,11 @@ void main() {
       expect(command.intent, SmartEntryIntent.addExpense);
       expect(command.amount, 500);
       expect(command.category, 'Food');
-      expect(command.confidenceByField.keys, containsAll(
-        ['intent', 'amount', 'title', 'category', 'date'],
-      ));
+      expect(
+          command.confidenceByField.keys,
+          containsAll(
+            ['intent', 'amount', 'title', 'category', 'date'],
+          ));
       expect(command.clarificationReasons, isEmpty);
     });
 
@@ -362,14 +363,15 @@ void main() {
     });
 
     test('rejects negative NLP amounts', () {
-      final command =
-          LocalNlpService().parseCommand('-500 burger', categories);
+      final command = LocalNlpService().parseCommand('-500 burger', categories);
 
       expect(command.amount, 0);
       expect(command.needsClarification, isTrue);
-      expect(command.clarificationReasons, contains(
-        'Amount must be greater than zero.',
-      ));
+      expect(
+          command.clarificationReasons,
+          contains(
+            'Amount must be greater than zero.',
+          ));
     });
 
     test('does not resolve when multiple wallets are mentioned', () {
@@ -398,7 +400,6 @@ void main() {
         isNull,
       );
     });
-
 
     test('finds one exact entry for a delete command', () {
       final command =
@@ -556,7 +557,6 @@ void main() {
       expect(command.title, 'Burger');
     });
 
-
     test('day before yesterday is parsed as two days ago', () {
       final command = LocalNlpService()
           .parseCommand('delete day before yesterday burger', categories);
@@ -568,7 +568,6 @@ void main() {
         DateTime(expected.year, expected.month, expected.day),
       );
     });
-
 
     test('treats adding money to a wallet as income', () {
       final command =
@@ -798,7 +797,5 @@ void main() {
         isFalse,
       );
     });
-
-
   });
 }

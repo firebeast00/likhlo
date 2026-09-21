@@ -14,10 +14,34 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
   void _loadWallets() {
     if (_box.isEmpty) {
       final initialWallets = [
-        Wallet(id: 'default_cash', name: 'Cash in Hand', balance: 0.0, isBackup: false, colorValue: 0xFF10B981, walletType: 'cash'),
-        Wallet(id: 'default_jazzcash', name: 'JazzCash', balance: 0.0, isBackup: false, colorValue: 0xFFEF4444, walletType: 'jazzcash'),
-        Wallet(id: 'default_bank', name: 'Bank Account', balance: 0.0, isBackup: false, colorValue: 0xFF3B82F6, walletType: 'bank'),
-        Wallet(id: 'default_backup', name: 'Emergency Stash', balance: 0.0, isBackup: true, colorValue: 0xFFF59E0B, walletType: 'reserve'),
+        Wallet(
+            id: 'default_cash',
+            name: 'Cash in Hand',
+            balance: 0.0,
+            isBackup: false,
+            colorValue: 0xFF10B981,
+            walletType: 'cash'),
+        Wallet(
+            id: 'default_jazzcash',
+            name: 'JazzCash',
+            balance: 0.0,
+            isBackup: false,
+            colorValue: 0xFFEF4444,
+            walletType: 'jazzcash'),
+        Wallet(
+            id: 'default_bank',
+            name: 'Bank Account',
+            balance: 0.0,
+            isBackup: false,
+            colorValue: 0xFF3B82F6,
+            walletType: 'bank'),
+        Wallet(
+            id: 'default_backup',
+            name: 'Emergency Stash',
+            balance: 0.0,
+            isBackup: true,
+            colorValue: 0xFFF59E0B,
+            walletType: 'reserve'),
       ];
       for (var w in initialWallets) {
         _box.put(w.id, w);
@@ -100,6 +124,7 @@ class WalletNotifier extends StateNotifier<List<Wallet>> {
   }
 }
 
-final walletProvider = StateNotifierProvider<WalletNotifier, List<Wallet>>((ref) {
+final walletProvider =
+    StateNotifierProvider<WalletNotifier, List<Wallet>>((ref) {
   return WalletNotifier(ref);
 });

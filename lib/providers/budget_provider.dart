@@ -22,8 +22,7 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
     } else {
       // 🚀 FIX: Actually SAVE the fallback to the box so Insights Engine can read it
       final rawOldLimit = box.get('limit', defaultValue: 20000.0);
-      final oldLimit =
-          rawOldLimit is num ? rawOldLimit.toDouble() : 20000.0;
+      final oldLimit = rawOldLimit is num ? rawOldLimit.toDouble() : 20000.0;
       state = {currentMonthKey: oldLimit};
       box.put('monthly_budgets', state);
     }
@@ -48,6 +47,7 @@ class BudgetNotifier extends StateNotifier<Map<String, double>> {
   }
 }
 
-final budgetProvider = StateNotifierProvider<BudgetNotifier, Map<String, double>>((ref) {
+final budgetProvider =
+    StateNotifierProvider<BudgetNotifier, Map<String, double>>((ref) {
   return BudgetNotifier();
 });

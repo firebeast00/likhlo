@@ -24,10 +24,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   void _finishOnboarding() async {
     if (_nameCtrl.text.trim().isNotEmpty && _profCtrl.text.trim().isNotEmpty) {
-      ref.read(settingsProvider.notifier).updateProfile(
-          _nameCtrl.text.trim(),
-          _profCtrl.text.trim()
-      );
+      ref
+          .read(settingsProvider.notifier)
+          .updateProfile(_nameCtrl.text.trim(), _profCtrl.text.trim());
 
       final box = Hive.box('preferences');
       await box.put('has_onboarded', true);
@@ -36,7 +35,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (_, __, ___) => const HomeScreen(),
-            transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
+            transitionsBuilder: (_, a, __, c) =>
+                FadeTransition(opacity: a, child: c),
             transitionDuration: const Duration(milliseconds: 800),
           ),
         );
@@ -47,7 +47,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           content: const Text("Please fill in all fields to continue"),
           backgroundColor: Colors.red.shade600,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -65,7 +66,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -83,27 +85,36 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       )
                     ],
                   ),
-                  child: Icon(Icons.person_pin_circle_rounded, size: 60, color: primaryColor),
+                  child: Icon(Icons.person_pin_circle_rounded,
+                      size: 60, color: primaryColor),
                 ),
                 const SizedBox(height: 32),
 
                 const Text(
                   "Welcome to Likhlo!",
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                  style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   "Let's personalize your expense manager.",
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w500),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
 
                 // Input Fields
-                _buildInput(_nameCtrl, "What should we call you?", Icons.person_rounded, primaryColor, isDark),
+                _buildInput(_nameCtrl, "What should we call you?",
+                    Icons.person_rounded, primaryColor, isDark),
                 const SizedBox(height: 16),
-                _buildInput(_profCtrl, "What do you do? (e.g. Student)", Icons.school_rounded, primaryColor, isDark),
+                _buildInput(_profCtrl, "What do you do? (e.g. Student)",
+                    Icons.school_rounded, primaryColor, isDark),
                 const SizedBox(height: 40),
 
                 // Get Started Button
@@ -114,15 +125,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18)),
                       elevation: 0,
                       shadowColor: primaryColor.withValues(alpha: 0.4),
                     ),
                     onPressed: _finishOnboarding,
-                    child: const Text(
-                        "Get Started",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5)
-                    ),
+                    child: const Text("Get Started",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5)),
                   ),
                 ),
               ],
@@ -133,7 +146,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  Widget _buildInput(TextEditingController ctrl, String label, IconData icon, Color primaryColor, bool isDark) {
+  Widget _buildInput(TextEditingController ctrl, String label, IconData icon,
+      Color primaryColor, bool isDark) {
     return TextField(
       controller: ctrl,
       textCapitalization: TextCapitalization.words,
@@ -151,22 +165,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade200,
-              width: 1.2
-          ),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.grey.shade200,
+              width: 1.2),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade200,
-              width: 1.2
-          ),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.grey.shade200,
+              width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(color: primaryColor, width: 1.8),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }

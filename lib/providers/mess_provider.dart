@@ -35,6 +35,7 @@ class MessNotifier extends StateNotifier<List<MessEntry>> {
   }
 }
 
-final messProvider = StateNotifierProvider<MessNotifier, List<MessEntry>>((ref) {
+final messProvider =
+    StateNotifierProvider<MessNotifier, List<MessEntry>>((ref) {
   return MessNotifier();
 });

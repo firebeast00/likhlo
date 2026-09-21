@@ -18,7 +18,8 @@ void main() {
     );
   });
 
-  test('encrypted backup round-trips without exposing financial text', () async {
+  test('encrypted backup round-trips without exposing financial text',
+      () async {
     final payload = <String, dynamic>{
       'schemaVersion': 1,
       'app': 'Likhlo',

@@ -12,7 +12,8 @@ class Wallet extends HiveObject {
   double balance;
 
   @HiveField(3)
-  final bool isBackup; // If true, treated as backup reserve (isolated from daily burn rate)
+  final bool
+      isBackup; // If true, treated as backup reserve (isolated from daily burn rate)
 
   @HiveField(4)
   final int colorValue;

@@ -41,8 +41,7 @@ class SpeechSessionController {
   int _retryCount = 0;
   bool _decisionIssued = false;
 
-  SpeechSessionController({this.maxRetries = 1})
-      : assert(maxRetries >= 0);
+  SpeechSessionController({this.maxRetries = 1}) : assert(maxRetries >= 0);
 
   SpeechSessionState get state => _state;
   String get latestDraft => _latestDraft;
