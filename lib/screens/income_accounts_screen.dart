@@ -8,6 +8,7 @@ import '../models/wallet_model.dart';
 import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
+import '../services/transaction_executor.dart';
 
 class IncomeAccountsScreen extends ConsumerWidget {
   const IncomeAccountsScreen({super.key});
@@ -230,7 +231,9 @@ class IncomeAccountsScreen extends ConsumerWidget {
                   return;
                 }
 
-                final saved = await ref.read(expenseProvider.notifier).addExpense(
+                final result = await ref
+                    .read(transactionExecutorProvider)
+                    .execute(CreateTransactionCommand(
                       Expense(
                         id: const Uuid().v4(),
                         title: titleController.text.trim().isEmpty
@@ -243,9 +246,9 @@ class IncomeAccountsScreen extends ConsumerWidget {
                         type: 'income',
                         walletId: walletId,
                       ),
-                    );
+                    ));
                 if (!dialogContext.mounted) return;
-                if (!saved) {
+                if (!result.succeeded) {
                   setDialogState(() => error = 'Could not save this income.');
                   return;
                 }

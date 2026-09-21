@@ -1,0 +1,24 @@
+{"id":"expense_en_01","input":"500 chai cash se","intent":"add_expense","amount":500}
+{"id":"expense_ur_01","input":"cash se paanch sau chai ke","intent":"add_expense","amount":500}
+{"id":"expense_script_01","input":"نقد سے ۵۰۰ چائے کے خرچ","intent":"add_expense","amount":500}
+{"id":"expense_asr_01","input":"do show petrol cash se","intent":"add_expense","amount":200}
+{"id":"expense_asr_02","input":"jazz cast se do gazaar grocery","intent":"add_expense","amount":2000}
+{"id":"income_en_01","input":"salary 50000 bank me ayi","intent":"add_income","amount":50000}
+{"id":"income_ur_01","input":"pachaas hazar salary Meezan me aayi","intent":"add_income","amount":50000}
+{"id":"income_script_01","input":"تنخواہ ۵۰۰۰۰ بینک میں جمع","intent":"add_income","amount":50000}
+{"id":"transfer_en_01","input":"transfer 5000 cash to JazzCash","intent":"transfer","amount":5000}
+{"id":"transfer_ur_01","input":"JazzCash se paanch hazar bank me bhejo","intent":"transfer","amount":5000}
+{"id":"transfer_mix_01","input":"five thousand JazzCash se bank mein transfer karo","intent":"transfer","amount":5000}
+{"id":"transfer_script_01","input":"جاز کیش سے ۵۰۰۰ بینک میں بھیجو","intent":"transfer","amount":5000}
+{"id":"edit_title_01","input":"400 ki headphones ka naam Kurch karo","intent":"edit_entry","amount":400}
+{"id":"edit_amount_01","input":"change 500 burger amount to 600","intent":"edit_entry","amount":600}
+{"id":"edit_amount_02","input":"headphones ka amount 550 kar do","intent":"edit_entry","amount":550}
+{"id":"edit_category_01","input":"petrol ki category Transport karo","intent":"edit_entry","amount":null}
+{"id":"delete_01","input":"kal wala 500 petrol delete karo","intent":"delete_entry","amount":500}
+{"id":"delete_02","input":"400 headphones hata do","intent":"delete_entry","amount":400}
+{"id":"repeat_01","input":"last burger repeat karo","intent":"repeat_entry","amount":null}
+{"id":"query_01","input":"show expenses this month","intent":"query","amount":null}
+{"id":"query_02","input":"is mahine kitna kharch hua","intent":"query","amount":null}
+{"id":"search_01","input":"find petrol expenses","intent":"search_entries","amount":null}
+{"id":"navigate_01","input":"open stats","intent":"navigate","amount":null}
+{"id":"navigate_02","input":"udhaar page kholo","intent":"navigate","amount":null}

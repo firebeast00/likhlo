@@ -288,8 +288,11 @@ SmartEntryMatchResult matchSmartEntryTransaction({
   required Iterable<SmartEntryTransaction> entries,
   String? walletId,
   Iterable<String> ignoredTitlePhrases = const [],
+  String? selectorTitle,
+  double? selectorAmount,
+  DateTime? selectorDate,
 }) {
-  var target = _normalizeMatchText(command.title);
+  var target = _normalizeMatchText(selectorTitle ?? command.title);
   for (final phrase in ignoredTitlePhrases) {
     final normalizedPhrase = _normalizeMatchText(phrase);
     if (normalizedPhrase.isEmpty) continue;
@@ -330,14 +333,19 @@ SmartEntryMatchResult matchSmartEntryTransaction({
     if (isTransfer) continue;
     if (walletId != null && entry.walletId != walletId) continue;
     if (requestedType != null && entry.type != requestedType) continue;
-    if (command.hasExplicitDate &&
-        !_sameCalendarDay(entry.date, command.date)) {
+    final requestedDate = selectorDate ??
+        (command.hasExplicitDate ? command.date : null);
+    if (requestedDate != null &&
+        !_sameCalendarDay(entry.date, requestedDate)) {
       continue;
     }
-    if ((command.intent == SmartEntryIntent.deleteEntry ||
-            command.intent == SmartEntryIntent.repeatEntry) &&
-        command.amount > 0 &&
-        (entry.amount - command.amount).abs() > 0.005) {
+    final requestedAmount = selectorAmount ??
+        ((command.intent == SmartEntryIntent.deleteEntry ||
+                command.intent == SmartEntryIntent.repeatEntry)
+            ? command.amount
+            : 0.0);
+    if (requestedAmount > 0 &&
+        (entry.amount - requestedAmount).abs() > 0.005) {
       continue;
     }
 
@@ -1404,6 +1412,7 @@ String? resolveSmartEntryAccount({
 bool shouldAutoSaveSmartEntry(
   Map<String, dynamic> parsed, {
   required bool hasResolvedWallet,
+  double? semanticConfidence,
 }) {
   final amount = parsed['amount'];
   final type = parsed['type'];
@@ -1412,6 +1421,7 @@ bool shouldAutoSaveSmartEntry(
       amount is num &&
       amount.isFinite &&
       amount > 0 &&
+      (semanticConfidence == null || semanticConfidence >= 0.94) &&
       (type == 'expense' || type == 'income');
 }
 

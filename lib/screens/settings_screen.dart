@@ -9,10 +9,8 @@ import 'package:intl/intl.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
-import '../providers/wallet_provider.dart';
-import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
-import 'backup_screen.dart';
+import '../services/voice_privacy_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -23,8 +21,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late Box _prefBox;
-  final DeviceAuthenticator _deviceAuthenticator = BiometricService();
-  bool _changingAppLock = false;
 
   @override
   void initState() {
@@ -32,80 +28,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _prefBox = Hive.box('preferences');
   }
 
-  void _showSecurityMessage(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
-  Future<void> _setAppLock(bool enabled) async {
-    if (_changingAppLock) return;
-    setState(() => _changingAppLock = true);
-
-    try {
-      if (enabled && !await _deviceAuthenticator.canUseBiometrics()) {
-        _showSecurityMessage(
-          'Set up a fingerprint or Face ID in your phone settings before enabling App Lock.',
-        );
-        return;
-      }
-
-      final result = await _deviceAuthenticator.authenticate(
-        reason: enabled
-            ? 'Confirm your fingerprint or Face ID to enable Likhlo App Lock.'
-            : 'Authenticate to turn off Likhlo App Lock.',
-        biometricOnly: enabled,
-      );
-      if (!mounted) return;
-
-      if (!result.authenticated) {
-        _showSecurityMessage(result.message);
-        return;
-      }
-
-      await _prefBox.put(BiometricService.preferenceKey, enabled);
-      if (!mounted) return;
-      setState(() {});
-      _showSecurityMessage(
-        enabled
-            ? 'App Lock is on. Likhlo will lock when you leave the app.'
-            : 'App Lock is off.',
-      );
-    } catch (error) {
-      debugPrint('App Lock setting failed: $error');
-      _showSecurityMessage(
-        'App Lock could not be changed. Please try again.',
-      );
-    } finally {
-      if (mounted) setState(() => _changingAppLock = false);
-    }
-  }
-
   Future<void> _setPersistentQuickLog(bool enabled) async {
     await _prefBox.put('persistent_bar_enabled', enabled);
-    if (enabled) {
-      final now = DateTime.now();
-      final entries = ref.read(expenseProvider).allExpenses;
-      final wallets = ref.read(walletProvider);
-      final walletNotifier = ref.read(walletProvider.notifier);
-      final available = wallets.fold<double>(
-        0,
-        (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
-      );
-      final spentToday = entries
-          .where((entry) =>
-              entry.type == 'expense' &&
-              entry.category != 'Transfer' &&
-              entry.date.year == now.year &&
-              entry.date.month == now.month &&
-              entry.date.day == now.day)
-          .fold<double>(0, (sum, entry) => sum + entry.amount);
-      await NotificationService().updatePersistentStatusBarWidget(
-        remainingToday: available,
-        spentToday: spentToday,
-      );
-    } else {
+    if (!enabled) {
       await NotificationService().cancelNotification(
         NotificationService.persistentBarId,
       );
@@ -130,6 +55,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ]);
     }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setVoicePreference(String key, bool enabled) async {
+    await _prefBox.put(key, enabled);
     if (mounted) setState(() {});
   }
 
@@ -271,10 +201,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Read Hive states for Notification toggles
     final bool persistentEnabled = _prefBox.get('persistent_bar_enabled', defaultValue: true);
     final bool remindersEnabled = _prefBox.get('daily_reminder_enabled', defaultValue: true);
-    final bool appLockEnabled = _prefBox.get(
-      BiometricService.preferenceKey,
-      defaultValue: false,
-    ) as bool;
+    final voicePrivacy = VoicePrivacySettings.read(_prefBox);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -408,27 +335,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 32),
 
-          const Padding(
-            padding: EdgeInsets.only(left: 8, bottom: 12),
-            child: Text("Security", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey)),
-          ),
-          _buildSettingsGroup(
-            isDark: isDark,
-            children: [
-              _buildSwitchTile(
-                title: "App Lock",
-                subtitle: appLockEnabled
-                    ? "Protect Likhlo when it opens or resumes"
-                    : "Use fingerprint, Face ID, or device passcode",
-                icon: Icons.fingerprint_rounded,
-                iconColor: Colors.blue,
-                value: appLockEnabled,
-                onChanged: _changingAppLock ? (_) {} : _setAppLock,
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-
           // 3. 🔔 NOTIFICATIONS & ALERTS
           const Padding(
             padding: EdgeInsets.only(left: 8, bottom: 12),
@@ -458,6 +364,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 32),
 
+          const Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 12),
+            child: Text(
+              "Voice & Privacy",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          _buildSettingsGroup(
+            isDark: isDark,
+            children: [
+              _buildSwitchTile(
+                title: "Cloud Voice Pilot",
+                subtitle: "Allow cloud speech only when a secure gateway is configured",
+                icon: Icons.cloud_outlined,
+                iconColor: Colors.blue,
+                value: voicePrivacy.cloudSpeechEnabled,
+                onChanged: (value) => _setVoicePreference(
+                  VoicePrivacySettings.cloudSpeechKey,
+                  value,
+                ),
+              ),
+              _buildDivider(),
+              _buildSwitchTile(
+                title: "Anonymous Voice Diagnostics",
+                subtitle: "Share timing and error categories, never audio or transcripts",
+                icon: Icons.analytics_outlined,
+                iconColor: Colors.purple,
+                value: voicePrivacy.diagnosticsOptIn,
+                onChanged: (value) => _setVoicePreference(
+                  VoicePrivacySettings.diagnosticsKey,
+                  value,
+                ),
+              ),
+              _buildDivider(),
+              _buildSwitchTile(
+                title: "Spoken Confirmations",
+                subtitle: "Use fixed transaction wording when voice feedback is available",
+                icon: Icons.volume_up_outlined,
+                iconColor: Colors.green,
+                value: voicePrivacy.spokenFeedbackEnabled,
+                onChanged: (value) => _setVoicePreference(
+                  VoicePrivacySettings.spokenFeedbackKey,
+                  value,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
           // 4. 📂 EXPORT REPORT
           const Padding(
             padding: EdgeInsets.only(left: 8, bottom: 12),
@@ -466,17 +425,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSettingsGroup(
             isDark: isDark,
             children: [
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                leading: _buildIconBox(Icons.enhanced_encryption_rounded, Colors.teal),
-                title: const Text("Backup & Restore", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text("Encrypted complete data backup", style: TextStyle(fontSize: 13, color: Colors.grey)),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BackupScreen()),
-                ),
-              ),
-              _buildDivider(),
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: _buildIconBox(Icons.picture_as_pdf_rounded, Colors.red.shade400),
@@ -534,347 +482,115 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // --- CLEAN PDF REPORT ---
+  // --- PROFESSIONAL PDF GENERATOR ---
   Future<void> _generatePdf(BuildContext context, WidgetRef ref) async {
     try {
-      final records = List.of(ref.read(expenseProvider).allExpenses);
-      final report = calculateLedgerReportSummary(records);
-      final settings = ref.read(settingsProvider);
-      final regularFont = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/DejaVuSans.ttf'),
-      );
-      final boldFont = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'),
-      );
-      final pdf = pw.Document(
-        theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
-      );
+    final records = List.of(ref.read(expenseProvider).allExpenses);
+    final expenses = visibleTransactions(records);
+    final settings = ref.read(settingsProvider);
+    final regularFont = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/DejaVuSans.ttf'),
+    );
+    final boldFont = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'),
+    );
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+    );
 
-      final generatedAt = DateTime.now();
-      final reportDate = DateFormat('dd MMM yyyy').format(generatedAt);
-      final fileDate = DateFormat('yyyy-MM-dd').format(generatedAt);
+    final totalSpent = records.where((e) => e.type == 'expense' && e.category != 'Transfer')
+        .fold(0.0, (sum, item) => sum + item.amount);
+    final dateStr = DateFormat.yMMMM().format(DateTime.now());
 
-      const primaryColor = PdfColor.fromInt(0xFF1E3A8A);
-      const incomeColor = PdfColor.fromInt(0xFF15803D);
-      const incomeBackground = PdfColor.fromInt(0xFFF0FDF4);
-      const expenseColor = PdfColor.fromInt(0xFFB91C1C);
-      const expenseBackground = PdfColor.fromInt(0xFFFEF2F2);
-      const transferColor = PdfColor.fromInt(0xFF1D4ED8);
-      const transferBackground = PdfColor.fromInt(0xFFEFF6FF);
+    const pdfPrimaryColor = PdfColor.fromInt(0xFF1E3A8A);
 
-      pw.Widget summaryCard({
-        required String label,
-        required int count,
-        required double amount,
-        required PdfColor color,
-        required PdfColor background,
-      }) {
-        return pw.Expanded(
-          child: pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: background,
-              borderRadius:
-                  const pw.BorderRadius.all(pw.Radius.circular(8)),
-              border: pw.Border.all(color: color, width: 0.6),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  label,
-                  style: pw.TextStyle(
-                    color: color,
-                    fontSize: 10,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 6),
-                pw.Text(
-                  'Rs. ${amount.toStringAsFixed(2)}',
-                  style: pw.TextStyle(
-                    color: color,
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 3),
-                pw.Text(
-                  '$count ${count == 1 ? 'record' : 'records'}',
-                  style: const pw.TextStyle(
-                    color: PdfColors.grey700,
-                    fontSize: 9,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-
-      pw.Widget tableCell(
-        String text, {
-        pw.TextStyle? style,
-        pw.Alignment alignment = pw.Alignment.centerLeft,
-      }) {
-        return pw.Container(
-          alignment: alignment,
-          padding:
-              const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-          child: pw.Text(
-            text,
-            style: style ?? const pw.TextStyle(fontSize: 9),
-            maxLines: 2,
-            overflow: pw.TextOverflow.clip,
-          ),
-        );
-      }
-
-      pw.Widget typeBadge(String type) {
-        final normalized = type.toLowerCase();
-        final color = normalized == 'income'
-            ? incomeColor
-            : normalized == 'transfer'
-                ? transferColor
-                : expenseColor;
-        final background = normalized == 'income'
-            ? incomeBackground
-            : normalized == 'transfer'
-                ? transferBackground
-                : expenseBackground;
-        final label = normalized == 'income'
-            ? 'Income'
-            : normalized == 'transfer'
-                ? 'Transfer'
-                : 'Expense';
-
-        return pw.Container(
-          margin:
-              const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          padding:
-              const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-          decoration: pw.BoxDecoration(
-            color: background,
-            borderRadius:
-                const pw.BorderRadius.all(pw.Radius.circular(8)),
-          ),
-          child: pw.Text(
-            label,
-            textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(
-              color: color,
-              fontSize: 8.5,
-              fontWeight: pw.FontWeight.bold,
-            ),
-          ),
-        );
-      }
-
-      pdf.addPage(
-        pw.MultiPage(
-          maxPages: 1000,
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(36),
-          build: (pw.Context pdfContext) => [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.end,
-              children: [
-                pw.Text(
-                  'LIKHLO',
-                  style: pw.TextStyle(
-                    fontSize: 25,
-                    fontWeight: pw.FontWeight.bold,
-                    color: primaryColor,
-                  ),
-                ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+    pdf.addPage(
+      pw.MultiPage(
+        maxPages: 1000,
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (pw.Context context) {
+          return [
+              pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    if (settings.userName.trim().isNotEmpty)
-                      pw.Text(
-                        settings.userName.trim(),
-                        style: pw.TextStyle(
-                          fontSize: 11,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                    pw.Text(
-                      reportDate,
-                      style: const pw.TextStyle(
-                        fontSize: 10,
-                        color: PdfColors.grey600,
-                      ),
+                    pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text("LIKHLO", style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: pdfPrimaryColor)),
+                          pw.SizedBox(height: 4),
+                          pw.Text("Financial Statement", style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
+                        ]
                     ),
-                  ],
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 18),
-            pw.Row(
-              children: [
-                summaryCard(
-                  label: 'EXPENSES',
-                  count: report.expenseCount,
-                  amount: report.expenseTotal,
-                  color: expenseColor,
-                  background: expenseBackground,
-                ),
-                pw.SizedBox(width: 9),
-                summaryCard(
-                  label: 'INCOME RECEIVED',
-                  count: report.incomeCount,
-                  amount: report.incomeTotal,
-                  color: incomeColor,
-                  background: incomeBackground,
-                ),
-                pw.SizedBox(width: 9),
-                summaryCard(
-                  label: 'TRANSFERS',
-                  count: report.transferCount,
-                  amount: report.transferTotal,
-                  color: transferColor,
-                  background: transferBackground,
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 22),
-            pw.Text(
-              'Transactions',
-              style: pw.TextStyle(
-                fontSize: 14,
-                fontWeight: pw.FontWeight.bold,
+                    pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text(settings.userName.isNotEmpty ? settings.userName : "Student Account", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                          pw.Text(dateStr, style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                        ]
+                    )
+                  ]
               ),
-            ),
-            pw.SizedBox(height: 8),
-            if (report.transactions.isEmpty)
+              pw.SizedBox(height: 30),
               pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(16),
-                decoration: const pw.BoxDecoration(
-                  color: PdfColors.grey100,
-                ),
-                child: pw.Text(
-                  'No transactions available.',
-                  textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(
-                    color: PdfColors.grey600,
-                    fontSize: 10,
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(12)),
+                      border: pw.Border.all(color: PdfColors.grey300)
                   ),
-                ),
-              )
-            else
-              pw.Table(
-                border: const pw.TableBorder(
-                  horizontalInside:
-                      pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                  bottom:
-                      pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                ),
-                columnWidths: const {
-                  0: pw.FlexColumnWidth(1.15),
-                  1: pw.FlexColumnWidth(2.2),
-                  2: pw.FlexColumnWidth(1.15),
-                  3: pw.FlexColumnWidth(1.35),
-                  4: pw.FlexColumnWidth(1.3),
-                },
-                children: [
-                  pw.TableRow(
-                    decoration:
-                        const pw.BoxDecoration(color: primaryColor),
-                    children: [
-                      tableCell(
-                        'Date',
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      tableCell(
-                        'Title',
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      tableCell(
-                        'Type',
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      tableCell(
-                        'Category',
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      tableCell(
-                        'Amount',
-                        alignment: pw.Alignment.centerRight,
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  for (final entry in report.transactions)
-                    pw.TableRow(
+                  child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        tableCell(
-                          DateFormat('dd MMM yy').format(entry.date),
-                        ),
-                        tableCell(entry.title),
-                        typeBadge(
-                          entry.category.trim().toLowerCase() == 'transfer'
-                              ? 'transfer'
-                              : entry.type,
-                        ),
-                        tableCell(entry.category),
-                        tableCell(
-                          '${entry.type == 'income' && entry.category.trim().toLowerCase() != 'transfer' ? '+' : entry.type == 'expense' && entry.category.trim().toLowerCase() != 'transfer' ? '-' : ''}Rs. ${entry.amount.toStringAsFixed(2)}',
-                          alignment: pw.Alignment.centerRight,
-                          style: pw.TextStyle(
-                            color: entry.category.trim().toLowerCase() ==
-                                    'transfer'
-                                ? transferColor
-                                : entry.type == 'income'
-                                    ? incomeColor
-                                    : expenseColor,
-                            fontSize: 9,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
+                        pw.Text("Total Spending (all records):", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                        pw.Text("Rs. ${totalSpent.toStringAsFixed(2)}", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: pdfPrimaryColor)),
+                      ]
+                  )
               ),
-          ],
-        ),
-      );
+              pw.SizedBox(height: 30),
+              pw.Text("Transaction History", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+              pw.TableHelper.fromTextArray(
+                context: context,
+                border: const pw.TableBorder(
+                  horizontalInside: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                  bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                ),
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+                cellPadding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                headers: ['Date', 'Title', 'Type', 'Category', 'Amount (Rs)'],
+                data: expenses.map((e) => [
+                  DateFormat('dd MMM yyyy').format(e.date),
+                  e.title,
+                  e.category == 'Transfer' ? 'Transfer' : e.type,
+                  e.category,
+                  e.amount.toStringAsFixed(2)
+                ]).toList(),
+              ),
+              pw.SizedBox(height: 16),
+              pw.Divider(color: PdfColors.grey400),
+              pw.SizedBox(height: 8),
+              pw.Center(
+                  child: pw.Text("Generated securely via Likhlo Expense Manager.", style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600))
+              )
+          ];
+        },
+      ),
+    );
 
-      final bytes = await pdf.save();
-      await Printing.layoutPdf(
+    final bytes = await pdf.save();
+    await Printing.layoutPdf(
         onLayout: (format) async => bytes,
-        name: 'Likhlo_Report_$fileDate.pdf',
-      );
+        name: 'Likhlo_Statement_$dateStr.pdf'
+    );
     } catch (error) {
       debugPrint('PDF export failed: $error');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not export the report. Please try again.'),
-        ),
+        const SnackBar(content: Text('Could not export the report. Please try again.')),
       );
     }
   }
-
 }
