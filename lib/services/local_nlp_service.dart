@@ -8,8 +8,60 @@ enum SmartEntryIntent {
   deleteEntry,
   editEntry,
   transfer,
+  repeatEntry,
   query,
+  searchEntries,
+  navigate,
   unknown,
+}
+
+enum SmartEntryQueryMetric {
+  spending,
+  income,
+  balance,
+  net,
+  transactionCount,
+}
+
+enum SmartEntryTimeRange {
+  today,
+  yesterday,
+  thisWeek,
+  lastWeek,
+  thisMonth,
+  lastMonth,
+  allTime,
+}
+
+bool matchesSmartEntryTimeRange(
+  DateTime date,
+  SmartEntryTimeRange range, {
+  DateTime? now,
+}) {
+  final reference = now ?? DateTime.now();
+  final day = DateTime(date.year, date.month, date.day);
+  final today = DateTime(reference.year, reference.month, reference.day);
+  switch (range) {
+    case SmartEntryTimeRange.today:
+      return day == today;
+    case SmartEntryTimeRange.yesterday:
+      return day == today.subtract(const Duration(days: 1));
+    case SmartEntryTimeRange.thisWeek:
+      final thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
+      return !day.isBefore(thisWeekStart) &&
+          day.isBefore(thisWeekStart.add(const Duration(days: 7)));
+    case SmartEntryTimeRange.lastWeek:
+      final thisWeek = today.subtract(Duration(days: today.weekday - 1));
+      final lastWeekStart = thisWeek.subtract(const Duration(days: 7));
+      return !day.isBefore(lastWeekStart) && day.isBefore(thisWeek);
+    case SmartEntryTimeRange.thisMonth:
+      return day.year == today.year && day.month == today.month;
+    case SmartEntryTimeRange.lastMonth:
+      final previous = DateTime(today.year, today.month - 1);
+      return day.year == previous.year && day.month == previous.month;
+    case SmartEntryTimeRange.allTime:
+      return true;
+  }
 }
 
 extension SmartEntryIntentDetails on SmartEntryIntent {
@@ -25,8 +77,14 @@ extension SmartEntryIntentDetails on SmartEntryIntent {
         return 'edit_entry';
       case SmartEntryIntent.transfer:
         return 'transfer';
+      case SmartEntryIntent.repeatEntry:
+        return 'repeat_entry';
       case SmartEntryIntent.query:
         return 'query';
+      case SmartEntryIntent.searchEntries:
+        return 'search_entries';
+      case SmartEntryIntent.navigate:
+        return 'navigate';
       case SmartEntryIntent.unknown:
         return 'unknown';
     }
@@ -49,6 +107,10 @@ class ParsedSmartEntryCommand {
   final double confidence;
   final Map<String, double> confidenceByField;
   final List<String> clarificationReasons;
+  final SmartEntryQueryMetric? queryMetric;
+  final SmartEntryTimeRange timeRange;
+  final String? navigationTarget;
+  final String? entryTypeFilter;
 
   const ParsedSmartEntryCommand({
     required this.rawInput,
@@ -61,6 +123,10 @@ class ParsedSmartEntryCommand {
     required this.confidence,
     required this.confidenceByField,
     required this.clarificationReasons,
+    this.queryMetric,
+    this.timeRange = SmartEntryTimeRange.allTime,
+    this.navigationTarget,
+    this.entryTypeFilter,
   });
 
   bool get needsClarification => clarificationReasons.isNotEmpty;
@@ -85,6 +151,10 @@ class ParsedSmartEntryCommand {
           Map<String, double>.unmodifiable(confidenceByField),
       'clarificationReasons':
           List<String>.unmodifiable(clarificationReasons),
+      'queryMetric': queryMetric?.name,
+      'timeRange': timeRange.name,
+      'navigationTarget': navigationTarget,
+      'entryTypeFilter': entryTypeFilter,
       'needsReview': needsClarification || confidence < 0.75,
     };
   }
@@ -220,8 +290,11 @@ SmartEntryMatchResult matchSmartEntryTransaction({
   required Iterable<SmartEntryTransaction> entries,
   String? walletId,
   Iterable<String> ignoredTitlePhrases = const [],
+  String? selectorTitle,
+  double? selectorAmount,
+  DateTime? selectorDate,
 }) {
-  var target = _normalizeMatchText(command.title);
+  var target = _normalizeMatchText(selectorTitle ?? command.title);
   for (final phrase in ignoredTitlePhrases) {
     final normalizedPhrase = _normalizeMatchText(phrase);
     if (normalizedPhrase.isEmpty) continue;
@@ -262,13 +335,19 @@ SmartEntryMatchResult matchSmartEntryTransaction({
     if (isTransfer) continue;
     if (walletId != null && entry.walletId != walletId) continue;
     if (requestedType != null && entry.type != requestedType) continue;
-    if (command.hasExplicitDate &&
-        !_sameCalendarDay(entry.date, command.date)) {
+    final requestedDate = selectorDate ??
+        (command.hasExplicitDate ? command.date : null);
+    if (requestedDate != null &&
+        !_sameCalendarDay(entry.date, requestedDate)) {
       continue;
     }
-    if (command.intent == SmartEntryIntent.deleteEntry &&
-        command.amount > 0 &&
-        (entry.amount - command.amount).abs() > 0.005) {
+    final requestedAmount = selectorAmount ??
+        ((command.intent == SmartEntryIntent.deleteEntry ||
+                command.intent == SmartEntryIntent.repeatEntry)
+            ? command.amount
+            : 0.0);
+    if (requestedAmount > 0 &&
+        (entry.amount - requestedAmount).abs() > 0.005) {
       continue;
     }
 
@@ -289,8 +368,16 @@ SmartEntryMatchResult matchSmartEntryTransaction({
   final strongMatches =
       scored.where((candidate) => candidate.score >= 0.95).toList();
   final prefersLatest = RegExp(
-    r'\b(last|latest|recent|previous|akhri|pichli)\b',
+    r'\b(last|latest|recent|previous|akhri|pichli|repeat|again|dobara)\b',
   ).hasMatch(normalizedRaw);
+
+  if (command.intent == SmartEntryIntent.repeatEntry && target.isEmpty) {
+    return SmartEntryMatchResult(
+      status: SmartEntryMatchStatus.unique,
+      matches: [scored.first.transaction],
+      confidence: 0.96,
+    );
+  }
 
   if (strongMatches.length == 1) {
     return SmartEntryMatchResult(
@@ -324,7 +411,6 @@ class LocalNlpService {
 
   final Map<String, String> _optimizedLexicon = {};
   final Map<String, String> _normalizedLexicon = {};
-  late final List<String> _sortedLexiconKeys;
 
   late final Map<String, int> _numberWordIndex;
   late final Map<String, int> _normalizedUnitsOnly;
@@ -343,9 +429,6 @@ class LocalNlpService {
         _normalizedLexicon[_normalize(w)] = category;
       }
     });
-
-    _sortedLexiconKeys = _optimizedLexicon.keys.toList()
-      ..sort((a, b) => b.length.compareTo(a.length));
 
     _normalizedUnitsOnly = {
       for (final e in _units.entries) _normalize(e.key): e.value,
@@ -409,12 +492,8 @@ class LocalNlpService {
   final List<String> _stopWords = [
     'ki', 'ka', 'ke', 'liye', 'for', 'on', 'aur', 'the', 'a', 'an', 'to', 'mein',
     'pe', 'jo', 'k', 'se', 'tak', 'par', 'wala', 'wali', 'wale',
-<<<<<<< HEAD
-    'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchased', 'khaan',
-=======
     'spend', 'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchase',
     'purchased', 'khaan', 'khareed', 'khareeda', 'khareedi', 'when', 'went',
->>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
     'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya', 'liye',
     'kha', 'pee', 'diya', 'kharida',
     'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
@@ -428,7 +507,15 @@ class LocalNlpService {
     'show', 'list', 'find', 'search', 'please', 'plz', 'last', 'latest',
     'recent', 'previous', 'akhri', 'pichli', 'me', 'ko', 'ye', 'yeh',
     'isko', 'usko', 'iss', 'is', 'wo', 'woh', 'dalo', 'daalo', 'daldo',
-    'daaldo'
+    'daaldo', 'repeat', 'again', 'same', 'dobara', 'phir', 'open', 'goto',
+    'go', 'take', 'screen', 'page', 'dashboard', 'home', 'stats',
+    'statistics', 'wallets', 'settings', 'about', 'udhaar', 'udhar', 'mess',
+    'khata', 'entries', 'entry', 'transactions', 'expenses', 'spending',
+    'total', 'today', 'yesterday', 'week', 'month', 'this', 'current',
+    'pichlay', 'pichle', 'mahine', 'haftay', 'din', 'aaj', 'kal',
+    'how', 'much', 'many', 'tell', 'calculate', 'summary', 'report',
+    'dikhao', 'batao', 'dhoondo', 'kitna', 'kitni', 'kitne', 'did',
+    'what', 'balance', 'available', 'remaining', 'count'
   ];
 
   // ==========================================
@@ -549,7 +636,6 @@ class LocalNlpService {
     double amount = 0;
     int? pendingUnit;
     String? pendingUnitToken;
-    bool matchedAnyScale = false;
 
     int i = 0;
     while (i < tokens.length) {
@@ -561,7 +647,6 @@ class LocalNlpService {
         if (mult != null) {
           amount += 2.5 * mult;
           consumed.addAll([raw, tokens[i + 1]]);
-          matchedAnyScale = true;
           i += 2;
           continue;
         }
@@ -573,7 +658,6 @@ class LocalNlpService {
         if (directMult != null) {
           amount += 1.25 * directMult;
           consumed.addAll([raw, tokens[i + 1]]);
-          matchedAnyScale = true;
           i += 2;
           continue;
         }
@@ -583,7 +667,6 @@ class LocalNlpService {
           if (mult != null) {
             amount += (unitVal + 0.25) * mult;
             consumed.addAll([raw, tokens[i + 1], tokens[i + 2]]);
-            matchedAnyScale = true;
             i += 3;
             continue;
           }
@@ -596,7 +679,6 @@ class LocalNlpService {
         if (unitVal != null && mult != null) {
           amount += (unitVal - 0.25) * mult;
           consumed.addAll([raw, tokens[i + 1], tokens[i + 2]]);
-          matchedAnyScale = true;
           i += 3;
           continue;
         }
@@ -606,7 +688,6 @@ class LocalNlpService {
       if (overrideVal != null) {
         amount += overrideVal;
         consumed.add(raw);
-        matchedAnyScale = true;
         i++;
         continue;
       }
@@ -618,7 +699,6 @@ class LocalNlpService {
         consumed.add(raw);
         pendingUnit = null;
         pendingUnitToken = null;
-        matchedAnyScale = true;
         i++;
         continue;
       }
@@ -627,14 +707,12 @@ class LocalNlpService {
       if (splitVal != null) {
         amount += splitVal;
         consumed.add(raw);
-        matchedAnyScale = true;
         i++;
         continue;
       }
 
       final numVal = _numberWordIndex[norm];
       if (numVal != null) {
-        if (numVal >= 10) matchedAnyScale = true;
         pendingUnit = numVal;
         pendingUnitToken = raw;
         i++;
@@ -694,50 +772,6 @@ class LocalNlpService {
   // ==========================================
   // 🧠 MAIN PARSING ENGINE
   // ==========================================
-<<<<<<< HEAD
-  SmartEntryIntent _detectIntent(String input) {
-    bool has(String pattern) => RegExp(pattern).hasMatch(input);
-
-    if (has(r'\b(delete|remove|erase|hata|hatao|nikal|nikalo)\b')) {
-      return SmartEntryIntent.deleteEntry;
-    }
-    if (has(r'\b(edit|change|update|modify|correct|badal|badlo|theek)\b')) {
-      return SmartEntryIntent.editEntry;
-    }
-    if (has(r'\b(transfer|move|shift|send|bhej|bhejo)\b')) {
-      return SmartEntryIntent.transfer;
-    }
-    if (has(r'\b(how much|show|list|find|search|kitna|kitni|balance|total)\b')) {
-      return SmartEntryIntent.query;
-    }
-    final addsMoneyToWallet = has(
-          r'\b(me|mein|ko)\s+(add|jama|deposit|dalo|daalo|daldo|daaldo)\b',
-        ) ||
-        has(
-          r'\b(add|jama|deposit)\b.{0,30}\b(to|me|mein|ko)\s+(cash|jazz\s*cash|wallet|account)\b',
-        );
-    if (addsMoneyToWallet) {
-      return SmartEntryIntent.addIncome;
-    }
-    if (has(
-      r'\b(income|salary|allowance|received|receive|credited|credit|deposit|kamai|earning|earned|bonus|refund|cashback|profit|aayi|ayi|aya|mila|mili|jama|wasool)\b',
-    )) {
-      return SmartEntryIntent.addIncome;
-    }
-    return input.trim().isEmpty
-        ? SmartEntryIntent.unknown
-        : SmartEntryIntent.addExpense;
-  }
-
-  double _intentConfidence(String input, SmartEntryIntent intent) {
-    if (intent == SmartEntryIntent.unknown) return 0.0;
-    if (intent != SmartEntryIntent.addExpense) return 0.98;
-
-    final explicitExpense = RegExp(
-      r'\b(expense|spent|paid|bought|purchased|kharch|kharcha|diye|diya|kharida)\b',
-    ).hasMatch(input);
-    return explicitExpense ? 0.96 : 0.84;
-=======
   SmartEntryIntent _intentFromRoute(RoutedSmartIntent intent) {
     switch (intent) {
       case RoutedSmartIntent.addExpense:
@@ -833,7 +867,6 @@ class LocalNlpService {
       return 'expense';
     }
     return null;
->>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
   }
 
   ParsedSmartEntryCommand parseCommand(
@@ -848,8 +881,6 @@ class LocalNlpService {
     final intentRoute = const PrimaryIntentRouter().classify(lowerInput);
     final intent = _intentFromRoute(intentRoute.intent);
     final isIncome = intent == SmartEntryIntent.addIncome;
-<<<<<<< HEAD
-=======
     final queryMetric = intent == SmartEntryIntent.query
         ? _queryMetric(lowerInput)
         : null;
@@ -858,7 +889,6 @@ class LocalNlpService {
         ? intentRoute.navigationTarget ?? _navigationTarget(lowerInput)
         : null;
     final entryTypeFilter = _entryTypeFilter(lowerInput);
->>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
 
     double amount = 0.0;
     double amountConfidence = 0.0;
@@ -1072,6 +1102,12 @@ class LocalNlpService {
     if (intent == SmartEntryIntent.unknown) {
       clarificationReasons.add('The command intent was not recognized.');
     }
+    if (intent == SmartEntryIntent.query && queryMetric == null) {
+      clarificationReasons.add('The financial question is incomplete.');
+    }
+    if (intent == SmartEntryIntent.navigate && navigationTarget == null) {
+      clarificationReasons.add('The destination was not recognized.');
+    }
 
     return ParsedSmartEntryCommand(
       rawInput: rawInput,
@@ -1084,6 +1120,10 @@ class LocalNlpService {
       confidence: confidence,
       confidenceByField: fieldConfidence,
       clarificationReasons: clarificationReasons,
+      queryMetric: queryMetric,
+      timeRange: timeRange,
+      navigationTarget: navigationTarget,
+      entryTypeFilter: entryTypeFilter,
     );
   }
 
@@ -1368,6 +1408,7 @@ String? resolveSmartEntryAccount({
 bool shouldAutoSaveSmartEntry(
   Map<String, dynamic> parsed, {
   required bool hasResolvedWallet,
+  double? semanticConfidence,
 }) {
   final amount = parsed['amount'];
   final type = parsed['type'];
@@ -1377,11 +1418,8 @@ bool shouldAutoSaveSmartEntry(
       amount is num &&
       amount.isFinite &&
       amount > 0 &&
-<<<<<<< HEAD
-=======
       (type != 'expense' || hasSpecificSmartEntryTitle(title)) &&
       (semanticConfidence == null || semanticConfidence >= 0.94) &&
->>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
       (type == 'expense' || type == 'income');
 }
 
