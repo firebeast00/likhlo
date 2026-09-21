@@ -27,6 +27,11 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     _loadExpenses();
   }
 
+  bool containsAnyTransactionId(Iterable<String> ids) {
+    final candidates = ids.toSet();
+    return state.allExpenses.any((entry) => candidates.contains(entry.id));
+  }
+
   List<Expense> _sortByNewest(Iterable<Expense> expenses) {
     final sorted = expenses.toList();
     sorted.sort((a, b) => b.date.compareTo(a.date));

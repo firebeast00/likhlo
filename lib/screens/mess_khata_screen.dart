@@ -6,7 +6,6 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/mess_entry_model.dart';
 import '../models/expense_model.dart';
 import '../providers/mess_provider.dart';
-import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/local_nlp_service.dart';
 import '../services/ocr_scanner_service.dart';
@@ -278,13 +277,13 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       final amt = double.tryParse(amountCtrl.text) ?? 0;
                       final count = int.tryParse(countCtrl.text) ?? 1;
                       if (titleCtrl.text.isNotEmpty && amt > 0 && count > 0) {
                         final expenseId = const Uuid().v4();
 
-                        ref.read(messProvider.notifier).addEntry(
+                        await ref.read(messProvider.notifier).addEntry(
                           MessEntry(
                             id: expenseId,
                             title: titleCtrl.text,
@@ -297,14 +296,19 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
 
                         await ref
                             .read(transactionExecutorProvider)
-                            .execute(CreateTransactionCommand(Expense(
-                            id: expenseId,
-                            title: "Mess: ${titleCtrl.text} (${payerCtrl.text})",
-                            amount: amt,
-                            category: "Hostel/Mess",
-                            date: DateTime.now(),
-                            colorValue: primaryColor.toARGB32(),
-                          )));
+                            .execute(
+                              CreateTransactionCommand(
+                                Expense(
+                                  id: expenseId,
+                                  title:
+                                      "Mess: ${titleCtrl.text} (${payerCtrl.text})",
+                                  amount: amt,
+                                  category: "Hostel/Mess",
+                                  date: DateTime.now(),
+                                  colorValue: primaryColor.toARGB32(),
+                                ),
+                              ),
+                            );
 
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
@@ -536,11 +540,14 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                         InkWell(
                           borderRadius: BorderRadius.circular(6),
                           onTap: () async {
-                            ref.read(messProvider.notifier).deleteEntry(item.id);
+                            await ref
+                                .read(messProvider.notifier)
+                                .deleteEntry(item.id);
                             await ref
                                 .read(transactionExecutorProvider)
                                 .execute(DeleteTransactionCommand(item.id));
 
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text("Deleted split expense & synced budget"), backgroundColor: Colors.red),
                             );

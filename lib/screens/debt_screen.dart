@@ -11,7 +11,6 @@ import '../services/local_nlp_service.dart';
 import '../services/ocr_scanner_service.dart';
 import '../providers/settings_provider.dart';
 import '../models/expense_model.dart';
-import '../providers/expense_provider.dart';
 import '../services/transaction_executor.dart';
 
 class DebtScreen extends ConsumerStatefulWidget {
@@ -503,7 +502,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   ),
                   onDismissed: (_) async {
                     // 1. Delete from Udhaar tab
-                    item.delete();
+                    await item.delete();
 
                     // 2. Delete from Main Expenses to restore the budget
                     try {
@@ -512,6 +511,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           .execute(DeleteTransactionCommand(item.id));
                     } catch (_) {} // Catch in case it was a "borrowed" record that wasn't synced
 
+                    if (!mounted) return;
                     setState((){});
                     ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text("Settled Udhaar with ${item.borrowerName} 🤝", style: const TextStyle(fontSize: 13)), backgroundColor: Colors.green)

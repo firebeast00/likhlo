@@ -2183,7 +2183,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<int>(
-                  value: selectedYear,
+                  initialValue: selectedYear,
                   decoration: const InputDecoration(
                     labelText: 'Year',
                     prefixIcon: Icon(Icons.calendar_today_rounded),
@@ -2355,7 +2355,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         }
       }
     } catch (error) {
-      debugPrint('Speech locale lookup failed: ' + error.toString());
+      debugPrint('Speech locale lookup failed: $error');
     }
 
     candidates.add(null);
@@ -2706,12 +2706,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          walletName + ' · ' + dateLabel,
+                          '$walletName · $dateLabel',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: Text(
-                          'Rs. ' + amountLabel,
+                          'Rs. $amountLabel',
                           style: theme.textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -2813,13 +2813,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final available = walletNotifier.getBalanceForWallet(source.id);
     if (command.amount > available + 0.000001) {
       _showTransactionError(
-        'Available in ' +
-            source.name +
-            ': Rs. ' +
-            available.toStringAsFixed(0) +
-            '. Required: Rs. ' +
-            command.amount.toStringAsFixed(0) +
-            '.',
+        'Available in ${source.name}: Rs. ${available.toStringAsFixed(0)}. '
+        'Required: Rs. ${command.amount.toStringAsFixed(0)}.',
         title: 'Insufficient balance',
       );
       return;
@@ -2828,8 +2823,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final transferId = const Uuid().v4();
     final transferEntries = [
       Expense(
-        id: transferId + '_out',
-        title: 'Transfer to ' + destination.name,
+        id: '${transferId}_out',
+        title: 'Transfer to ${destination.name}',
         amount: command.amount,
         date: command.date,
         category: 'Transfer',
@@ -2838,8 +2833,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         walletId: source.id,
       ),
       Expense(
-        id: transferId + '_in',
-        title: 'Transfer from ' + source.name,
+        id: '${transferId}_in',
+        title: 'Transfer from ${source.name}',
         amount: command.amount,
         date: command.date,
         category: 'Transfer',
@@ -2870,12 +2865,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       command.amount == command.amount.truncateToDouble() ? 0 : 2,
     );
     _showTransactionSuccess(
-      'Rs. ' +
-          transferAmount +
-          ' · ' +
-          source.name +
-          ' → ' +
-          destination.name,
+      'Rs. $transferAmount · ${source.name} → ${destination.name}',
       title: 'Transfer completed',
       actionLabel: 'Undo',
       onAction: () async {
@@ -3377,7 +3367,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       final deletedAmount =
           deletedEntry.amount.toStringAsFixed(0);
       _showTransactionSuccess(
-        deletedEntry.title + ' — Rs. ' + deletedAmount,
+        '${deletedEntry.title} — Rs. $deletedAmount',
         title: 'Entry deleted',
         actionLabel: 'Undo',
         onAction: () async {
