@@ -560,7 +560,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
                 rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
                 cellPadding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                headers: ['Date', 'Title', 'Type', 'Category', 'Amount (Rs)'],
+                headers: const ['Date', 'Title', 'Type', 'Category', 'Amount (Rs)'],
                 data: expenses.map((e) => [
                   DateFormat('dd MMM yyyy').format(e.date),
                   e.title,

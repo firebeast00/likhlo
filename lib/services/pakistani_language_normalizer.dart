@@ -117,7 +117,7 @@ class PakistaniLanguageNormalizer {
       'amount_alias',
     );
 
-    final amountLead =
+    const amountLead =
         r'(aik|ek|do|teen|tin|chaar|char|paanch|panch|chhay|saat|aath|nau|\d+)';
     value = value.replaceAllMapped(
       RegExp('\\b$amountLead\\s+(gazaar|gazar)\\b'),

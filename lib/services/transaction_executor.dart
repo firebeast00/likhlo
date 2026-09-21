@@ -112,9 +112,10 @@ class ExpenseTransactionStore implements TransactionStore {
         : transactionId.endsWith('_in')
             ? transactionId.substring(0, transactionId.length - 3)
             : transactionId;
-    final exists = notifier.state.allExpenses.any(
-      (entry) => entry.id == '${baseId}_out' || entry.id == '${baseId}_in',
-    );
+    final exists = notifier.containsAnyTransactionId([
+      '${baseId}_out',
+      '${baseId}_in',
+    ]);
     if (!exists) return false;
     await notifier.deleteTransferPair(transactionId);
     return true;

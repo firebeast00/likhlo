@@ -226,7 +226,7 @@ SmartEntryMatchResult matchSmartEntryTransaction({
     target = target
         .replaceAll(
           RegExp(
-            r'(^|\s)' + RegExp.escape(normalizedPhrase) + r'(\s|$)',
+            '(^|\\s)${RegExp.escape(normalizedPhrase)}(\\s|\$)',
           ),
           ' ',
         )
@@ -492,7 +492,9 @@ class LocalNlpService {
         final cost = (a[i] == b[j]) ? 0 : 1;
         v1[j + 1] = min(v1[j] + 1, min(v0[j + 1] + 1, v0[j] + cost));
       }
-      for (int j = 0; j <= b.length; j++) v0[j] = v1[j];
+      for (int j = 0; j <= b.length; j++) {
+        v0[j] = v1[j];
+      }
     }
     return v1[b.length];
   }
@@ -783,7 +785,7 @@ class LocalNlpService {
 
     final candidates = <String>[];
     for (var index = 0; index < words.length - 1; index++) {
-      candidates.add(words[index] + ' ' + words[index + 1]);
+      candidates.add('${words[index]} ${words[index + 1]}');
     }
     candidates.addAll(words);
 
@@ -809,7 +811,7 @@ class LocalNlpService {
     if (!categoryFound) {
       for (final activeCategory in activeCategories) {
         if (RegExp(
-          r'\b' + RegExp.escape(activeCategory.toLowerCase()) + r'\b',
+          '\\b${RegExp.escape(activeCategory.toLowerCase())}\\b',
         ).hasMatch(lowerInput)) {
           applyCategory(activeCategory, activeCategory.toLowerCase());
           break;
@@ -839,13 +841,13 @@ class LocalNlpService {
     String cleanTitle = lowerInput.replaceAll(amountRegExp, ' ');
     for (final token in consumedTokens) {
       cleanTitle = cleanTitle.replaceFirst(
-        RegExp(r'\b' + RegExp.escape(token) + r'\b'),
+        RegExp('\\b${RegExp.escape(token)}\\b'),
         ' ',
       );
     }
     for (final stopWord in _stopWords) {
       cleanTitle = cleanTitle.replaceAll(
-        RegExp(r'\b' + RegExp.escape(stopWord) + r'\b'),
+        RegExp('\\b${RegExp.escape(stopWord)}\\b'),
         ' ',
       );
     }
@@ -981,7 +983,7 @@ bool _accountMentioned(String input, SmartEntryAccount account) {
 
   for (final alias in _smartEntryAccountAliases(account)) {
     final exact = RegExp(
-      '(^|\\s)' + RegExp.escape(alias) + '(\\s|\$)',
+      '(^|\\s)${RegExp.escape(alias)}(\\s|\$)',
     );
     for (final match in exact.allMatches(normalizedInput)) {
       final start = match.start + (match.group(1)?.length ?? 0);
@@ -1033,7 +1035,7 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
       ..sort((first, second) => second.length.compareTo(first.length));
     for (final alias in aliases) {
       final pattern = RegExp(
-        '(^|\\s)' + RegExp.escape(alias) + '(\\s|\$)',
+        '(^|\\s)${RegExp.escape(alias)}(\\s|\$)',
       );
       for (final match in pattern.allMatches(normalizedInput)) {
         final leadingLength = match.group(1)?.length ?? 0;
@@ -1070,7 +1072,7 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
   bool hasBefore(_SmartEntryAccountMention mention, String marker) {
     final before = normalizedInput.substring(0, mention.start).trimRight();
     return RegExp(
-      r'(^|\s)' + RegExp.escape(marker) + r'$',
+      '(^|\\s)${RegExp.escape(marker)}\$',
     ).hasMatch(before);
   }
 
@@ -1081,7 +1083,7 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
     final after = normalizedInput.substring(mention.end).trimLeft();
     return markers.any(
       (marker) => RegExp(
-        '^' + RegExp.escape(marker) + r'(\s|$)',
+        '^${RegExp.escape(marker)}(\\s|\$)',
       ).hasMatch(after),
     );
   }
