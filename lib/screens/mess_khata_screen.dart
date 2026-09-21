@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -9,9 +8,9 @@ import '../models/expense_model.dart';
 import '../providers/mess_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/wallet_provider.dart';
 import '../services/local_nlp_service.dart';
 import '../services/ocr_scanner_service.dart';
+import '../services/transaction_executor.dart';
 
 class MessKhataScreen extends ConsumerStatefulWidget {
   const MessKhataScreen({super.key});
@@ -32,7 +31,6 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   }
 
   void _listenForInput() async {
-    FocusManager.instance.primaryFocus?.unfocus();
     if (!_isListening) {
       bool available = await _speech.initialize(
         onStatus: (val) {
@@ -85,7 +83,6 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   }
 
   void _startReceiptScan() async {
-    FocusManager.instance.primaryFocus?.unfocus();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -190,7 +187,6 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   }
 
   void _showAddDialog(BuildContext context, WidgetRef ref, {String initialTitle = "", String initialAmount = ""}) {
-    FocusManager.instance.primaryFocus?.unfocus();
     final titleCtrl = TextEditingController(text: initialTitle);
     final amountCtrl = TextEditingController(text: initialAmount);
     final payerCtrl = TextEditingController(text: "Me");
@@ -282,104 +278,33 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () async {
-                      final amt = double.tryParse(amountCtrl.text);
-                      final count = int.tryParse(countCtrl.text);
-                      if (titleCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Enter an expense title.')),
-                        );
-                        return;
-                      }
-                      if (amt == null || !amt.isFinite || amt <= 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Enter a valid amount above zero. Negative amounts are not allowed.'),
-                          ),
-                        );
-                        return;
-                      }
-                      if (count == null || count <= 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Split count must be at least 1.')),
-                        );
-                        return;
-                      }
-
-                      final wallets = ref.read(walletProvider);
-                      if (wallets.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Create a wallet before adding an expense.')),
-                        );
-                        return;
-                      }
-                      final sourceWallet = wallets.firstWhere(
-                        (wallet) =>
-                            !wallet.isBackup &&
-                            (wallet.walletType == 'cash' ||
-                                wallet.name.toLowerCase().contains('cash')),
-                        orElse: () => wallets.firstWhere(
-                          (wallet) => !wallet.isBackup,
-                          orElse: () => wallets.first,
-                        ),
-                      );
-                      final available = ref
-                          .read(walletProvider.notifier)
-                          .getBalanceForWallet(sourceWallet.id);
-                      if (amt > available) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Not enough money in ${sourceWallet.name}. Available: Rs. ${available.toStringAsFixed(0)}; required: Rs. ${amt.toStringAsFixed(0)}. Add money or enter a smaller amount.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-
+                    onPressed: () {
+                      final amt = double.tryParse(amountCtrl.text) ?? 0;
+                      final count = int.tryParse(countCtrl.text) ?? 1;
                       if (titleCtrl.text.isNotEmpty && amt > 0 && count > 0) {
                         final expenseId = const Uuid().v4();
 
-                        final messEntry = MessEntry(
-                          id: expenseId,
-                          title: titleCtrl.text.trim(),
-                          totalAmount: amt,
-                          paidBy: payerCtrl.text.trim(),
-                          splitCount: count,
-                          date: DateTime.now(),
+                        ref.read(messProvider.notifier).addEntry(
+                          MessEntry(
+                            id: expenseId,
+                            title: titleCtrl.text,
+                            totalAmount: amt,
+                            paidBy: payerCtrl.text,
+                            splitCount: count,
+                            date: DateTime.now(),
+                          ),
                         );
-                        final messSaved =
-                            await ref.read(messProvider.notifier).addEntry(messEntry);
-                        if (!messSaved) {
-                          if (!ctx.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Could not save the Mess Khata record.')),
-                          );
-                          return;
-                        }
-                        final linkedSaved = await ref
-                            .read(expenseProvider.notifier)
-                            .addExpense(
-                              Expense(
-                                id: expenseId,
-                                title: "Mess: ${titleCtrl.text.trim()} (${payerCtrl.text.trim()})",
-                                amount: amt,
-                                category: "Hostel/Mess",
-                                date: DateTime.now(),
-                                colorValue: primaryColor.toARGB32(),
-                                walletId: sourceWallet.id,
-                              ),
-                            );
-                        if (!linkedSaved) {
-                          await ref
-                              .read(messProvider.notifier)
-                              .deleteEntry(expenseId);
-                          if (!ctx.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Could not save the linked expense.')),
-                          );
-                          return;
-                        }
+
+                        await ref
+                            .read(transactionExecutorProvider)
+                            .execute(CreateTransactionCommand(Expense(
+                            id: expenseId,
+                            title: "Mess: ${titleCtrl.text} (${payerCtrl.text})",
+                            amount: amt,
+                            category: "Hostel/Mess",
+                            date: DateTime.now(),
+                            colorValue: primaryColor.toARGB32(),
+                          )));
 
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
@@ -399,12 +324,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
   Widget _buildDialogInput(TextEditingController ctrl, String label, IconData icon, BuildContext context, Color primaryColor, {bool isNumber = false}) {
     return TextField(
       controller: ctrl,
-      keyboardType: isNumber
-          ? const TextInputType.numberWithOptions(decimal: true, signed: false)
-          : TextInputType.text,
-      inputFormatters: isNumber
-          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))]
-          : null,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
@@ -616,35 +536,13 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                         InkWell(
                           borderRadius: BorderRadius.circular(6),
                           onTap: () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (dialogContext) => AlertDialog(
-                                title: const Text('Delete Mess Khata record?'),
-                                content: Text(
-                                  "Delete '${item.title}'? This will also remove the linked expense from your records.",
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(dialogContext, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  FilledButton(
-                                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                    onPressed: () => Navigator.pop(dialogContext, true),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirmed != true || !mounted) return;
-                            await ref.read(messProvider.notifier).deleteEntry(item.id);
-                            await ref.read(expenseProvider.notifier).deleteExpense(item.id);
-                            if (!mounted) return;
+                            ref.read(messProvider.notifier).deleteEntry(item.id);
+                            await ref
+                                .read(transactionExecutorProvider)
+                                .execute(DeleteTransactionCommand(item.id));
+
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Deleted split expense and updated records'),
-                                backgroundColor: Colors.red,
-                              ),
+                              const SnackBar(content: Text("Deleted split expense & synced budget"), backgroundColor: Colors.red),
                             );
                           },
                           child: Padding(
