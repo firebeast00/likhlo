@@ -24,6 +24,7 @@ import 'stats_screen.dart';
 import 'about_screen.dart';
 import '../services/local_nlp_service.dart';
 import '../services/ocr_scanner_service.dart';
+import '../services/speech_session_controller.dart';
 import "./mess_khata_screen.dart";
 import './income_accounts_screen.dart';
 
@@ -54,9 +55,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   late Animation<double> _fabScale;
 
   final stt.SpeechToText _speech = stt.SpeechToText();
+  final SpeechSessionController _speechSession = SpeechSessionController();
   bool _isListening = false;
-  bool _voiceResultProcessed = false;
   bool _handlingSpeechError = false;
+  bool _restartingSpeech = false;
   bool _speechInitialized = false;
   bool _speechLocalesLoaded = false;
   List<String?> _speechLocaleCandidates = const [null];
@@ -2269,8 +2271,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
-    _voiceResultProcessed = false;
+    _speechSession.start();
     _handlingSpeechError = false;
+    _restartingSpeech = false;
     _smartInputCtrl.clear();
     if (!_speechInitialized) {
       final available = await _speech.initialize(
@@ -2353,30 +2356,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           cancelOnError: true,
           partialResults: true,
           listenMode: stt.ListenMode.search,
-          pauseFor: const Duration(seconds: 2),
+          pauseFor: const Duration(seconds: 3),
           listenFor: const Duration(seconds: 12),
         ),
         onResult: (result) async {
           if (!mounted) return;
           final words = result.recognizedWords.trim();
-          _smartInputCtrl.value = TextEditingValue(
-            text: words,
-            selection: TextSelection.collapsed(offset: words.length),
-          );
-          if (result.finalResult &&
-              words.isNotEmpty &&
-              !_voiceResultProcessed) {
-            _voiceResultProcessed = true;
-            setState(() => _isListening = false);
-            await _processNLP(words);
+          if (words.isNotEmpty) {
+            _smartInputCtrl.value = TextEditingValue(
+              text: words,
+              selection: TextSelection.collapsed(offset: words.length),
+            );
           }
+          final decision = _speechSession.recordTranscript(
+            words,
+            isFinal: result.finalResult,
+          );
+          await _applySpeechDecision(decision);
         },
       );
     } catch (error) {
       debugPrint('Speech listen failed: $error');
       if (!mounted || _handlingSpeechError) return;
       _handlingSpeechError = true;
-      _voiceResultProcessed = true;
+      _speechSession.onRecognizerError(retryable: false);
       setState(() => _isListening = false);
       _showTransactionError(
         'Voice recognition could not start. Check microphone permission and the phone\'s speech-recognition service.',
@@ -2386,43 +2389,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _handleSpeechError(String errorMessage) async {
-    if (!mounted || _handlingSpeechError || _voiceResultProcessed) return;
+    if (!mounted || _handlingSpeechError) return;
+    if (_speechSession.state != SpeechSessionState.listening &&
+        _speechSession.state != SpeechSessionState.finalizing) {
+      return;
+    }
     debugPrint('STT Error: $errorMessage');
     _handlingSpeechError = true;
 
     final normalized = errorMessage.toLowerCase();
-    final partialWords = _smartInputCtrl.text.trim();
     final recoverableEnd = normalized.contains('error_speech_timeout') ||
         normalized.contains('error_no_match') ||
         normalized.contains('error_client');
-    if (recoverableEnd && partialWords.isNotEmpty) {
-      _voiceResultProcessed = true;
-      setState(() => _isListening = false);
-      await _processNLP(partialWords);
-      return;
-    }
     final languageFailure =
         normalized.contains('error_language_unavailable') ||
         normalized.contains('error_language_not_supported');
+    final canTryAnotherLocale = languageFailure &&
+        _speechLocaleCandidateIndex + 1 < _speechLocaleCandidates.length;
+    final decision = _speechSession.onRecognizerError(
+      retryable: recoverableEnd || canTryAnotherLocale,
+    );
 
-    if (languageFailure &&
-        _speechLocaleCandidateIndex + 1 <
-            _speechLocaleCandidates.length) {
-      _voiceResultProcessed = true;
+    if (decision.action == SpeechSessionAction.retry) {
+      _restartingSpeech = true;
       await _speech.cancel();
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
+      if (!mounted) {
+        _restartingSpeech = false;
+        return;
+      }
 
-      _speechLocaleCandidateIndex++;
-      _smartInputCtrl.clear();
-      _voiceResultProcessed = false;
+      if (canTryAnotherLocale) _speechLocaleCandidateIndex++;
       _handlingSpeechError = false;
+      _restartingSpeech = false;
+      setState(() => _isListening = true);
       await _startSpeechListening();
       return;
     }
 
-    _voiceResultProcessed = true;
     setState(() => _isListening = false);
+
+    if (decision.action == SpeechSessionAction.processFinal) {
+      await _applySpeechDecision(decision);
+      return;
+    }
 
     if (normalized.contains('error_client')) {
       _speechInitialized = false;
@@ -2435,7 +2445,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (networkFailure) {
       _showTransactionError(
-        'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
+        _speechDraftMessage(
+          'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
+        ),
         title: 'Voice service is offline',
       );
       return;
@@ -2443,16 +2455,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (languageFailure) {
       _showTransactionError(
-        'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
+        _speechDraftMessage(
+          'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
+        ),
         title: 'Speech language unavailable',
       );
       return;
     }
 
     _showTransactionError(
-      'Voice Log stopped before an entry could be saved. Please try again.',
+      _speechDraftMessage(
+        'Voice Log stopped before it received a final result. Please try again.',
+      ),
       title: 'Voice Log stopped',
     );
+  }
+
+  String _speechDraftMessage(String message) {
+    if (_smartInputCtrl.text.trim().isEmpty) return message;
+    return '$message Your unfinished words were kept as a draft; review them and tap Save to continue.';
+  }
+
+  Future<void> _applySpeechDecision(SpeechSessionDecision decision) async {
+    if (!mounted) return;
+    switch (decision.action) {
+      case SpeechSessionAction.processFinal:
+        setState(() => _isListening = false);
+        _speechSession.markProcessing();
+        try {
+          await _processNLP(decision.transcript);
+          _speechSession.markCompleted();
+        } catch (error) {
+          _speechSession.markFailed();
+          rethrow;
+        }
+        return;
+      case SpeechSessionAction.preserveDraft:
+        setState(() => _isListening = false);
+        _showTransactionInfo(
+          'Voice recognition stopped before it produced a final result. Your words are still in Smart Entry—review them and tap Save when ready.',
+          title: 'Voice draft kept',
+        );
+        return;
+      case SpeechSessionAction.none:
+      case SpeechSessionAction.retry:
+        return;
+    }
   }
 
   Future<void> _scanReceiptIntoInput() async {
@@ -2503,12 +2551,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   void _handleSpeechStatus(String status) {
     if (!mounted || (status != 'done' && status != 'notListening')) return;
-    final words = _smartInputCtrl.text.trim();
-    setState(() => _isListening = false);
-    if (!_voiceResultProcessed && words.isNotEmpty) {
-      _voiceResultProcessed = true;
-      _processNLP(words);
-    }
+    if (_restartingSpeech) return;
+    final decision = _speechSession.onRecognizerStopped();
+    if (_isListening) setState(() => _isListening = false);
+    _applySpeechDecision(decision);
   }
 
   Future<Expense?> _showSmartEntryMatchPicker(
