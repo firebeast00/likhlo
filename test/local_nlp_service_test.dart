@@ -680,6 +680,125 @@ void main() {
       );
     });
 
+    test('parses financial questions with metric and time range', () {
+      final spending = LocalNlpService().parseCommand(
+        'how much did I spend on food this month',
+        categories,
+      );
+      final balance = LocalNlpService().parseCommand(
+        'what is my cash balance',
+        categories,
+      );
+
+      expect(spending.intent, SmartEntryIntent.query);
+      expect(spending.queryMetric, SmartEntryQueryMetric.spending);
+      expect(spending.timeRange, SmartEntryTimeRange.thisMonth);
+      expect(spending.category, 'Food');
+      expect(balance.intent, SmartEntryIntent.query);
+      expect(balance.queryMetric, SmartEntryQueryMetric.balance);
+    });
+
+    test('does not turn normal income statements into questions', () {
+      final command = LocalNlpService().parseCommand(
+        'salary 50 hazar received in cash',
+        categories,
+      );
+
+      expect(command.intent, SmartEntryIntent.addIncome);
+      expect(command.amount, 50000);
+    });
+
+    test('recognizes repeat search and navigation commands', () {
+      final repeat = LocalNlpService().parseCommand(
+        'repeat last petrol expense',
+        categories,
+      );
+      final search = LocalNlpService().parseCommand(
+        'find burger entries',
+        categories,
+      );
+      final navigate = LocalNlpService().parseCommand(
+        'open wallets',
+        categories,
+      );
+
+      expect(repeat.intent, SmartEntryIntent.repeatEntry);
+      expect(search.intent, SmartEntryIntent.searchEntries);
+      expect(navigate.intent, SmartEntryIntent.navigate);
+      expect(navigate.navigationTarget, 'Wallets');
+    });
+
+    test('repeat last expense selects newest non-transfer expense', () {
+      final command = LocalNlpService().parseCommand(
+        'repeat last expense',
+        categories,
+      );
+      final match = matchSmartEntryTransaction(
+        command: command,
+        entries: [
+          SmartEntryTransaction(
+            id: 'old',
+            title: 'Books',
+            amount: 500,
+            category: 'Education',
+            type: 'expense',
+            date: DateTime(2026, 9, 19),
+            walletId: 'cash',
+          ),
+          SmartEntryTransaction(
+            id: 'new',
+            title: 'Petrol',
+            amount: 1000,
+            category: 'Transport',
+            type: 'expense',
+            date: DateTime(2026, 9, 20),
+            walletId: 'cash',
+          ),
+          SmartEntryTransaction(
+            id: 'pair_out',
+            title: 'Transfer to JazzCash',
+            amount: 2000,
+            category: 'Transfer',
+            type: 'expense',
+            date: DateTime(2026, 9, 21),
+            walletId: 'cash',
+          ),
+        ],
+      );
+
+      expect(match.status, SmartEntryMatchStatus.unique);
+      expect(match.matches.single.id, 'new');
+    });
+
+    test('time range helper handles current and previous months', () {
+      final now = DateTime(2026, 9, 21);
+
+      expect(
+        matchesSmartEntryTimeRange(
+          DateTime(2026, 9, 1),
+          SmartEntryTimeRange.thisMonth,
+          now: now,
+        ),
+        isTrue,
+      );
+      expect(
+        matchesSmartEntryTimeRange(
+          DateTime(2026, 8, 31),
+          SmartEntryTimeRange.lastMonth,
+          now: now,
+        ),
+        isTrue,
+      );
+      expect(
+        matchesSmartEntryTimeRange(
+          DateTime(2026, 7, 31),
+          SmartEntryTimeRange.lastMonth,
+          now: now,
+        ),
+        isFalse,
+      );
+    });
+
 
   });
 }

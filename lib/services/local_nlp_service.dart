@@ -6,8 +6,59 @@ enum SmartEntryIntent {
   deleteEntry,
   editEntry,
   transfer,
+  repeatEntry,
   query,
+  searchEntries,
+  navigate,
   unknown,
+}
+
+enum SmartEntryQueryMetric {
+  spending,
+  income,
+  balance,
+  net,
+  transactionCount,
+}
+
+enum SmartEntryTimeRange {
+  today,
+  yesterday,
+  thisWeek,
+  lastWeek,
+  thisMonth,
+  lastMonth,
+  allTime,
+}
+
+bool matchesSmartEntryTimeRange(
+  DateTime date,
+  SmartEntryTimeRange range, {
+  DateTime? now,
+}) {
+  final reference = now ?? DateTime.now();
+  final day = DateTime(date.year, date.month, date.day);
+  final today = DateTime(reference.year, reference.month, reference.day);
+  switch (range) {
+    case SmartEntryTimeRange.today:
+      return day == today;
+    case SmartEntryTimeRange.yesterday:
+      return day == today.subtract(const Duration(days: 1));
+    case SmartEntryTimeRange.thisWeek:
+      final start = today.subtract(Duration(days: today.weekday - 1));
+      return !day.isBefore(start) && day.isBefore(start.add(const Duration(days: 7)));
+    case SmartEntryTimeRange.lastWeek:
+      final thisWeek = today.subtract(Duration(days: today.weekday - 1));
+      final start = thisWeek.subtract(const Duration(days: 7));
+      return !day.isBefore(start) && day.isBefore(thisWeek);
+    case SmartEntryTimeRange.thisMonth:
+      return day.year == today.year && day.month == today.month;
+    case SmartEntryTimeRange.lastMonth:
+      final previous = DateTime(today.year, today.month - 1);
+      return day.year == previous.year && day.month == previous.month;
+    case SmartEntryTimeRange.allTime:
+      return true;
+  }
 }
 
 extension SmartEntryIntentDetails on SmartEntryIntent {
@@ -23,8 +74,14 @@ extension SmartEntryIntentDetails on SmartEntryIntent {
         return 'edit_entry';
       case SmartEntryIntent.transfer:
         return 'transfer';
+      case SmartEntryIntent.repeatEntry:
+        return 'repeat_entry';
       case SmartEntryIntent.query:
         return 'query';
+      case SmartEntryIntent.searchEntries:
+        return 'search_entries';
+      case SmartEntryIntent.navigate:
+        return 'navigate';
       case SmartEntryIntent.unknown:
         return 'unknown';
     }
@@ -47,6 +104,10 @@ class ParsedSmartEntryCommand {
   final double confidence;
   final Map<String, double> confidenceByField;
   final List<String> clarificationReasons;
+  final SmartEntryQueryMetric? queryMetric;
+  final SmartEntryTimeRange timeRange;
+  final String? navigationTarget;
+  final String? entryTypeFilter;
 
   const ParsedSmartEntryCommand({
     required this.rawInput,
@@ -59,6 +120,10 @@ class ParsedSmartEntryCommand {
     required this.confidence,
     required this.confidenceByField,
     required this.clarificationReasons,
+    this.queryMetric,
+    this.timeRange = SmartEntryTimeRange.allTime,
+    this.navigationTarget,
+    this.entryTypeFilter,
   });
 
   bool get needsClarification => clarificationReasons.isNotEmpty;
@@ -83,6 +148,10 @@ class ParsedSmartEntryCommand {
           Map<String, double>.unmodifiable(confidenceByField),
       'clarificationReasons':
           List<String>.unmodifiable(clarificationReasons),
+      'queryMetric': queryMetric?.name,
+      'timeRange': timeRange.name,
+      'navigationTarget': navigationTarget,
+      'entryTypeFilter': entryTypeFilter,
       'needsReview': needsClarification || confidence < 0.75,
     };
   }
@@ -264,7 +333,8 @@ SmartEntryMatchResult matchSmartEntryTransaction({
         !_sameCalendarDay(entry.date, command.date)) {
       continue;
     }
-    if (command.intent == SmartEntryIntent.deleteEntry &&
+    if ((command.intent == SmartEntryIntent.deleteEntry ||
+            command.intent == SmartEntryIntent.repeatEntry) &&
         command.amount > 0 &&
         (entry.amount - command.amount).abs() > 0.005) {
       continue;
@@ -287,8 +357,16 @@ SmartEntryMatchResult matchSmartEntryTransaction({
   final strongMatches =
       scored.where((candidate) => candidate.score >= 0.95).toList();
   final prefersLatest = RegExp(
-    r'\b(last|latest|recent|previous|akhri|pichli)\b',
+    r'\b(last|latest|recent|previous|akhri|pichli|repeat|again|dobara)\b',
   ).hasMatch(normalizedRaw);
+
+  if (command.intent == SmartEntryIntent.repeatEntry && target.isEmpty) {
+    return SmartEntryMatchResult(
+      status: SmartEntryMatchStatus.unique,
+      matches: [scored.first.transaction],
+      confidence: 0.96,
+    );
+  }
 
   if (strongMatches.length == 1) {
     return SmartEntryMatchResult(
@@ -407,7 +485,7 @@ class LocalNlpService {
   final List<String> _stopWords = [
     'ki', 'ka', 'ke', 'liye', 'for', 'on', 'aur', 'the', 'a', 'an', 'to', 'mein',
     'pe', 'jo', 'k', 'se', 'tak', 'par', 'wala', 'wali', 'wale',
-    'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchased', 'khaan',
+    'spend', 'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchased', 'khaan',
     'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya', 'liye',
     'kha', 'pee', 'diya', 'kharida',
     'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
@@ -421,7 +499,15 @@ class LocalNlpService {
     'show', 'list', 'find', 'search', 'please', 'plz', 'last', 'latest',
     'recent', 'previous', 'akhri', 'pichli', 'me', 'ko', 'ye', 'yeh',
     'isko', 'usko', 'iss', 'is', 'wo', 'woh', 'dalo', 'daalo', 'daldo',
-    'daaldo'
+    'daaldo', 'repeat', 'again', 'same', 'dobara', 'phir', 'open', 'goto',
+    'go', 'take', 'screen', 'page', 'dashboard', 'home', 'stats',
+    'statistics', 'wallets', 'settings', 'about', 'udhaar', 'udhar', 'mess',
+    'khata', 'entries', 'entry', 'transactions', 'expenses', 'spending',
+    'total', 'today', 'yesterday', 'week', 'month', 'this', 'current',
+    'pichlay', 'pichle', 'mahine', 'haftay', 'din', 'aaj', 'kal',
+    'how', 'much', 'many', 'tell', 'calculate', 'summary', 'report',
+    'dikhao', 'batao', 'dhoondo', 'kitna', 'kitni', 'kitne', 'did',
+    'what', 'balance', 'available', 'remaining', 'count'
   ];
 
   // ==========================================
@@ -659,8 +745,25 @@ class LocalNlpService {
     if (has(r'\b(transfer|move|shift|send|bhej|bhejo)\b')) {
       return SmartEntryIntent.transfer;
     }
-    if (has(r'\b(how much|show|list|find|search|kitna|kitni|balance|total)\b')) {
+    if (has(r'\b(repeat|again|dobara)\b') ||
+        has(r'\b(same|wahi|wohi)\b.{0,30}\b(phir|again|dobara)\b') ||
+        has(r'\b(phir\s+se)\b')) {
+      return SmartEntryIntent.repeatEntry;
+    }
+    if (has(r'\b(open|goto|go\s+to|take\s+me\s+to|khol|kholo)\b') &&
+        has(r'\b(home|dashboard|stats|statistics|wallet|wallets|udhaar|udhar|mess|khata|settings|about)\b')) {
+      return SmartEntryIntent.navigate;
+    }
+    final asksFinancialQuestion =
+        has(r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining)\b') ||
+        has(r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining)\b') ||
+        (has(r'\b(show|tell|calculate|summary|report|dikhao|batao)\b') &&
+            has(r'\b(spent|spending|expense|expenses|income|earned|received|kamai)\b'));
+    if (asksFinancialQuestion) {
       return SmartEntryIntent.query;
+    }
+    if (has(r'\b(show|list|find|search|dhoondo|dikhao)\b')) {
+      return SmartEntryIntent.searchEntries;
     }
     final addsMoneyToWallet = has(
           r'\b(me|mein|ko)\s+(add|jama|deposit|dalo|daalo|daldo|daaldo)\b',
@@ -679,6 +782,78 @@ class LocalNlpService {
     return input.trim().isEmpty
         ? SmartEntryIntent.unknown
         : SmartEntryIntent.addExpense;
+  }
+
+  SmartEntryQueryMetric? _queryMetric(String input) {
+    if (RegExp(r'\b(balance|available|bachay|bacha)\b').hasMatch(input)) {
+      return SmartEntryQueryMetric.balance;
+    }
+    if (RegExp(r'\b(net|difference|remaining|bacha\s+kitna)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.net;
+    }
+    if (RegExp(r'\b(how\s+many|count|kitni\s+entries|kitne\s+transactions)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.transactionCount;
+    }
+    if (RegExp(r'\b(income|earned|received|salary|kamai|aayi|mili)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.income;
+    }
+    if (RegExp(r'\b(spend|spent|spending|expense|expenses|kharch|kharcha)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.spending;
+    }
+    return null;
+  }
+
+  SmartEntryTimeRange _timeRange(String input) {
+    if (RegExp(r'\b(last\s+month|previous\s+month|pichlay\s+mahine|pichle\s+mahine)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.lastMonth;
+    }
+    if (RegExp(r'\b(last\s+week|previous\s+week|pichlay\s+haftay|pichle\s+haftay)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.lastWeek;
+    }
+    if (RegExp(r'\b(this\s+week|current\s+week|is\s+haftay)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.thisWeek;
+    }
+    if (RegExp(r'\b(this\s+month|current\s+month|is\s+mahine)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.thisMonth;
+    }
+    if (RegExp(r'\b(yesterday|kal)\b').hasMatch(input)) {
+      return SmartEntryTimeRange.yesterday;
+    }
+    if (RegExp(r'\b(today|aaj)\b').hasMatch(input)) {
+      return SmartEntryTimeRange.today;
+    }
+    return SmartEntryTimeRange.allTime;
+  }
+
+  String? _navigationTarget(String input) {
+    if (RegExp(r'\b(wallet|wallets)\b').hasMatch(input)) return 'Wallets';
+    if (RegExp(r'\b(stats|statistics)\b').hasMatch(input)) return 'Stats';
+    if (RegExp(r'\b(udhaar|udhar)\b').hasMatch(input)) return 'Udhaar';
+    if (RegExp(r'\b(mess|khata)\b').hasMatch(input)) return 'Mess Khata';
+    if (RegExp(r'\b(settings|setting)\b').hasMatch(input)) return 'Settings';
+    if (RegExp(r'\babout\b').hasMatch(input)) return 'About';
+    if (RegExp(r'\b(home|dashboard)\b').hasMatch(input)) return 'Dashboard';
+    return null;
+  }
+
+  String? _entryTypeFilter(String input) {
+    if (RegExp(r'\b(income|salary|received|kamai|aayi|mili)\b')
+        .hasMatch(input)) {
+      return 'income';
+    }
+    if (RegExp(r'\b(expense|expenses|spent|spending|kharch)\b')
+        .hasMatch(input)) {
+      return 'expense';
+    }
+    return null;
   }
 
   double _intentConfidence(String input, SmartEntryIntent intent) {
@@ -702,6 +877,14 @@ class LocalNlpService {
         );
     final intent = _detectIntent(lowerInput);
     final isIncome = intent == SmartEntryIntent.addIncome;
+    final queryMetric = intent == SmartEntryIntent.query
+        ? _queryMetric(lowerInput)
+        : null;
+    final timeRange = _timeRange(lowerInput);
+    final navigationTarget = intent == SmartEntryIntent.navigate
+        ? _navigationTarget(lowerInput)
+        : null;
+    final entryTypeFilter = _entryTypeFilter(lowerInput);
 
     double amount = 0.0;
     double amountConfidence = 0.0;
@@ -914,6 +1097,12 @@ class LocalNlpService {
     if (intent == SmartEntryIntent.unknown) {
       clarificationReasons.add('The command intent was not recognized.');
     }
+    if (intent == SmartEntryIntent.query && queryMetric == null) {
+      clarificationReasons.add('The financial question is incomplete.');
+    }
+    if (intent == SmartEntryIntent.navigate && navigationTarget == null) {
+      clarificationReasons.add('The destination was not recognized.');
+    }
 
     return ParsedSmartEntryCommand(
       rawInput: rawInput,
@@ -926,6 +1115,10 @@ class LocalNlpService {
       confidence: confidence,
       confidenceByField: fieldConfidence,
       clarificationReasons: clarificationReasons,
+      queryMetric: queryMetric,
+      timeRange: timeRange,
+      navigationTarget: navigationTarget,
+      entryTypeFilter: entryTypeFilter,
     );
   }
 

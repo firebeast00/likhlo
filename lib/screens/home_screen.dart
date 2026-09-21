@@ -39,11 +39,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   static const _smartEntryDefaultAccountKey =
       'smart_entry_default_wallet_id';
   static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
+  static const _smartEntryLearningKey = 'smart_entry_learning_v1';
   String _currentView = 'Dashboard';
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
   bool _isSearching = false;
   String _searchQuery = "";
+  String? _smartEntryTypeFilter;
+  SmartEntryTimeRange? _smartEntrySearchRange;
+  bool _smartEntrySearchAllHistory = false;
   final ScrollController _categoryScrollCtrl = ScrollController();
 
   late AnimationController _fabController;
@@ -61,6 +65,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final TextEditingController _smartInputCtrl = TextEditingController();
   String? _smartEntryDefaultWalletId;
   List<String> _homeVisibleWalletIds = const [];
+  final Map<String, _LearnedSmartEntryPreference>
+      _learnedSmartEntryPreferences = {};
   Timer? _notificationUpdateTimer;
   Timer? _messageTimer;
   OverlayEntry? _activeMessageEntry;
@@ -83,6 +89,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             .take(4)
             .toList(growable: false)
         : const [];
+    _loadSmartEntryLearning();
     _fabController = AnimationController(vsync: this, duration: const Duration(milliseconds: 200), lowerBound: 0.0, upperBound: 0.1);
     _fabScale = Tween<double>(begin: 1.0, end: 0.95).animate(_fabController);
 
@@ -193,6 +200,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
+  void _loadSmartEntryLearning() {
+    final stored = Hive.box('preferences').get(_smartEntryLearningKey);
+    if (stored is! Map) return;
+    for (final item in stored.entries) {
+      final key = item.key?.toString() ?? '';
+      final preference = _LearnedSmartEntryPreference.fromStored(item.value);
+      if (key.isNotEmpty && preference != null) {
+        _learnedSmartEntryPreferences[key] = preference;
+      }
+    }
+  }
+
+  _LearnedSmartEntryPreference? _learnedPreferenceFor(String title) {
+    final key = _normalizeLearningTitle(title);
+    if (key.isEmpty) return null;
+    return _learnedSmartEntryPreferences[key];
+  }
+
+  Future<void> _rememberSmartEntryPreference(Expense entry) async {
+    if (entry.category == 'Transfer') return;
+    final key = _normalizeLearningTitle(entry.title);
+    if (key.isEmpty) return;
+
+    final existing = _learnedSmartEntryPreferences[key];
+    _learnedSmartEntryPreferences[key] = _LearnedSmartEntryPreference(
+      category: entry.category,
+      walletId: entry.walletId,
+      uses: (existing?.uses ?? 0) + 1,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    if (_learnedSmartEntryPreferences.length > 200) {
+      final oldest = _learnedSmartEntryPreferences.entries.reduce(
+        (first, second) => first.value.updatedAt <= second.value.updatedAt
+            ? first
+            : second,
+      );
+      _learnedSmartEntryPreferences.remove(oldest.key);
+    }
+
+    try {
+      await Hive.box('preferences').put(
+        _smartEntryLearningKey,
+        {
+          for (final item in _learnedSmartEntryPreferences.entries)
+            item.key: item.value.toStored(),
+        },
+      );
+    } catch (error) {
+      debugPrint('Smart Entry learning could not be saved: $error');
+    }
+  }
+
   void _selectCategory(String category, int index) {
     _dismissKeyboard();
     setState(() => _selectedCategoryTab = category);
@@ -225,6 +285,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _currentView = view;
       _isSearching = false;
       _searchQuery = '';
+      _smartEntryTypeFilter = null;
+      _smartEntrySearchRange = null;
+      _smartEntrySearchAllHistory = false;
     });
 
     if (view == 'Dashboard') _queuePersistentNotificationUpdate();
@@ -582,6 +645,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           }
                         }
 
+                        Expense? preferenceEntry;
                         if (transactionType == 'transfer') {
                           if (wallets.length < 2) {
                             _showTransactionError('Create at least two wallets to transfer money.');
@@ -631,7 +695,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
                           final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
                           if (existing == null) {
-                            final saved = await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
+                            final newEntry = Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId);
+                            final saved = await ref.read(expenseProvider.notifier).addExpense(newEntry);
                             if (!saved) {
                               _showTransactionError(
                                 'Check the selected wallet balance and try again.',
@@ -639,13 +704,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                               );
                               return;
                             }
+                            preferenceEntry = newEntry;
                           } else {
-                            final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
+                            final editedEntry = Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId);
+                            final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, editedEntry);
                             if (!updated) {
                               _showTransactionError('This transaction no longer exists.');
                               return;
                             }
+                            preferenceEntry = editedEntry;
                           }
+                        }
+                        if (preferenceEntry != null) {
+                          await _rememberSmartEntryPreference(preferenceEntry);
                         }
                         try {
                           await NotificationService().scheduleSmartEntryReminders();
@@ -855,7 +926,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
     );
 
-    var displayExpenses = List<Expense>.from(monthlyTransactions);
+    var displayExpenses = List<Expense>.from(
+      _isSearching && _smartEntrySearchAllHistory
+          ? visibleTransactions(ref.watch(expenseProvider).allExpenses)
+          : monthlyTransactions,
+    );
 
     if (_selectedCategoryTab != 'All' && !categories.contains(_selectedCategoryTab)) {
       _selectedCategoryTab = 'All';
@@ -863,6 +938,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (_selectedCategoryTab != 'All') displayExpenses = displayExpenses.where((e) => e.category == _selectedCategoryTab).toList();
     if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    if (_smartEntryTypeFilter != null) {
+      displayExpenses = displayExpenses
+          .where((entry) => entry.type == _smartEntryTypeFilter)
+          .toList();
+    }
+    if (_smartEntrySearchRange != null) {
+      displayExpenses = displayExpenses
+          .where((entry) => matchesSmartEntryTimeRange(
+                entry.date,
+                _smartEntrySearchRange!,
+              ))
+          .toList();
+    }
 
     return Scaffold(
       drawer: AppDrawer(
@@ -901,7 +989,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 _dismissKeyboard();
                 setState(() {
                   _isSearching = !_isSearching;
-                  if (!_isSearching) _searchQuery = '';
+                  if (!_isSearching) {
+                    _searchQuery = '';
+                    _smartEntryTypeFilter = null;
+                    _smartEntrySearchRange = null;
+                    _smartEntrySearchAllHistory = false;
+                  }
                 });
               },
             ),
@@ -2421,6 +2514,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Future<Expense?> _showSmartEntryMatchPicker(
     List<SmartEntryTransaction> matches, {
     required bool deleting,
+    bool repeating = false,
   }) async {
     final allEntries = ref.read(expenseProvider).allExpenses;
     final entriesById = {
@@ -2472,7 +2566,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       Icon(
                         deleting
                             ? Icons.delete_outline_rounded
-                            : Icons.edit_outlined,
+                            : repeating
+                                ? Icons.replay_rounded
+                                : Icons.edit_outlined,
                         color: theme.colorScheme.primary,
                       ),
                       const SizedBox(width: 12),
@@ -2483,7 +2579,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             Text(
                               deleting
                                   ? 'Choose entry to delete'
-                                  : 'Choose entry to edit',
+                                  : repeating
+                                      ? 'Choose entry to repeat'
+                                      : 'Choose entry to edit',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2702,6 +2800,319 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         );
       },
     );
+  }
+
+  Future<void> _handleSmartEntryRepeatCommand(
+    ParsedSmartEntryCommand command,
+  ) async {
+    final wallets = ref.read(walletProvider);
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final accounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+            id: wallet.id,
+            name: wallet.name,
+            type: wallet.walletType,
+            availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+            isBackup: wallet.isBackup,
+          ),
+        )
+        .toList(growable: false);
+    final mentionedIds = findMentionedSmartEntryAccountIds(
+      command.rawInput,
+      accounts,
+    );
+    if (mentionedIds.length > 1) {
+      _showTransactionError(
+        'Mention only one wallet when selecting an entry to repeat.',
+        title: 'Multiple wallets detected',
+      );
+      return;
+    }
+
+    final walletId = mentionedIds.isEmpty ? null : mentionedIds.single;
+    SmartEntryAccount? mentionedAccount;
+    for (final account in accounts) {
+      if (account.id == walletId) mentionedAccount = account;
+    }
+    final allEntries = ref.read(expenseProvider).allExpenses;
+    final match = matchSmartEntryTransaction(
+      command: command,
+      entries: allEntries.map(
+        (entry) => SmartEntryTransaction(
+          id: entry.id,
+          title: entry.title,
+          amount: entry.amount,
+          category: entry.category,
+          type: entry.type,
+          date: entry.date,
+          walletId: entry.walletId,
+        ),
+      ),
+      walletId: walletId,
+      ignoredTitlePhrases: mentionedAccount == null
+          ? const []
+          : [mentionedAccount.name, mentionedAccount.type],
+    );
+    if (match.status == SmartEntryMatchStatus.notFound) {
+      _showTransactionError(
+        'No safe matching entry was found. Add a title, amount, date, or wallet.',
+        title: 'Entry not found',
+      );
+      return;
+    }
+
+    Expense? source;
+    if (match.status == SmartEntryMatchStatus.unique) {
+      final id = match.matches.single.id;
+      for (final entry in allEntries) {
+        if (entry.id == id) source = entry;
+      }
+    } else {
+      source = await _showSmartEntryMatchPicker(
+        match.matches,
+        deleting: false,
+        repeating: true,
+      );
+    }
+    if (source == null || !mounted) return;
+
+    final repeated = source.copyWith(
+      id: const Uuid().v4(),
+      date: DateTime.now(),
+    );
+    final saved = await ref.read(expenseProvider.notifier).addExpense(repeated);
+    if (!mounted) return;
+    if (!saved) {
+      _showTransactionError(
+        source.type == 'expense'
+            ? 'The original wallet does not have enough balance to repeat this expense.'
+            : 'The original wallet is no longer available.',
+        title: 'Entry not repeated',
+      );
+      return;
+    }
+
+    await _rememberSmartEntryPreference(repeated);
+    _smartInputCtrl.clear();
+    await HapticFeedback.lightImpact();
+    if (!mounted) return;
+    _showTransactionSuccess(
+      '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
+      title: source.type == 'income' ? 'Income repeated' : 'Expense repeated',
+      actionLabel: 'Undo',
+      onAction: () async {
+        await ref.read(expenseProvider.notifier).deleteExpense(repeated.id);
+        if (!mounted) return;
+        _showTransactionInfo(
+          'The repeated entry was removed.',
+          title: 'Repeat undone',
+        );
+      },
+    );
+  }
+
+  void _handleSmartEntryQuery(ParsedSmartEntryCommand command) {
+    final metric = command.queryMetric;
+    if (metric == null) {
+      _showTransactionInfo(
+        "Ask something like 'how much did I spend this month?'",
+        title: 'Question needs more detail',
+      );
+      return;
+    }
+
+    final wallets = ref.read(walletProvider);
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final accounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+            id: wallet.id,
+            name: wallet.name,
+            type: wallet.walletType,
+            availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+            isBackup: wallet.isBackup,
+          ),
+        )
+        .toList(growable: false);
+    final mentionedIds = findMentionedSmartEntryAccountIds(
+      command.rawInput,
+      accounts,
+    );
+    if (mentionedIds.length > 1) {
+      _showTransactionError(
+        'Mention one wallet at a time for a precise answer.',
+        title: 'Multiple wallets detected',
+      );
+      return;
+    }
+
+    if (metric == SmartEntryQueryMetric.balance) {
+      if (mentionedIds.isEmpty) {
+        final total = wallets.fold<double>(
+          0,
+          (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+        );
+        _showTransactionInfo(
+          'Rs. ${total.toStringAsFixed(0)} across ${wallets.length} wallet${wallets.length == 1 ? '' : 's'}.',
+          title: 'Total wallet balance',
+        );
+      } else {
+        final wallet = wallets.firstWhere(
+          (item) => item.id == mentionedIds.single,
+        );
+        final balance = walletNotifier.getBalanceForWallet(wallet.id);
+        _showTransactionInfo(
+          'Rs. ${balance.toStringAsFixed(0)} available.',
+          title: '${wallet.name} balance',
+        );
+      }
+      _smartInputCtrl.clear();
+      return;
+    }
+
+    var entries = ref
+        .read(expenseProvider)
+        .allExpenses
+        .where((entry) => entry.category != 'Transfer')
+        .where((entry) => matchesSmartEntryTimeRange(
+              entry.date,
+              command.timeRange,
+            ));
+    if (mentionedIds.isNotEmpty) {
+      final walletId = mentionedIds.single;
+      entries = entries.where((entry) => entry.walletId == walletId);
+    }
+    final hasCategory = command.category != 'General' &&
+        command.confidenceByField['category']! >= 0.8;
+    if (hasCategory) {
+      entries = entries.where((entry) => entry.category == command.category);
+    } else {
+      final title = _smartQueryTitle(command.title);
+      if (title.isNotEmpty) {
+        entries = entries.where(
+          (entry) => entry.title.toLowerCase().contains(title.toLowerCase()),
+        );
+      }
+    }
+    final matching = entries.toList(growable: false);
+    final income = matching
+        .where((entry) => entry.type == 'income')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+    final spending = matching
+        .where((entry) => entry.type == 'expense')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+    final period = _smartTimeRangeLabel(command.timeRange);
+    final subject = hasCategory ? ' · ${command.category}' : '';
+
+    switch (metric) {
+      case SmartEntryQueryMetric.spending:
+        _showTransactionInfo(
+          '${matching.where((entry) => entry.type == 'expense').length} expense${matching.where((entry) => entry.type == 'expense').length == 1 ? '' : 's'}$subject.',
+          title: 'Rs. ${spending.toStringAsFixed(0)} spent · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.income:
+        _showTransactionInfo(
+          '${matching.where((entry) => entry.type == 'income').length} income entr${matching.where((entry) => entry.type == 'income').length == 1 ? 'y' : 'ies'}$subject.',
+          title: 'Rs. ${income.toStringAsFixed(0)} received · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.net:
+        _showTransactionInfo(
+          'Income Rs. ${income.toStringAsFixed(0)} · Expenses Rs. ${spending.toStringAsFixed(0)}.',
+          title: 'Net Rs. ${(income - spending).toStringAsFixed(0)} · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.transactionCount:
+        final type = command.entryTypeFilter;
+        final count = type == null
+            ? matching.length
+            : matching.where((entry) => entry.type == type).length;
+        _showTransactionInfo(
+          '${type == null ? 'Income and expense' : type == 'income' ? 'Income' : 'Expense'} records$subject.',
+          title: '$count transactions · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.balance:
+        break;
+    }
+    _smartInputCtrl.clear();
+  }
+
+  void _handleSmartEntrySearch(ParsedSmartEntryCommand command) {
+    final category = command.category != 'General' &&
+            command.confidenceByField['category']! >= 0.8
+        ? command.category
+        : 'All';
+    var query = _smartQueryTitle(command.title);
+    if (category != 'All' &&
+        query.toLowerCase() == category.toLowerCase()) {
+      query = '';
+    }
+    setState(() {
+      _currentView = 'Dashboard';
+      _isSearching = true;
+      _searchQuery = query;
+      _selectedCategoryTab = category;
+      _smartEntryTypeFilter = command.entryTypeFilter;
+      _smartEntrySearchRange = command.timeRange;
+      _smartEntrySearchAllHistory = true;
+    });
+    _smartInputCtrl.clear();
+    _showTransactionInfo(
+      'Close search to return to the normal monthly view.',
+      title: 'Transaction filters applied',
+    );
+  }
+
+  Future<void> _handleSmartEntryNavigation(
+    ParsedSmartEntryCommand command,
+  ) async {
+    final target = command.navigationTarget;
+    if (target == null) {
+      _showTransactionInfo(
+        'Try Home, Stats, Wallets, Udhaar, Mess Khata, Settings, or About.',
+        title: 'Screen not recognized',
+      );
+      return;
+    }
+    _smartInputCtrl.clear();
+    if (target == 'Wallets') {
+      await _openIncomeAccounts();
+      return;
+    }
+    await _changeView(target);
+  }
+
+  String _smartQueryTitle(String value) {
+    final normalized = value.trim();
+    const generic = {
+      '',
+      'Transaction',
+      'Quick Expense',
+      'Income Allowance',
+    };
+    return generic.contains(normalized) ? '' : normalized;
+  }
+
+  String _smartTimeRangeLabel(SmartEntryTimeRange range) {
+    switch (range) {
+      case SmartEntryTimeRange.today:
+        return 'today';
+      case SmartEntryTimeRange.yesterday:
+        return 'yesterday';
+      case SmartEntryTimeRange.thisWeek:
+        return 'this week';
+      case SmartEntryTimeRange.lastWeek:
+        return 'last week';
+      case SmartEntryTimeRange.thisMonth:
+        return 'this month';
+      case SmartEntryTimeRange.lastMonth:
+        return 'last month';
+      case SmartEntryTimeRange.allTime:
+        return 'all time';
+    }
   }
 
   Future<void> _handleSmartEntryMutationCommand(
@@ -2940,11 +3351,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         case SmartEntryIntent.transfer:
           await _handleSmartEntryTransferCommand(command);
           return;
+        case SmartEntryIntent.repeatEntry:
+          await _handleSmartEntryRepeatCommand(command);
+          return;
         case SmartEntryIntent.query:
-          title = 'Question recognized';
-          message =
-              'Financial questions will be enabled in a later Smart Entry phase.';
-          break;
+          _handleSmartEntryQuery(command);
+          return;
+        case SmartEntryIntent.searchEntries:
+          _handleSmartEntrySearch(command);
+          return;
+        case SmartEntryIntent.navigate:
+          await _handleSmartEntryNavigation(command);
+          return;
         case SmartEntryIntent.unknown:
           title = 'Command not recognized';
           message = 'Try an expense or income command with an amount.';
@@ -2960,6 +3378,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     final result = command.toLegacyMap();
+    final learnedPreference = _learnedPreferenceFor(command.title);
+    if (result['type'] == 'expense' &&
+        result['category'] == 'General' &&
+        learnedPreference != null &&
+        categories.contains(learnedPreference.category)) {
+      result['category'] = learnedPreference.category;
+    }
     final amount = result['amount'];
     if (amount is! num || !amount.isFinite || amount <= 0) {
       _showTransactionError(
@@ -2997,12 +3422,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         findMentionedSmartEntryAccountId(normalized, smartAccounts);
     final configuredDefaultWallet =
         _selectedSmartEntryWallet(wallets);
+    String? learnedWalletId;
+    if (mentionedWalletId == null && configuredDefaultWallet == null) {
+      final candidateId = learnedPreference?.walletId;
+      if (candidateId != null &&
+          wallets.any((wallet) => wallet.id == candidateId)) {
+        learnedWalletId = candidateId;
+      }
+    }
     final resolvedWalletId = resolveSmartEntryAccount(
       input: normalized,
       accounts: smartAccounts,
       transactionType: type,
       amount: amountValue,
-      preferredAccountId: configuredDefaultWallet?.id,
+      preferredAccountId: configuredDefaultWallet?.id ?? learnedWalletId,
     );
 
     if (shouldAutoSaveSmartEntry(
@@ -3039,6 +3472,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         return;
       }
 
+      await _rememberSmartEntryPreference(entry);
       _smartInputCtrl.clear();
       FocusScope.of(context).unfocus();
       await HapticFeedback.lightImpact();
@@ -3074,6 +3508,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         ? 'The named wallet cannot cover this expense. Choose another wallet before saving.'
         : configuredDefaultWallet != null
             ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
+            : learnedWalletId != null
+                ? 'The wallet previously used for this entry cannot cover it. Choose another funded wallet.'
             : defaultsAreEmpty
                 ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
                 : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
@@ -3088,7 +3524,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       prefilledDate: result['date'] is DateTime
           ? result['date'] as DateTime
           : DateTime.now(),
-      preselectedWalletId: mentionedWalletId,
+      preselectedWalletId: mentionedWalletId ??
+          configuredDefaultWallet?.id ??
+          learnedWalletId,
       initialType: type,
       reviewMessage: reviewMessage,
     );
@@ -3143,6 +3581,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return title;
   }
 
+}
+
+String _normalizeLearningTitle(String value) {
+  final normalized = value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  const ignored = {
+    '',
+    'quick expense',
+    'income allowance',
+    'transaction',
+    'general',
+  };
+  return ignored.contains(normalized) ? '' : normalized;
+}
+
+class _LearnedSmartEntryPreference {
+  final String category;
+  final String walletId;
+  final int uses;
+  final int updatedAt;
+
+  const _LearnedSmartEntryPreference({
+    required this.category,
+    required this.walletId,
+    required this.uses,
+    required this.updatedAt,
+  });
+
+  static _LearnedSmartEntryPreference? fromStored(dynamic value) {
+    if (value is! Map) return null;
+    final category = value['category']?.toString().trim() ?? '';
+    final walletId = value['walletId']?.toString().trim() ?? '';
+    final uses = value['uses'];
+    final updatedAt = value['updatedAt'];
+    if (category.isEmpty || walletId.isEmpty) return null;
+    return _LearnedSmartEntryPreference(
+      category: category,
+      walletId: walletId,
+      uses: uses is num ? uses.toInt() : 1,
+      updatedAt: updatedAt is num ? updatedAt.toInt() : 0,
+    );
+  }
+
+  Map<String, dynamic> toStored() => {
+        'category': category,
+        'walletId': walletId,
+        'uses': uses,
+        'updatedAt': updatedAt,
+      };
 }
 
 
