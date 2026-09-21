@@ -15,7 +15,7 @@ void main() {
       expect(controller.retryCount, 0);
     });
 
-    test('never executes a partial transcript when recognition stops', () {
+    test('promotes the best transcript when recognition stops normally', () {
       final controller = SpeechSessionController()..start();
 
       final partial = controller.recordTranscript(
@@ -23,10 +23,21 @@ void main() {
         isFinal: false,
       );
       final stopped = controller.onRecognizerStopped();
+      final duplicateStop = controller.onRecognizerStopped();
 
       expect(partial.action, SpeechSessionAction.none);
-      expect(stopped.action, SpeechSessionAction.preserveDraft);
+      expect(stopped.action, SpeechSessionAction.processFinal);
       expect(stopped.transcript, '500 biryani');
+      expect(duplicateStop.action, SpeechSessionAction.none);
+      expect(controller.state, SpeechSessionState.finalizing);
+    });
+
+    test('a normal stop without any transcript creates no work', () {
+      final controller = SpeechSessionController()..start();
+
+      final stopped = controller.onRecognizerStopped();
+
+      expect(stopped.action, SpeechSessionAction.none);
       expect(controller.state, SpeechSessionState.failed);
     });
 

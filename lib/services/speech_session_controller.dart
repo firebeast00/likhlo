@@ -28,9 +28,10 @@ class SpeechSessionDecision {
 
 /// Keeps speech-recognition lifecycle events separate from financial actions.
 ///
-/// Only an explicit final recognition result may produce [processFinal]. A
-/// recognizer timeout, error, or stopped status can preserve a partial draft,
-/// but can never promote that draft into an executable command.
+/// An explicit final result is preferred. Some device recognizers emit only
+/// partial callbacks and then end normally, so a normal stop promotes the best
+/// available transcript through the same semantic validation pipeline. Error
+/// callbacks still preserve partial text instead of executing it.
 class SpeechSessionController {
   final int maxRetries;
 
@@ -87,6 +88,11 @@ class SpeechSessionController {
       return SpeechSessionDecision.none;
     }
     if (_finalTranscript.isNotEmpty) return _emitFinal();
+    if (_latestDraft.isNotEmpty) {
+      _finalTranscript = _latestDraft;
+      _state = SpeechSessionState.finalizing;
+      return _emitFinal();
+    }
 
     _state = SpeechSessionState.failed;
     _decisionIssued = true;

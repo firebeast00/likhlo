@@ -11,6 +11,7 @@ import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
 import '../services/notification_service.dart';
 import '../services/voice_privacy_service.dart';
+import 'backup_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -425,6 +426,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSettingsGroup(
             isDark: isDark,
             children: [
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                leading: _buildIconBox(
+                  Icons.backup_rounded,
+                  Colors.blue.shade600,
+                ),
+                title: const Text(
+                  "Backup & Restore",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                subtitle: const Text(
+                  "Create or restore an encrypted Likhlo backup",
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const BackupScreen(),
+                  ),
+                ),
+              ),
+              _buildDivider(),
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: _buildIconBox(Icons.picture_as_pdf_rounded, Colors.red.shade400),

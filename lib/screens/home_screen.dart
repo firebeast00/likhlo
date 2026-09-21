@@ -2571,9 +2571,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   void _handleSpeechStatus(String status) {
     if (!mounted || (status != 'done' && status != 'notListening')) return;
     if (_restartingSpeech) return;
+    unawaited(_finalizeNormallyStoppedSpeech());
+  }
+
+  Future<void> _finalizeNormallyStoppedSpeech() async {
+    // Several Android recognizers report `done` just before delivering their
+    // final callback. Give that callback a brief chance to arrive, then route
+    // the best transcript through normal NLP and confidence validation.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted || _restartingSpeech) return;
     final decision = _speechSession.onRecognizerStopped();
     if (_isListening) setState(() => _isListening = false);
-    _applySpeechDecision(decision);
+    await _applySpeechDecision(decision);
   }
 
   Future<Expense?> _showSmartEntryMatchPicker(
