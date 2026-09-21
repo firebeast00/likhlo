@@ -47,10 +47,11 @@ Expense _entry({
   required String walletId,
   String category = 'Food',
   double amount = 500,
+  String title = 'Test',
 }) {
   return Expense(
     id: id,
-    title: 'Test',
+    title: title,
     amount: amount,
     date: DateTime(2026, 9, 21),
     category: category,
@@ -86,12 +87,14 @@ void main() {
       type: 'expense',
       walletId: 'cash',
       category: 'Transfer',
+      title: 'Transfer to Very Long Wallet',
     ).copyWith(date: date);
     final incoming = _entry(
       id: 'pair_in',
       type: 'income',
       walletId: 'bank',
       category: 'Transfer',
+      title: 'Transfer from Cash in Hand',
     ).copyWith(date: date);
 
     final result = await executor.execute(CreateTransferCommand(
@@ -101,6 +104,8 @@ void main() {
 
     expect(result.succeeded, isTrue);
     expect(store.entries.keys, containsAll(['pair_out', 'pair_in']));
+    expect(store.entries['pair_out']?.title, 'Transfer Very Long');
+    expect(store.entries['pair_in']?.title, 'Transfer Cash Hand');
   });
 
   test('rejects a transfer with the same source and destination', () async {
@@ -126,5 +131,25 @@ void main() {
 
     expect(result.status, TransactionResultStatus.rejected);
     expect(store.entries, isEmpty);
+  });
+
+  test('stores only three core title words for creates and updates', () async {
+    final store = _FakeStore();
+    final executor = TransactionExecutor(store);
+    final original = _entry(
+      id: 'compact',
+      type: 'expense',
+      walletId: 'cash',
+      title: 'please add blue gel ink pen',
+    );
+
+    await executor.execute(CreateTransactionCommand(original));
+    expect(store.entries['compact']?.title, 'blue gel ink');
+
+    await executor.execute(UpdateTransactionCommand(
+      existingId: 'compact',
+      updated: original.copyWith(title: 'university admission form fee'),
+    ));
+    expect(store.entries['compact']?.title, 'university admission form');
   });
 }

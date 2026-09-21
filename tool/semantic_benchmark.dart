@@ -24,6 +24,9 @@ Future<void> main(List<String> arguments) async {
   var safetyCorrect = 0;
   var safetySamples = 0;
   var wholeCommandCorrect = 0;
+  var totalParseMicros = 0;
+  var slowestParseMicros = 0;
+  String? slowestParseId;
   final failures = <String>[];
 
   await for (final line in file
@@ -39,7 +42,20 @@ Future<void> main(List<String> arguments) async {
     final source = sample['source'] == 'voice'
         ? SmartInputSource.voice
         : SmartInputSource.typed;
+    final parseTimer = Stopwatch()..start();
     final plan = engine.parse(input, categories, source: source);
+    parseTimer.stop();
+    totalParseMicros += parseTimer.elapsedMicroseconds;
+    if (parseTimer.elapsedMicroseconds > slowestParseMicros) {
+      slowestParseMicros = parseTimer.elapsedMicroseconds;
+      slowestParseId = sample['id']?.toString();
+    }
+    if (parseTimer.elapsedMilliseconds >= 1000) {
+      failures.add(
+        '${sample['id']}: parser exceeded the 1-second target '
+        '(${parseTimer.elapsedMilliseconds} ms)',
+      );
+    }
     final expectedIntent = sample['intent'] as String;
     final expectedAmount = (sample['amount'] as num?)?.toDouble();
     final expectedTitle = sample['title'] as String?;
@@ -108,6 +124,15 @@ Future<void> main(List<String> arguments) async {
   }
   stdout.writeln(
     'Semantic command accuracy: ${percent(wholeCommandCorrect)}%',
+  );
+  stdout.writeln(
+    'Average parse latency: '
+    '${(totalParseMicros / total / 1000).toStringAsFixed(2)} ms',
+  );
+  stdout.writeln(
+    'Slowest parse latency: '
+    '${(slowestParseMicros / 1000).toStringAsFixed(2)} ms '
+    '(${slowestParseId ?? 'unknown'})',
   );
   if (failures.isNotEmpty) {
     stdout.writeln('\nFailures:');

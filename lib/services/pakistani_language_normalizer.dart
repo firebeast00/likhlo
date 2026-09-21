@@ -75,6 +75,10 @@ class PakistaniLanguageNormalizer {
     'کروڑ': 'crore',
   };
 
+  static final List<MapEntry<String, String>> _sortedUrduPhrases =
+      _urduPhrases.entries.toList(growable: false)
+        ..sort((first, second) => second.key.length.compareTo(first.key.length));
+
   PakistaniNormalizationResult normalize(
     String input, {
     bool enableContextualAsrRepairs = false,
@@ -89,9 +93,7 @@ class PakistaniLanguageNormalizer {
       }
     }
 
-    final phrases = _urduPhrases.entries.toList()
-      ..sort((a, b) => b.key.length.compareTo(a.key.length));
-    for (final entry in phrases) {
+    for (final entry in _sortedUrduPhrases) {
       if (value.contains(entry.key)) {
         value = value.replaceAll(entry.key, ' ${entry.value} ');
         if (!applied.contains('urdu_script')) applied.add('urdu_script');

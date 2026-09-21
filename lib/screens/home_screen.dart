@@ -29,6 +29,7 @@ import '../services/smart_command.dart';
 import '../services/smart_input_engine.dart';
 import '../services/confidence_evaluator.dart';
 import '../services/speech_recognition_provider.dart';
+import '../services/transaction_title_policy.dart';
 import "./mess_khata_screen.dart";
 import './income_accounts_screen.dart';
 
@@ -62,6 +63,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     deviceProvider: DeviceSpeechRecognitionProvider(),
   );
   final SpeechSessionController _speechSession = SpeechSessionController();
+  final SmartInputEngine _smartInputEngine = SmartInputEngine();
   bool _isListening = false;
   bool _handlingSpeechError = false;
   bool _restartingSpeech = false;
@@ -258,6 +260,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
     } catch (error) {
       debugPrint('Smart Entry learning could not be saved: $error');
+    }
+  }
+
+  Future<void> _refreshSmartEntryReminders() async {
+    try {
+      await NotificationService().scheduleSmartEntryReminders();
+    } catch (error) {
+      debugPrint('Notification reset failed: $error');
     }
   }
 
@@ -680,8 +690,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           final transferResult = await ref
                               .read(transactionExecutorProvider)
                               .execute(CreateTransferCommand(
-                                outgoing: Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
-                                incoming: Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
+                                outgoing: Expense(id: '${transferId}_out', title: coreTransactionTitle("Transfer to $toName"), amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
+                                incoming: Expense(id: '${transferId}_in', title: coreTransactionTitle("Transfer from $fromName"), amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
                               ));
                           if (!transferResult.succeeded) {
                             _showTransactionError(
@@ -691,7 +701,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             return;
                           }
                         } else {
-                          String finalTitle = titleCtrl.text.trim();
+                          String finalTitle =
+                              coreTransactionTitle(titleCtrl.text);
                           if (finalTitle.isEmpty) {
                             if (transactionType == 'income') {
                               finalTitle = 'Income / Allowance';
@@ -730,15 +741,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             preferenceEntry = editedEntry;
                           }
                         }
-                        if (preferenceEntry != null) {
-                          await _rememberSmartEntryPreference(preferenceEntry);
-                        }
-                        try {
-                          await NotificationService().scheduleSmartEntryReminders();
-                        } catch (e) {
-                          debugPrint("Notification reset failed: $e");
-                        }
                         if (ctx.mounted) Navigator.pop(ctx, true);
+                        if (preferenceEntry != null) {
+                          unawaited(
+                            _rememberSmartEntryPreference(preferenceEntry),
+                          );
+                        }
+                        unawaited(_refreshSmartEntryReminders());
                       },
                       child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
@@ -2283,7 +2292,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _dismissKeyboard();
     if (_isListening) {
       await _speech.stop();
-      await HapticFeedback.selectionClick();
+      unawaited(HapticFeedback.selectionClick());
       if (mounted) setState(() => _isListening = false);
       return;
     }
@@ -2317,7 +2326,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     _speechSession.start();
     setState(() => _isListening = true);
-    await HapticFeedback.mediumImpact();
+    unawaited(HapticFeedback.mediumImpact());
     await _startSpeechListening();
   }
 
@@ -2372,8 +2381,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         options: SpeechRecognitionListenOptions(
           localeId: localeId,
           partialResults: true,
-          pauseFor: const Duration(seconds: 3),
-          listenFor: const Duration(seconds: 20),
+          pauseFor: const Duration(milliseconds: 800),
+          listenFor: const Duration(seconds: 25),
         ),
         onResult: (result) async {
           if (!mounted) return;
@@ -2578,7 +2587,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     // Several Android recognizers report `done` just before delivering their
     // final callback. Give that callback a brief chance to arrive, then route
     // the best transcript through normal NLP and confidence validation.
-    await Future<void>.delayed(const Duration(milliseconds: 250));
+    await Future<void>.delayed(const Duration(milliseconds: 75));
     if (!mounted || _restartingSpeech) return;
     final decision = _speechSession.onRecognizerStopped();
     if (_isListening) setState(() => _isListening = false);
@@ -2833,7 +2842,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final transferEntries = [
       Expense(
         id: '${transferId}_out',
-        title: 'Transfer to ${destination.name}',
+        title: coreTransactionTitle('Transfer to ${destination.name}'),
         amount: command.amount,
         date: command.date,
         category: 'Transfer',
@@ -2843,7 +2852,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       ),
       Expense(
         id: '${transferId}_in',
-        title: 'Transfer from ${source.name}',
+        title: coreTransactionTitle('Transfer from ${source.name}'),
         amount: command.amount,
         date: command.date,
         category: 'Transfer',
@@ -2868,8 +2877,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     _smartInputCtrl.clear();
-    await HapticFeedback.lightImpact();
-    if (!mounted) return;
     final transferAmount = command.amount.toStringAsFixed(
       command.amount == command.amount.truncateToDouble() ? 0 : 2,
     );
@@ -2888,6 +2895,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         );
       },
     );
+    unawaited(HapticFeedback.lightImpact());
   }
 
   Future<void> _handleSmartEntryRepeatCommand(
@@ -2968,6 +2976,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final repeated = source.copyWith(
       id: const Uuid().v4(),
       date: DateTime.now(),
+      title: coreTransactionTitle(source.title),
     );
     final execution = await ref
         .read(transactionExecutorProvider)
@@ -2986,10 +2995,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
-    await _rememberSmartEntryPreference(repeated);
     _smartInputCtrl.clear();
-    await HapticFeedback.lightImpact();
-    if (!mounted) return;
     _showTransactionSuccess(
       '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
       title: source.type == 'income' ? 'Income repeated' : 'Expense repeated',
@@ -3005,6 +3011,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         );
       },
     );
+    unawaited(_rememberSmartEntryPreference(repeated));
+    unawaited(HapticFeedback.lightImpact());
   }
 
   void _handleSmartEntryQuery(ParsedSmartEntryCommand command) {
@@ -3370,8 +3378,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
 
       _smartInputCtrl.clear();
-      await HapticFeedback.lightImpact();
-      if (!mounted) return;
       final deletedEntry = target;
       final deletedAmount =
           deletedEntry.amount.toStringAsFixed(0);
@@ -3400,6 +3406,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           }
         },
       );
+      unawaited(HapticFeedback.lightImpact());
       return;
     }
 
@@ -3422,7 +3429,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
     final updatedEntry = originalEntry.copyWith(
       amount: mutation.patch.amount,
-      title: mutation.patch.title,
+      title: mutation.patch.title == null
+          ? null
+          : coreTransactionTitle(mutation.patch.title!),
       category: updatedCategory,
       date: mutation.patch.date,
       walletId: mutation.patch.walletId,
@@ -3455,8 +3464,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     _smartInputCtrl.clear();
-    await HapticFeedback.lightImpact();
-    if (!mounted) return;
     _showTransactionSuccess(
       '${updatedEntry.title} · Rs. ${updatedEntry.amount.toStringAsFixed(0)} · ${updatedEntry.category}',
       title: 'Entry updated',
@@ -3482,6 +3489,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         }
       },
     );
+    unawaited(HapticFeedback.lightImpact());
   }
 
   Future<void> _processNLP(
@@ -3493,7 +3501,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (normalized.isEmpty) return;
 
     final categories = ref.read(categoryProvider);
-    final plan = SmartInputEngine().parse(
+    final plan = _smartInputEngine.parse(
       normalized,
       categories,
       source: source,
@@ -3657,11 +3665,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         return;
       }
 
-      await _rememberSmartEntryPreference(entry);
       _smartInputCtrl.clear();
       FocusScope.of(context).unfocus();
-      await HapticFeedback.lightImpact();
-      if (!mounted) return;
       _showTransactionSuccess(
         '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} · ${wallet.name}',
         title: type == 'income' ? 'Income added' : 'Expense saved',
@@ -3679,6 +3684,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           }
         },
       );
+      unawaited(_rememberSmartEntryPreference(entry));
+      unawaited(HapticFeedback.lightImpact());
       return;
     }
 
@@ -3791,13 +3798,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         .replaceAll(RegExp(r'^(From|Via|Using)\s+', caseSensitive: false), '');
 
     if (title.isEmpty || title.toLowerCase() == 'quick expense') {
-      if (type == 'income') return 'Income / Allowance';
+      if (type == 'income') return 'Income Allowance';
       final category = result['category']?.toString().trim() ?? '';
-      return category.isEmpty || category.toLowerCase() == 'general'
+      final fallback = category.isEmpty || category.toLowerCase() == 'general'
           ? 'Quick Expense'
           : category;
+      return coreTransactionTitle(fallback);
     }
-    return title;
+    return coreTransactionTitle(title);
   }
 
 }

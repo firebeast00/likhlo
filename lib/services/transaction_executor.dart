@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
+import 'transaction_title_policy.dart';
 
 enum TransactionAction {
   create,
@@ -132,13 +133,14 @@ class TransactionExecutor {
   Future<TransactionResult> execute(LedgerCommand command) async {
     switch (command) {
       case CreateTransactionCommand():
-        final saved = await store.add(command.entry);
+        final entry = _withCoreTitle(command.entry);
+        final saved = await store.add(entry);
         return TransactionResult(
           status: saved
               ? TransactionResultStatus.succeeded
               : TransactionResultStatus.rejected,
           action: command.action,
-          affectedIds: saved ? [command.entry.id] : const [],
+          affectedIds: saved ? [entry.id] : const [],
           reason: saved ? null : 'Ledger validation rejected the transaction.',
         );
       case CreateTransferCommand():
@@ -149,10 +151,9 @@ class TransactionExecutor {
             reason: 'A transfer requires a valid outgoing and incoming pair.',
           );
         }
-        final saved = await store.addAll([
-          command.outgoing,
-          command.incoming,
-        ]);
+        final outgoing = _withCoreTitle(command.outgoing);
+        final incoming = _withCoreTitle(command.incoming);
+        final saved = await store.addAll([outgoing, incoming]);
         return TransactionResult(
           status: saved
               ? TransactionResultStatus.succeeded
@@ -164,9 +165,10 @@ class TransactionExecutor {
           reason: saved ? null : 'Ledger validation rejected the transfer.',
         );
       case UpdateTransactionCommand():
+        final updatedEntry = _withCoreTitle(command.updated);
         final updated = await store.update(
           command.existingId,
-          command.updated,
+          updatedEntry,
         );
         return TransactionResult(
           status: updated
@@ -219,6 +221,18 @@ class TransactionExecutor {
         outgoing.amount > 0 &&
         outgoing.amount == incoming.amount &&
         outgoing.date == incoming.date;
+  }
+
+  Expense _withCoreTitle(Expense entry) {
+    var title = coreTransactionTitle(entry.title);
+    if (title.isEmpty) {
+      title = entry.type == 'income'
+          ? 'Income Allowance'
+          : coreTransactionTitle(entry.category);
+    }
+    if (title.isEmpty) title = 'Transaction';
+    if (title == entry.title) return entry;
+    return entry.copyWith(title: title);
   }
 }
 

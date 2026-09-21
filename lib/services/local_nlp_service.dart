@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'primary_intent_router.dart';
+import 'transaction_title_policy.dart';
 
 enum SmartEntryIntent {
   addExpense,
@@ -489,12 +490,12 @@ class LocalNlpService {
   };
 
   // 🚀 FIXED: Removed 'kal' and 'aaj' from here so we can parse them as dates
-  final List<String> _stopWords = [
+  final Set<String> _stopWords = {
     'ki', 'ka', 'ke', 'liye', 'for', 'on', 'aur', 'the', 'a', 'an', 'to', 'mein',
     'pe', 'jo', 'k', 'se', 'tak', 'par', 'wala', 'wali', 'wale',
     'spend', 'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchase',
     'purchased', 'khaan', 'khareed', 'khareeda', 'khareedi', 'when', 'went',
-    'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya', 'liye',
+    'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya',
     'kha', 'pee', 'diya', 'kharida',
     'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
     'paisa', 'mani', 'money', 'subah', 'shaam', 'raat', 'rupay', 'pkr',
@@ -510,13 +511,13 @@ class LocalNlpService {
     'daaldo', 'repeat', 'again', 'same', 'dobara', 'phir', 'open', 'goto',
     'go', 'take', 'screen', 'page', 'dashboard', 'home', 'stats',
     'statistics', 'wallets', 'settings', 'about', 'udhaar', 'udhar', 'mess',
-    'khata', 'entries', 'entry', 'transactions', 'expenses', 'spending',
+    'khata', 'entries', 'transactions', 'expenses', 'spending',
     'total', 'today', 'yesterday', 'week', 'month', 'this', 'current',
     'pichlay', 'pichle', 'mahine', 'haftay', 'din', 'aaj', 'kal',
     'how', 'much', 'many', 'tell', 'calculate', 'summary', 'report',
     'dikhao', 'batao', 'dhoondo', 'kitna', 'kitni', 'kitne', 'did',
     'what', 'balance', 'available', 'remaining', 'count'
-  ];
+  };
 
   // ==========================================
   // 🔢 ROMAN URDU NUMBER WORDS
@@ -1068,6 +1069,7 @@ class LocalNlpService {
       cleanTitle = cleanTitle.split(' ').map((word) {
         return word[0].toUpperCase() + word.substring(1).toLowerCase();
       }).join(' ');
+      cleanTitle = coreTransactionTitle(cleanTitle);
     }
 
     final intentConfidence = intentRoute.confidence;

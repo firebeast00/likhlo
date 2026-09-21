@@ -127,6 +127,17 @@ void main() {
       expect(plan.parsed.amount, 200);
       expect(plan.parsed.title, 'Pen');
     });
+
+    test('limits an extracted title to three core words', () {
+      final plan = engine.parse(
+        'I bought a blue gel ink pen for 250 rupees',
+        categories,
+      );
+
+      expect(plan.parsed.amount, 250);
+      expect(plan.parsed.title, 'Blue Gel Ink');
+      expect(plan.parsed.title.split(' '), hasLength(3));
+    });
   });
 
   group('contextual ASR repair', () {
