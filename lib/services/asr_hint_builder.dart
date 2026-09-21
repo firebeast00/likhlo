@@ -31,6 +31,8 @@ class AsrHintBuilder {
     'sau',
     'lakh',
     'kharch',
+    'spent',
+    'expense',
     'jama',
     'bhejo',
     'transfer',
@@ -38,6 +40,11 @@ class AsrHintBuilder {
     'dalo',
     'udhaar',
     'tankhwa',
+    'pen',
+    'pencil',
+    'marker',
+    'petrol',
+    'groceries',
   ];
 
   List<String> build(DomainLexicon lexicon) {

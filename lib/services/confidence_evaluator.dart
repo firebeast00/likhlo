@@ -1,3 +1,4 @@
+import 'local_nlp_service.dart';
 import 'smart_command.dart';
 
 enum ConfidenceDisposition { autoExecute, review, clarify, block }
@@ -72,6 +73,10 @@ class ConfidenceEvaluator {
       if (!context.hasResolvedWallet) {
         reasons.add('A wallet must be resolved.');
       }
+      if (parsed.intent == SmartEntryIntent.addExpense &&
+          !hasSpecificSmartEntryTitle(parsed.title)) {
+        reasons.add('A specific expense title is required.');
+      }
       if (reasons.isNotEmpty) {
         return SemanticConfidence(
           score: parsed.confidence,
@@ -79,12 +84,17 @@ class ConfidenceEvaluator {
           reasons: reasons,
         );
       }
+      final score = (
+        (parsed.confidenceByField['intent'] ?? 0) * 0.35 +
+        (parsed.confidenceByField['amount'] ?? 0) * 0.40 +
+        (parsed.confidenceByField['title'] ?? 0) * 0.25
+      ).clamp(0.0, 1.0).toDouble();
       return SemanticConfidence(
-        score: parsed.confidence,
-        disposition: parsed.confidence >= 0.94
+        score: score,
+        disposition: score >= 0.94
             ? ConfidenceDisposition.autoExecute
             : ConfidenceDisposition.review,
-        reasons: parsed.confidence >= 0.94
+        reasons: score >= 0.94
             ? const []
             : const ['Review fields before saving.'],
       );

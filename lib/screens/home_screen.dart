@@ -2915,8 +2915,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (normalized.isEmpty) return;
 
     final categories = ref.read(categoryProvider);
+<<<<<<< HEAD
     final command =
         LocalNlpService().parseCommand(normalized, categories);
+=======
+    final plan = SmartInputEngine().parse(
+      normalized,
+      categories,
+      source: source,
+    );
+    _debugSmartInputPlan(plan);
+    final command = plan.parsed;
+    final canonicalInput = plan.normalizedText;
+>>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
     if (!command.intent.isTransactionAddition) {
       if (command.intent == SmartEntryIntent.deleteEntry ||
           command.intent == SmartEntryIntent.editEntry) {
@@ -2994,8 +3005,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       amount: amountValue,
       preferredAccountId: configuredDefaultWallet?.id,
     );
+    assert(() {
+      debugPrint(
+        '[SmartEntry confidence] '
+        'disposition=${semanticConfidence.disposition} '
+        'score=${semanticConfidence.score.toStringAsFixed(3)} '
+        'reasons=${semanticConfidence.reasons.join(' | ')}',
+      );
+      return true;
+    }());
 
+<<<<<<< HEAD
     if (shouldAutoSaveSmartEntry(
+=======
+    if (!plan.requiresAsrReview &&
+        semanticConfidence.canAutoExecute &&
+        shouldAutoSaveSmartEntry(
+>>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
       result,
       hasResolvedWallet: resolvedWalletId != null,
     )) {
@@ -3060,7 +3086,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }).toList(growable: false);
     final defaultsAreEmpty = defaultAccounts.isEmpty ||
         defaultAccounts.every((account) => account.availableBalance <= 0);
+<<<<<<< HEAD
     final reviewMessage = mentionedWalletId != null
+=======
+    final reviewMessage = plan.requiresAsrReview
+        ? 'Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.'
+        : resolvedWalletId != null &&
+            !semanticConfidence.canAutoExecute
+        ? 'Review the detected title, amount, category, date, and wallet before saving.'
+        : mentionedWalletId != null
+>>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
         ? 'The named wallet cannot cover this expense. Choose another wallet before saving.'
         : configuredDefaultWallet != null
             ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
@@ -3091,6 +3126,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
     }
     if (mounted) FocusScope.of(context).unfocus();
+  }
+
+  void _debugSmartInputPlan(SmartInputPlan plan) {
+    assert(() {
+      final smartCommand = plan.command;
+      var selector = 'none';
+      var patch = 'none';
+      if (smartCommand is MutationCommand) {
+        selector = '{title: ${smartCommand.selector.title}, '
+            'amount: ${smartCommand.selector.amount}, '
+            'date: ${smartCommand.selector.date}, '
+            'type: ${smartCommand.selector.transactionType}}';
+        patch = '{title: ${smartCommand.patch.title}, '
+            'amount: ${smartCommand.patch.amount}, '
+            'category: ${smartCommand.patch.category}, '
+            'date: ${smartCommand.patch.date}, '
+            'wallet: ${smartCommand.patch.walletId}}';
+      }
+      debugPrint(
+        '[SmartEntry parse] original="${plan.originalText}" '
+        'normalized="${plan.normalizedText}" '
+        'intent=${plan.parsed.intent.wireName} '
+        'selector=$selector patch=$patch '
+        'amount=${plan.parsed.amount} title="${plan.parsed.title}" '
+        'confidence=${plan.parsed.confidence.toStringAsFixed(3)} '
+        'requiresAsrReview=${plan.requiresAsrReview}',
+      );
+      return true;
+    }());
   }
 
   String _smartEntryTitle(

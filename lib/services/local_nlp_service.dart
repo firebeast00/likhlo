@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'primary_intent_router.dart';
+
 enum SmartEntryIntent {
   addExpense,
   addIncome,
@@ -407,7 +409,12 @@ class LocalNlpService {
   final List<String> _stopWords = [
     'ki', 'ka', 'ke', 'liye', 'for', 'on', 'aur', 'the', 'a', 'an', 'to', 'mein',
     'pe', 'jo', 'k', 'se', 'tak', 'par', 'wala', 'wali', 'wale',
+<<<<<<< HEAD
     'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchased', 'khaan',
+=======
+    'spend', 'spent', 'paid', 'gave', 'khaye', 'diye', 'bought', 'purchase',
+    'purchased', 'khaan', 'khareed', 'khareeda', 'khareedi', 'when', 'went',
+>>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
     'lag', 'gaye', 'ho', 'gaya', 'kar', 'karo', 'kardiye', 'karwa', 'liya', 'liye',
     'kha', 'pee', 'diya', 'kharida',
     'rs', 'rupees', 'rupee', 'amount', 'kharch', 'kharcha', 'pese', 'paise',
@@ -646,9 +653,48 @@ class LocalNlpService {
     return _WordAmountResult(amount, consumed);
   }
 
+  String _stripConversationalContext(
+    String input,
+    SmartEntryIntent intent,
+  ) {
+    if (!intent.isTransactionAddition) return input;
+
+    var value = input;
+    final narrativePrefixes = [
+      RegExp(
+        r'^\s*when\b.+?(?=\b(?:i\s+)?(?:bought|purchased|paid|spent)\b)',
+      ),
+      RegExp(
+        r'^\s*i\s+(?:went|go|was\s+going)\s+to\s+.+?(?=\b(?:and\s+)?(?:i\s+)?(?:bought|purchased|paid|spent)\b)',
+      ),
+      RegExp(
+        r'^\s*(?:jab|main)\b.+?(?=\b(?:maine|main\s+ne)\s+)',
+      ),
+      RegExp(r'^\s*.+?\bke\s+paa?s\s+gaya\s+tha\b'),
+    ];
+    for (final pattern in narrativePrefixes) {
+      value = value.replaceFirst(pattern, ' ');
+    }
+
+    return value
+        .replaceAll(
+          RegExp(r'\b(?:and\s+)?i\s+(?:bought|purchased|paid\s+for)\b'),
+          ' ',
+        )
+        .replaceAll(
+          RegExp(
+            r'\b(?:maine|main\s+ne)\s+(?:kharida|khareeda|khareed|liya)\b',
+          ),
+          ' ',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
   // ==========================================
   // 🧠 MAIN PARSING ENGINE
   // ==========================================
+<<<<<<< HEAD
   SmartEntryIntent _detectIntent(String input) {
     bool has(String pattern) => RegExp(pattern).hasMatch(input);
 
@@ -691,6 +737,103 @@ class LocalNlpService {
       r'\b(expense|spent|paid|bought|purchased|kharch|kharcha|diye|diya|kharida)\b',
     ).hasMatch(input);
     return explicitExpense ? 0.96 : 0.84;
+=======
+  SmartEntryIntent _intentFromRoute(RoutedSmartIntent intent) {
+    switch (intent) {
+      case RoutedSmartIntent.addExpense:
+        return SmartEntryIntent.addExpense;
+      case RoutedSmartIntent.addIncome:
+        return SmartEntryIntent.addIncome;
+      case RoutedSmartIntent.deleteEntry:
+        return SmartEntryIntent.deleteEntry;
+      case RoutedSmartIntent.editEntry:
+        return SmartEntryIntent.editEntry;
+      case RoutedSmartIntent.transfer:
+        return SmartEntryIntent.transfer;
+      case RoutedSmartIntent.repeatEntry:
+        return SmartEntryIntent.repeatEntry;
+      case RoutedSmartIntent.query:
+        return SmartEntryIntent.query;
+      case RoutedSmartIntent.searchEntries:
+        return SmartEntryIntent.searchEntries;
+      case RoutedSmartIntent.navigate:
+        return SmartEntryIntent.navigate;
+      case RoutedSmartIntent.unknown:
+        return SmartEntryIntent.unknown;
+    }
+  }
+
+  SmartEntryQueryMetric? _queryMetric(String input) {
+    if (RegExp(r'\b(balance|available|bachay|bacha)\b').hasMatch(input)) {
+      return SmartEntryQueryMetric.balance;
+    }
+    if (RegExp(r'\b(net|difference|remaining|bacha\s+kitna)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.net;
+    }
+    if (RegExp(r'\b(how\s+many|count|kitni\s+entries|kitne\s+transactions)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.transactionCount;
+    }
+    if (RegExp(r'\b(income|earned|received|salary|kamai|aayi|mili)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.income;
+    }
+    if (RegExp(r'\b(spend|spent|spending|expense|expenses|kharch|kharcha)\b')
+        .hasMatch(input)) {
+      return SmartEntryQueryMetric.spending;
+    }
+    return null;
+  }
+
+  SmartEntryTimeRange _timeRange(String input) {
+    if (RegExp(r'\b(last\s+month|previous\s+month|pichlay\s+mahine|pichle\s+mahine)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.lastMonth;
+    }
+    if (RegExp(r'\b(last\s+week|previous\s+week|pichlay\s+haftay|pichle\s+haftay)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.lastWeek;
+    }
+    if (RegExp(r'\b(this\s+week|current\s+week|is\s+haftay)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.thisWeek;
+    }
+    if (RegExp(r'\b(this\s+month|current\s+month|is\s+mahine)\b')
+        .hasMatch(input)) {
+      return SmartEntryTimeRange.thisMonth;
+    }
+    if (RegExp(r'\b(yesterday|kal)\b').hasMatch(input)) {
+      return SmartEntryTimeRange.yesterday;
+    }
+    if (RegExp(r'\b(today|aaj)\b').hasMatch(input)) {
+      return SmartEntryTimeRange.today;
+    }
+    return SmartEntryTimeRange.allTime;
+  }
+
+  String? _navigationTarget(String input) {
+    if (RegExp(r'\b(wallet|wallets)\b').hasMatch(input)) return 'Wallets';
+    if (RegExp(r'\b(stats|statistics)\b').hasMatch(input)) return 'Stats';
+    if (RegExp(r'\b(udhaar|udhar)\b').hasMatch(input)) return 'Udhaar';
+    if (RegExp(r'\b(mess|khata)\b').hasMatch(input)) return 'Mess Khata';
+    if (RegExp(r'\b(settings|setting)\b').hasMatch(input)) return 'Settings';
+    if (RegExp(r'\babout\b').hasMatch(input)) return 'About';
+    if (RegExp(r'\b(home|dashboard)\b').hasMatch(input)) return 'Dashboard';
+    return null;
+  }
+
+  String? _entryTypeFilter(String input) {
+    if (RegExp(r'\b(income|salary|received|kamai|aayi|mili)\b')
+        .hasMatch(input)) {
+      return 'income';
+    }
+    if (RegExp(r'\b(expense|expenses|spend|spent|spending|kharch)\b')
+        .hasMatch(input)) {
+      return 'expense';
+    }
+    return null;
+>>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
   }
 
   ParsedSmartEntryCommand parseCommand(
@@ -702,8 +845,20 @@ class LocalNlpService {
           RegExp(r'\s+'),
           ' ',
         );
-    final intent = _detectIntent(lowerInput);
+    final intentRoute = const PrimaryIntentRouter().classify(lowerInput);
+    final intent = _intentFromRoute(intentRoute.intent);
     final isIncome = intent == SmartEntryIntent.addIncome;
+<<<<<<< HEAD
+=======
+    final queryMetric = intent == SmartEntryIntent.query
+        ? _queryMetric(lowerInput)
+        : null;
+    final timeRange = _timeRange(lowerInput);
+    final navigationTarget = intent == SmartEntryIntent.navigate
+        ? intentRoute.navigationTarget ?? _navigationTarget(lowerInput)
+        : null;
+    final entryTypeFilter = _entryTypeFilter(lowerInput);
+>>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
 
     double amount = 0.0;
     double amountConfidence = 0.0;
@@ -838,7 +993,8 @@ class LocalNlpService {
       }
     }
 
-    String cleanTitle = lowerInput.replaceAll(amountRegExp, ' ');
+    final titleSource = _stripConversationalContext(lowerInput, intent);
+    String cleanTitle = titleSource.replaceAll(amountRegExp, ' ');
     for (final token in consumedTokens) {
       cleanTitle = cleanTitle.replaceFirst(
         RegExp('\\b${RegExp.escape(token)}\\b'),
@@ -884,7 +1040,7 @@ class LocalNlpService {
       }).join(' ');
     }
 
-    final intentConfidence = _intentConfidence(lowerInput, intent);
+    final intentConfidence = intentRoute.confidence;
     final categoryConfidence =
         isIncome ? 0.98 : categoryFound ? 0.94 : 0.35;
     final titleConfidence = usedFallbackTitle ? 0.35 : 0.9;
@@ -1215,12 +1371,25 @@ bool shouldAutoSaveSmartEntry(
 }) {
   final amount = parsed['amount'];
   final type = parsed['type'];
+  final title = parsed['title']?.toString() ?? '';
 
   return hasResolvedWallet &&
       amount is num &&
       amount.isFinite &&
       amount > 0 &&
+<<<<<<< HEAD
+=======
+      (type != 'expense' || hasSpecificSmartEntryTitle(title)) &&
+      (semanticConfidence == null || semanticConfidence >= 0.94) &&
+>>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
       (type == 'expense' || type == 'income');
+}
+
+bool hasSpecificSmartEntryTitle(String title) {
+  final normalized = title.trim().toLowerCase();
+  return normalized.isNotEmpty &&
+      normalized != 'transaction' &&
+      normalized != 'quick expense';
 }
 
 class _WordAmountResult {

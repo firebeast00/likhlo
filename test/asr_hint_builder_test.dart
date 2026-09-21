@@ -13,6 +13,7 @@ void main() {
 
     expect(hints.length, lessThanOrEqualTo(30));
     expect(hints, containsAll(['JazzCash', 'Business Wallet', 'Foodpanda']));
+    expect(hints, containsAll(['spent', 'expense', 'pen', 'petrol']));
     expect(
       hints.where((hint) => hint.toLowerCase() == 'foodpanda').length,
       1,

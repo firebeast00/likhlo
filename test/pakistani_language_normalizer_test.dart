@@ -29,6 +29,24 @@ void main() {
       normalizer.normalize('jazz cast se do gazaar').normalized,
       'jazzcash se do hazar',
     );
+    expect(
+      normalizer
+          .normalize('Spain pen 200', enableContextualAsrRepairs: true)
+          .normalized,
+      'spent pen 200',
+    );
+    expect(
+      normalizer
+          .normalize('200 pain khareeda', enableContextualAsrRepairs: true)
+          .normalized,
+      '200 pen khareeda',
+    );
+    expect(
+      normalizer
+          .normalize('pain medicine 200', enableContextualAsrRepairs: true)
+          .normalized,
+      'pain medicine 200',
+    );
   });
 
   test('builds a selector and title patch for Roman Urdu edit', () {

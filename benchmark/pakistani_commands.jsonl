@@ -1,4 +1,4 @@
-{"id":"expense_en_01","input":"500 chai cash se","intent":"add_expense","amount":500}
+{"id":"expense_en_01","input":"500 chai cash se","intent":"add_expense","amount":500,"allow_auto_execute":true}
 {"id":"expense_ur_01","input":"cash se paanch sau chai ke","intent":"add_expense","amount":500}
 {"id":"expense_script_01","input":"نقد سے ۵۰۰ چائے کے خرچ","intent":"add_expense","amount":500}
 {"id":"expense_asr_01","input":"do show petrol cash se","intent":"add_expense","amount":200}
@@ -22,3 +22,15 @@
 {"id":"search_01","input":"find petrol expenses","intent":"search_entries","amount":null}
 {"id":"navigate_01","input":"open stats","intent":"navigate","amount":null}
 {"id":"navigate_02","input":"udhaar page kholo","intent":"navigate","amount":null}
+{"id":"navigate_03","input":"go to stats tab","intent":"navigate","amount":null}
+{"id":"navigate_04","input":"show me stats","intent":"navigate","amount":null}
+{"id":"query_03","input":"show me food expenses","intent":"query","amount":null}
+{"id":"create_explicit_01","input":"150 ka jute add karo","intent":"add_expense","amount":150,"title":"Jute","allow_auto_execute":true}
+{"id":"narrative_01","input":"when I go to university I bought a pen for 50 rupees","intent":"add_expense","amount":50,"title":"Pen"}
+{"id":"narrative_02","input":"I spent 200 on a pen","intent":"add_expense","amount":200,"title":"Pen"}
+{"id":"asr_spent_01","input":"Spain pen 200","source":"voice","intent":"add_expense","amount":200,"title":"Pen","allow_auto_execute":false}
+{"id":"asr_pen_01","input":"200 pain khareeda","source":"voice","intent":"add_expense","amount":200,"title":"Pen","allow_auto_execute":false}
+{"id":"edit_title_02","input":"change milk name to doodh","intent":"edit_entry","amount":null}
+{"id":"edit_title_03","input":"update title pen to marker","intent":"edit_entry","amount":null}
+{"id":"unknown_01","input":"hello there","intent":"unknown","amount":null}
+{"id":"generic_title_01","input":"500","intent":"add_expense","amount":500,"title":"Quick Expense","allow_auto_execute":false}
