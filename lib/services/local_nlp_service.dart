@@ -409,7 +409,6 @@ class LocalNlpService {
 
   final Map<String, String> _optimizedLexicon = {};
   final Map<String, String> _normalizedLexicon = {};
-  late final List<String> _sortedLexiconKeys;
 
   late final Map<String, int> _numberWordIndex;
   late final Map<String, int> _normalizedUnitsOnly;
@@ -428,9 +427,6 @@ class LocalNlpService {
         _normalizedLexicon[_normalize(w)] = category;
       }
     });
-
-    _sortedLexiconKeys = _optimizedLexicon.keys.toList()
-      ..sort((a, b) => b.length.compareTo(a.length));
 
     _normalizedUnitsOnly = {
       for (final e in _units.entries) _normalize(e.key): e.value,
@@ -635,7 +631,6 @@ class LocalNlpService {
     double amount = 0;
     int? pendingUnit;
     String? pendingUnitToken;
-    bool matchedAnyScale = false;
 
     int i = 0;
     while (i < tokens.length) {
@@ -647,7 +642,6 @@ class LocalNlpService {
         if (mult != null) {
           amount += 2.5 * mult;
           consumed.addAll([raw, tokens[i + 1]]);
-          matchedAnyScale = true;
           i += 2;
           continue;
         }
@@ -659,7 +653,6 @@ class LocalNlpService {
         if (directMult != null) {
           amount += 1.25 * directMult;
           consumed.addAll([raw, tokens[i + 1]]);
-          matchedAnyScale = true;
           i += 2;
           continue;
         }
@@ -669,7 +662,6 @@ class LocalNlpService {
           if (mult != null) {
             amount += (unitVal + 0.25) * mult;
             consumed.addAll([raw, tokens[i + 1], tokens[i + 2]]);
-            matchedAnyScale = true;
             i += 3;
             continue;
           }
@@ -682,7 +674,6 @@ class LocalNlpService {
         if (unitVal != null && mult != null) {
           amount += (unitVal - 0.25) * mult;
           consumed.addAll([raw, tokens[i + 1], tokens[i + 2]]);
-          matchedAnyScale = true;
           i += 3;
           continue;
         }
@@ -692,7 +683,6 @@ class LocalNlpService {
       if (overrideVal != null) {
         amount += overrideVal;
         consumed.add(raw);
-        matchedAnyScale = true;
         i++;
         continue;
       }
@@ -704,7 +694,6 @@ class LocalNlpService {
         consumed.add(raw);
         pendingUnit = null;
         pendingUnitToken = null;
-        matchedAnyScale = true;
         i++;
         continue;
       }
@@ -713,14 +702,12 @@ class LocalNlpService {
       if (splitVal != null) {
         amount += splitVal;
         consumed.add(raw);
-        matchedAnyScale = true;
         i++;
         continue;
       }
 
       final numVal = _numberWordIndex[norm];
       if (numVal != null) {
-        if (numVal >= 10) matchedAnyScale = true;
         pendingUnit = numVal;
         pendingUnitToken = raw;
         i++;
