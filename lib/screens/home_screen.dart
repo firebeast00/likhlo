@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:quick_actions/quick_actions.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -24,6 +23,12 @@ import 'stats_screen.dart';
 import 'about_screen.dart';
 import '../services/local_nlp_service.dart';
 import '../services/ocr_scanner_service.dart';
+import '../services/speech_session_controller.dart';
+import '../services/transaction_executor.dart';
+import '../services/smart_command.dart';
+import '../services/smart_input_engine.dart';
+import '../services/confidence_evaluator.dart';
+import '../services/speech_recognition_provider.dart';
 import "./mess_khata_screen.dart";
 import './income_accounts_screen.dart';
 
@@ -39,20 +44,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   static const _smartEntryDefaultAccountKey =
       'smart_entry_default_wallet_id';
   static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
+  static const _smartEntryLearningKey = 'smart_entry_learning_v1';
   String _currentView = 'Dashboard';
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
   bool _isSearching = false;
   String _searchQuery = "";
+  String? _smartEntryTypeFilter;
+  SmartEntryTimeRange? _smartEntrySearchRange;
+  bool _smartEntrySearchAllHistory = false;
   final ScrollController _categoryScrollCtrl = ScrollController();
 
   late AnimationController _fabController;
   late Animation<double> _fabScale;
 
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  final SpeechRecognitionProvider _speech = SpeechProviderRouter(
+    deviceProvider: DeviceSpeechRecognitionProvider(),
+  );
+  final SpeechSessionController _speechSession = SpeechSessionController();
   bool _isListening = false;
-  bool _voiceResultProcessed = false;
   bool _handlingSpeechError = false;
+  bool _restartingSpeech = false;
   bool _speechInitialized = false;
   bool _speechLocalesLoaded = false;
   List<String?> _speechLocaleCandidates = const [null];
@@ -61,6 +73,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final TextEditingController _smartInputCtrl = TextEditingController();
   String? _smartEntryDefaultWalletId;
   List<String> _homeVisibleWalletIds = const [];
+  final Map<String, _LearnedSmartEntryPreference>
+      _learnedSmartEntryPreferences = {};
   Timer? _notificationUpdateTimer;
   Timer? _messageTimer;
   OverlayEntry? _activeMessageEntry;
@@ -83,6 +97,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             .take(4)
             .toList(growable: false)
         : const [];
+    _loadSmartEntryLearning();
     _fabController = AnimationController(vsync: this, duration: const Duration(milliseconds: 200), lowerBound: 0.0, upperBound: 0.1);
     _fabScale = Tween<double>(begin: 1.0, end: 0.95).animate(_fabController);
 
@@ -193,6 +208,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
+  void _loadSmartEntryLearning() {
+    final stored = Hive.box('preferences').get(_smartEntryLearningKey);
+    if (stored is! Map) return;
+    for (final item in stored.entries) {
+      final key = item.key?.toString() ?? '';
+      final preference = _LearnedSmartEntryPreference.fromStored(item.value);
+      if (key.isNotEmpty && preference != null) {
+        _learnedSmartEntryPreferences[key] = preference;
+      }
+    }
+  }
+
+  _LearnedSmartEntryPreference? _learnedPreferenceFor(String title) {
+    final key = _normalizeLearningTitle(title);
+    if (key.isEmpty) return null;
+    return _learnedSmartEntryPreferences[key];
+  }
+
+  Future<void> _rememberSmartEntryPreference(Expense entry) async {
+    if (entry.category == 'Transfer') return;
+    final key = _normalizeLearningTitle(entry.title);
+    if (key.isEmpty) return;
+
+    final existing = _learnedSmartEntryPreferences[key];
+    _learnedSmartEntryPreferences[key] = _LearnedSmartEntryPreference(
+      category: entry.category,
+      walletId: entry.walletId,
+      uses: (existing?.uses ?? 0) + 1,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    if (_learnedSmartEntryPreferences.length > 200) {
+      final oldest = _learnedSmartEntryPreferences.entries.reduce(
+        (first, second) => first.value.updatedAt <= second.value.updatedAt
+            ? first
+            : second,
+      );
+      _learnedSmartEntryPreferences.remove(oldest.key);
+    }
+
+    try {
+      await Hive.box('preferences').put(
+        _smartEntryLearningKey,
+        {
+          for (final item in _learnedSmartEntryPreferences.entries)
+            item.key: item.value.toStored(),
+        },
+      );
+    } catch (error) {
+      debugPrint('Smart Entry learning could not be saved: $error');
+    }
+  }
+
   void _selectCategory(String category, int index) {
     _dismissKeyboard();
     setState(() => _selectedCategoryTab = category);
@@ -225,6 +293,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _currentView = view;
       _isSearching = false;
       _searchQuery = '';
+      _smartEntryTypeFilter = null;
+      _smartEntrySearchRange = null;
+      _smartEntrySearchAllHistory = false;
     });
 
     if (view == 'Dashboard') _queuePersistentNotificationUpdate();
@@ -582,6 +653,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           }
                         }
 
+                        Expense? preferenceEntry;
                         if (transactionType == 'transfer') {
                           if (wallets.length < 2) {
                             _showTransactionError('Create at least two wallets to transfer money.');
@@ -605,13 +677,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           final toName = wallets.firstWhere((w) => w.id == transferToWalletId).name;
                           final transferId = const Uuid().v4();
 
-                          final saved = await ref
-                              .read(expenseProvider.notifier)
-                              .addExpenses([
-                            Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
-                            Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
-                          ]);
-                          if (!saved) {
+                          final transferResult = await ref
+                              .read(transactionExecutorProvider)
+                              .execute(CreateTransferCommand(
+                                outgoing: Expense(id: '${transferId}_out', title: "Transfer to $toName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'expense', walletId: selectedWalletId),
+                                incoming: Expense(id: '${transferId}_in', title: "Transfer from $fromName", amount: amt, date: selectedDate, category: "Transfer", colorValue: Colors.blue.toARGB32(), type: 'income', walletId: transferToWalletId),
+                              ));
+                          if (!transferResult.succeeded) {
                             _showTransactionError(
                               'The source wallet no longer has enough money for this transfer.',
                               title: 'Transfer not saved',
@@ -631,21 +703,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
                           final finalCategory = transactionType == 'income' ? 'Income / Allowance' : selectedCategory;
                           if (existing == null) {
-                            final saved = await ref.read(expenseProvider.notifier).addExpense(Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId));
-                            if (!saved) {
+                            final newEntry = Expense(id: const Uuid().v4(), title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: primaryColor.toARGB32(), type: transactionType, walletId: selectedWalletId);
+                            final createResult = await ref
+                                .read(transactionExecutorProvider)
+                                .execute(CreateTransactionCommand(newEntry));
+                            if (!createResult.succeeded) {
                               _showTransactionError(
                                 'Check the selected wallet balance and try again.',
                                 title: 'Transaction not saved',
                               );
                               return;
                             }
+                            preferenceEntry = newEntry;
                           } else {
-                            final updated = await ref.read(expenseProvider.notifier).editExpense(existing.id, Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId));
-                            if (!updated) {
+                            final editedEntry = Expense(id: existing.id, title: finalTitle, amount: amt, date: selectedDate, category: finalCategory, colorValue: existing.colorValue, type: transactionType, walletId: selectedWalletId);
+                            final updateResult = await ref
+                                .read(transactionExecutorProvider)
+                                .execute(UpdateTransactionCommand(
+                                  existingId: existing.id,
+                                  updated: editedEntry,
+                                ));
+                            if (!updateResult.succeeded) {
                               _showTransactionError('This transaction no longer exists.');
                               return;
                             }
+                            preferenceEntry = editedEntry;
                           }
+                        }
+                        if (preferenceEntry != null) {
+                          await _rememberSmartEntryPreference(preferenceEntry);
                         }
                         try {
                           await NotificationService().scheduleSmartEntryReminders();
@@ -855,7 +941,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
     );
 
-    var displayExpenses = List<Expense>.from(monthlyTransactions);
+    var displayExpenses = List<Expense>.from(
+      _isSearching && _smartEntrySearchAllHistory
+          ? visibleTransactions(ref.watch(expenseProvider).allExpenses)
+          : monthlyTransactions,
+    );
 
     if (_selectedCategoryTab != 'All' && !categories.contains(_selectedCategoryTab)) {
       _selectedCategoryTab = 'All';
@@ -863,6 +953,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (_selectedCategoryTab != 'All') displayExpenses = displayExpenses.where((e) => e.category == _selectedCategoryTab).toList();
     if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    if (_smartEntryTypeFilter != null) {
+      displayExpenses = displayExpenses
+          .where((entry) => entry.type == _smartEntryTypeFilter)
+          .toList();
+    }
+    if (_smartEntrySearchRange != null) {
+      displayExpenses = displayExpenses
+          .where((entry) => matchesSmartEntryTimeRange(
+                entry.date,
+                _smartEntrySearchRange!,
+              ))
+          .toList();
+    }
 
     return Scaffold(
       drawer: AppDrawer(
@@ -901,7 +1004,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 _dismissKeyboard();
                 setState(() {
                   _isSearching = !_isSearching;
-                  if (!_isSearching) _searchQuery = '';
+                  if (!_isSearching) {
+                    _searchQuery = '';
+                    _smartEntryTypeFilter = null;
+                    _smartEntrySearchRange = null;
+                    _smartEntrySearchAllHistory = false;
+                  }
                 });
               },
             ),
@@ -1154,9 +1262,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       },
       onDismissed: (direction) async {
         if (isTransfer) {
-          await ref.read(expenseProvider.notifier).deleteTransferPair(e.id);
+          await ref
+              .read(transactionExecutorProvider)
+              .execute(DeleteTransferCommand(e.id));
         } else {
-          await ref.read(expenseProvider.notifier).deleteExpense(e.id);
+          await ref
+              .read(transactionExecutorProvider)
+              .execute(DeleteTransactionCommand(e.id));
         }
         if (!mounted) return;
         _showTransactionSuccess(
@@ -2176,13 +2288,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
-    _voiceResultProcessed = false;
+    _speechSession.reset();
     _handlingSpeechError = false;
+    _restartingSpeech = false;
     _smartInputCtrl.clear();
     if (!_speechInitialized) {
       final available = await _speech.initialize(
         onStatus: _handleSpeechStatus,
-        onError: (error) => _handleSpeechError(error.errorMsg),
+        onError: (error) => _handleSpeechError(error.message),
       );
       if (!mounted) return;
       if (!available) {
@@ -2202,6 +2315,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _speechLocaleCandidateIndex = 0;
     if (!mounted) return;
 
+    _speechSession.start();
     setState(() => _isListening = true);
     await HapticFeedback.mediumImpact();
     await _startSpeechListening();
@@ -2255,35 +2369,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     try {
       await _speech.listen(
-        listenOptions: stt.SpeechListenOptions(
+        options: SpeechRecognitionListenOptions(
           localeId: localeId,
-          cancelOnError: true,
           partialResults: true,
-          listenMode: stt.ListenMode.search,
-          pauseFor: const Duration(seconds: 2),
-          listenFor: const Duration(seconds: 12),
+          pauseFor: const Duration(seconds: 3),
+          listenFor: const Duration(seconds: 20),
         ),
         onResult: (result) async {
           if (!mounted) return;
-          final words = result.recognizedWords.trim();
-          _smartInputCtrl.value = TextEditingValue(
-            text: words,
-            selection: TextSelection.collapsed(offset: words.length),
-          );
-          if (result.finalResult &&
-              words.isNotEmpty &&
-              !_voiceResultProcessed) {
-            _voiceResultProcessed = true;
-            setState(() => _isListening = false);
-            await _processNLP(words);
+          final words = result.text.trim();
+          if (words.isNotEmpty) {
+            _smartInputCtrl.value = TextEditingValue(
+              text: words,
+              selection: TextSelection.collapsed(offset: words.length),
+            );
           }
+          final decision = _speechSession.recordTranscript(
+            words,
+            isFinal: result.isFinal,
+          );
+          await _applySpeechDecision(decision);
         },
       );
     } catch (error) {
       debugPrint('Speech listen failed: $error');
       if (!mounted || _handlingSpeechError) return;
       _handlingSpeechError = true;
-      _voiceResultProcessed = true;
+      _speechSession.onRecognizerError(retryable: false);
       setState(() => _isListening = false);
       _showTransactionError(
         'Voice recognition could not start. Check microphone permission and the phone\'s speech-recognition service.',
@@ -2293,43 +2405,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _handleSpeechError(String errorMessage) async {
-    if (!mounted || _handlingSpeechError || _voiceResultProcessed) return;
+    if (!mounted || _handlingSpeechError) return;
+    if (_speechSession.state != SpeechSessionState.listening &&
+        _speechSession.state != SpeechSessionState.finalizing) {
+      return;
+    }
     debugPrint('STT Error: $errorMessage');
     _handlingSpeechError = true;
 
     final normalized = errorMessage.toLowerCase();
-    final partialWords = _smartInputCtrl.text.trim();
     final recoverableEnd = normalized.contains('error_speech_timeout') ||
         normalized.contains('error_no_match') ||
         normalized.contains('error_client');
-    if (recoverableEnd && partialWords.isNotEmpty) {
-      _voiceResultProcessed = true;
-      setState(() => _isListening = false);
-      await _processNLP(partialWords);
-      return;
-    }
     final languageFailure =
         normalized.contains('error_language_unavailable') ||
         normalized.contains('error_language_not_supported');
+    final canTryAnotherLocale = languageFailure &&
+        _speechLocaleCandidateIndex + 1 < _speechLocaleCandidates.length;
+    final decision = _speechSession.onRecognizerError(
+      retryable: recoverableEnd || canTryAnotherLocale,
+    );
 
-    if (languageFailure &&
-        _speechLocaleCandidateIndex + 1 <
-            _speechLocaleCandidates.length) {
-      _voiceResultProcessed = true;
+    if (decision.action == SpeechSessionAction.retry) {
+      _restartingSpeech = true;
       await _speech.cancel();
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
+      if (!mounted) {
+        _restartingSpeech = false;
+        return;
+      }
 
-      _speechLocaleCandidateIndex++;
-      _smartInputCtrl.clear();
-      _voiceResultProcessed = false;
+      if (canTryAnotherLocale) _speechLocaleCandidateIndex++;
       _handlingSpeechError = false;
+      _restartingSpeech = false;
+      setState(() => _isListening = true);
       await _startSpeechListening();
       return;
     }
 
-    _voiceResultProcessed = true;
     setState(() => _isListening = false);
+
+    if (decision.action == SpeechSessionAction.processFinal) {
+      await _applySpeechDecision(decision);
+      return;
+    }
 
     if (normalized.contains('error_client')) {
       _speechInitialized = false;
@@ -2342,7 +2461,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (networkFailure) {
       _showTransactionError(
-        'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
+        _speechDraftMessage(
+          'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
+        ),
         title: 'Voice service is offline',
       );
       return;
@@ -2350,16 +2471,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (languageFailure) {
       _showTransactionError(
-        'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
+        _speechDraftMessage(
+          'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
+        ),
         title: 'Speech language unavailable',
       );
       return;
     }
 
     _showTransactionError(
-      'Voice Log stopped before an entry could be saved. Please try again.',
+      _speechDraftMessage(
+        'Voice Log stopped before it received a final result. Please try again.',
+      ),
       title: 'Voice Log stopped',
     );
+  }
+
+  String _speechDraftMessage(String message) {
+    if (_smartInputCtrl.text.trim().isEmpty) return message;
+    return '$message Your unfinished words were kept as a draft; review them and tap Save to continue.';
+  }
+
+  Future<void> _applySpeechDecision(SpeechSessionDecision decision) async {
+    if (!mounted) return;
+    switch (decision.action) {
+      case SpeechSessionAction.processFinal:
+        setState(() => _isListening = false);
+        _speechSession.markProcessing();
+        try {
+          await _processNLP(
+            decision.transcript,
+            source: SmartInputSource.voice,
+          );
+          _speechSession.markCompleted();
+        } catch (error) {
+          _speechSession.markFailed();
+          rethrow;
+        }
+        return;
+      case SpeechSessionAction.preserveDraft:
+        setState(() => _isListening = false);
+        _showTransactionInfo(
+          'Voice recognition stopped before it produced a final result. Your words are still in Smart Entry—review them and tap Save when ready.',
+          title: 'Voice draft kept',
+        );
+        return;
+      case SpeechSessionAction.none:
+      case SpeechSessionAction.retry:
+        return;
+    }
   }
 
   Future<void> _scanReceiptIntoInput() async {
@@ -2410,17 +2570,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   void _handleSpeechStatus(String status) {
     if (!mounted || (status != 'done' && status != 'notListening')) return;
-    final words = _smartInputCtrl.text.trim();
-    setState(() => _isListening = false);
-    if (!_voiceResultProcessed && words.isNotEmpty) {
-      _voiceResultProcessed = true;
-      _processNLP(words);
-    }
+    if (_restartingSpeech) return;
+    final decision = _speechSession.onRecognizerStopped();
+    if (_isListening) setState(() => _isListening = false);
+    _applySpeechDecision(decision);
   }
 
   Future<Expense?> _showSmartEntryMatchPicker(
     List<SmartEntryTransaction> matches, {
     required bool deleting,
+    bool repeating = false,
   }) async {
     final allEntries = ref.read(expenseProvider).allExpenses;
     final entriesById = {
@@ -2472,7 +2631,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       Icon(
                         deleting
                             ? Icons.delete_outline_rounded
-                            : Icons.edit_outlined,
+                            : repeating
+                                ? Icons.replay_rounded
+                                : Icons.edit_outlined,
                         color: theme.colorScheme.primary,
                       ),
                       const SizedBox(width: 12),
@@ -2483,7 +2644,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             Text(
                               deleting
                                   ? 'Choose entry to delete'
-                                  : 'Choose entry to edit',
+                                  : repeating
+                                      ? 'Choose entry to repeat'
+                                      : 'Choose entry to edit',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2612,6 +2775,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
+    final transferConfidence = const ConfidenceEvaluator().evaluate(
+      TransferCommand(
+        parsed: command,
+        source: SmartInputSource.typed,
+      ),
+      context: ConfidenceContext(
+        hasExactAmount: command.amount > 0 &&
+            (command.confidenceByField['amount'] ?? 0) >= 0.9,
+        hasResolvedTransferSource: true,
+        hasResolvedTransferDestination: true,
+        transferDirectionConfidence: resolution.confidence,
+      ),
+    );
+    if (!transferConfidence.canAutoExecute) {
+      _showTransactionError(
+        'I found both wallets but the transfer direction is not clear. Say “Cash se JazzCash me” or “Cash to JazzCash”.',
+        title: 'Confirm transfer direction',
+      );
+      return;
+    }
+
     final source = wallets.firstWhere(
       (wallet) => wallet.id == resolution.sourceAccountId,
     );
@@ -2659,11 +2843,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         walletId: destination.id,
       ),
     ];
-    final saved = await ref
-        .read(expenseProvider.notifier)
-        .addExpenses(transferEntries);
+    final execution = await ref
+        .read(transactionExecutorProvider)
+        .execute(CreateTransferCommand(
+          outgoing: transferEntries.first,
+          incoming: transferEntries.last,
+        ));
     if (!mounted) return;
-    if (!saved) {
+    if (!execution.succeeded) {
       _showTransactionError(
         'The source wallet changed or no longer has enough money.',
         title: 'Transfer not saved',
@@ -2683,8 +2870,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       actionLabel: 'Undo',
       onAction: () async {
         await ref
-            .read(expenseProvider.notifier)
-            .deleteTransferPair(transferId);
+            .read(transactionExecutorProvider)
+            .execute(DeleteTransferCommand(transferId));
         if (!mounted) return;
         _showTransactionInfo(
           'The transfer was reversed.',
@@ -2694,14 +2881,344 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Future<void> _handleSmartEntryMutationCommand(
+  Future<void> _handleSmartEntryRepeatCommand(
     ParsedSmartEntryCommand command,
   ) async {
-    final deleting = command.intent == SmartEntryIntent.deleteEntry;
-    if (!deleting && command.amount <= 0) {
+    final wallets = ref.read(walletProvider);
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final accounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+            id: wallet.id,
+            name: wallet.name,
+            type: wallet.walletType,
+            availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+            isBackup: wallet.isBackup,
+          ),
+        )
+        .toList(growable: false);
+    final mentionedIds = findMentionedSmartEntryAccountIds(
+      command.rawInput,
+      accounts,
+    );
+    if (mentionedIds.length > 1) {
       _showTransactionError(
-        "Include the new amount, for example: 'change burger amount to 600'.",
-        title: 'New amount required',
+        'Mention only one wallet when selecting an entry to repeat.',
+        title: 'Multiple wallets detected',
+      );
+      return;
+    }
+
+    final walletId = mentionedIds.isEmpty ? null : mentionedIds.single;
+    SmartEntryAccount? mentionedAccount;
+    for (final account in accounts) {
+      if (account.id == walletId) mentionedAccount = account;
+    }
+    final allEntries = ref.read(expenseProvider).allExpenses;
+    final match = matchSmartEntryTransaction(
+      command: command,
+      entries: allEntries.map(
+        (entry) => SmartEntryTransaction(
+          id: entry.id,
+          title: entry.title,
+          amount: entry.amount,
+          category: entry.category,
+          type: entry.type,
+          date: entry.date,
+          walletId: entry.walletId,
+        ),
+      ),
+      walletId: walletId,
+      ignoredTitlePhrases: mentionedAccount == null
+          ? const []
+          : [mentionedAccount.name, mentionedAccount.type],
+    );
+    if (match.status == SmartEntryMatchStatus.notFound) {
+      _showTransactionError(
+        'No safe matching entry was found. Add a title, amount, date, or wallet.',
+        title: 'Entry not found',
+      );
+      return;
+    }
+
+    Expense? source;
+    if (match.status == SmartEntryMatchStatus.unique) {
+      final id = match.matches.single.id;
+      for (final entry in allEntries) {
+        if (entry.id == id) source = entry;
+      }
+    } else {
+      source = await _showSmartEntryMatchPicker(
+        match.matches,
+        deleting: false,
+        repeating: true,
+      );
+    }
+    if (source == null || !mounted) return;
+
+    final repeated = source.copyWith(
+      id: const Uuid().v4(),
+      date: DateTime.now(),
+    );
+    final execution = await ref
+        .read(transactionExecutorProvider)
+        .execute(CreateTransactionCommand(
+          repeated,
+          action: TransactionAction.repeat,
+        ));
+    if (!mounted) return;
+    if (!execution.succeeded) {
+      _showTransactionError(
+        source.type == 'expense'
+            ? 'The original wallet does not have enough balance to repeat this expense.'
+            : 'The original wallet is no longer available.',
+        title: 'Entry not repeated',
+      );
+      return;
+    }
+
+    await _rememberSmartEntryPreference(repeated);
+    _smartInputCtrl.clear();
+    await HapticFeedback.lightImpact();
+    if (!mounted) return;
+    _showTransactionSuccess(
+      '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
+      title: source.type == 'income' ? 'Income repeated' : 'Expense repeated',
+      actionLabel: 'Undo',
+      onAction: () async {
+        await ref
+            .read(transactionExecutorProvider)
+            .execute(DeleteTransactionCommand(repeated.id));
+        if (!mounted) return;
+        _showTransactionInfo(
+          'The repeated entry was removed.',
+          title: 'Repeat undone',
+        );
+      },
+    );
+  }
+
+  void _handleSmartEntryQuery(ParsedSmartEntryCommand command) {
+    final metric = command.queryMetric;
+    if (metric == null) {
+      _showTransactionInfo(
+        "Ask something like 'how much did I spend this month?'",
+        title: 'Question needs more detail',
+      );
+      return;
+    }
+
+    final wallets = ref.read(walletProvider);
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final accounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+            id: wallet.id,
+            name: wallet.name,
+            type: wallet.walletType,
+            availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+            isBackup: wallet.isBackup,
+          ),
+        )
+        .toList(growable: false);
+    final mentionedIds = findMentionedSmartEntryAccountIds(
+      command.rawInput,
+      accounts,
+    );
+    if (mentionedIds.length > 1) {
+      _showTransactionError(
+        'Mention one wallet at a time for a precise answer.',
+        title: 'Multiple wallets detected',
+      );
+      return;
+    }
+
+    if (metric == SmartEntryQueryMetric.balance) {
+      if (mentionedIds.isEmpty) {
+        final total = wallets.fold<double>(
+          0,
+          (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+        );
+        _showTransactionInfo(
+          'Rs. ${total.toStringAsFixed(0)} across ${wallets.length} wallet${wallets.length == 1 ? '' : 's'}.',
+          title: 'Total wallet balance',
+        );
+      } else {
+        final wallet = wallets.firstWhere(
+          (item) => item.id == mentionedIds.single,
+        );
+        final balance = walletNotifier.getBalanceForWallet(wallet.id);
+        _showTransactionInfo(
+          'Rs. ${balance.toStringAsFixed(0)} available.',
+          title: '${wallet.name} balance',
+        );
+      }
+      _smartInputCtrl.clear();
+      return;
+    }
+
+    var entries = ref
+        .read(expenseProvider)
+        .allExpenses
+        .where((entry) => entry.category != 'Transfer')
+        .where((entry) => matchesSmartEntryTimeRange(
+              entry.date,
+              command.timeRange,
+            ));
+    if (mentionedIds.isNotEmpty) {
+      final walletId = mentionedIds.single;
+      entries = entries.where((entry) => entry.walletId == walletId);
+    }
+    final hasCategory = command.category != 'General' &&
+        command.confidenceByField['category']! >= 0.8;
+    if (hasCategory) {
+      entries = entries.where((entry) => entry.category == command.category);
+    } else {
+      final title = _smartQueryTitle(command.title);
+      if (title.isNotEmpty) {
+        entries = entries.where(
+          (entry) => entry.title.toLowerCase().contains(title.toLowerCase()),
+        );
+      }
+    }
+    final matching = entries.toList(growable: false);
+    final income = matching
+        .where((entry) => entry.type == 'income')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+    final spending = matching
+        .where((entry) => entry.type == 'expense')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+    final period = _smartTimeRangeLabel(command.timeRange);
+    final subject = hasCategory ? ' · ${command.category}' : '';
+
+    switch (metric) {
+      case SmartEntryQueryMetric.spending:
+        _showTransactionInfo(
+          '${matching.where((entry) => entry.type == 'expense').length} expense${matching.where((entry) => entry.type == 'expense').length == 1 ? '' : 's'}$subject.',
+          title: 'Rs. ${spending.toStringAsFixed(0)} spent · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.income:
+        _showTransactionInfo(
+          '${matching.where((entry) => entry.type == 'income').length} income entr${matching.where((entry) => entry.type == 'income').length == 1 ? 'y' : 'ies'}$subject.',
+          title: 'Rs. ${income.toStringAsFixed(0)} received · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.net:
+        _showTransactionInfo(
+          'Income Rs. ${income.toStringAsFixed(0)} · Expenses Rs. ${spending.toStringAsFixed(0)}.',
+          title: 'Net Rs. ${(income - spending).toStringAsFixed(0)} · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.transactionCount:
+        final type = command.entryTypeFilter;
+        final count = type == null
+            ? matching.length
+            : matching.where((entry) => entry.type == type).length;
+        _showTransactionInfo(
+          '${type == null ? 'Income and expense' : type == 'income' ? 'Income' : 'Expense'} records$subject.',
+          title: '$count transactions · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.balance:
+        break;
+    }
+    _smartInputCtrl.clear();
+  }
+
+  void _handleSmartEntrySearch(ParsedSmartEntryCommand command) {
+    final category = command.category != 'General' &&
+            command.confidenceByField['category']! >= 0.8
+        ? command.category
+        : 'All';
+    var query = _smartQueryTitle(command.title);
+    if (category != 'All' &&
+        query.toLowerCase() == category.toLowerCase()) {
+      query = '';
+    }
+    setState(() {
+      _currentView = 'Dashboard';
+      _isSearching = true;
+      _searchQuery = query;
+      _selectedCategoryTab = category;
+      _smartEntryTypeFilter = command.entryTypeFilter;
+      _smartEntrySearchRange = command.timeRange;
+      _smartEntrySearchAllHistory = true;
+    });
+    _smartInputCtrl.clear();
+    _showTransactionInfo(
+      'Close search to return to the normal monthly view.',
+      title: 'Transaction filters applied',
+    );
+  }
+
+  Future<void> _handleSmartEntryNavigation(
+    ParsedSmartEntryCommand command,
+  ) async {
+    final target = command.navigationTarget;
+    if (target == null) {
+      _showTransactionInfo(
+        'Try Home, Stats, Wallets, Udhaar, Mess Khata, Settings, or About.',
+        title: 'Screen not recognized',
+      );
+      return;
+    }
+    _smartInputCtrl.clear();
+    if (target == 'Wallets') {
+      await _openIncomeAccounts();
+      return;
+    }
+    await _changeView(target);
+  }
+
+  String _smartQueryTitle(String value) {
+    final normalized = value.trim();
+    const generic = {
+      '',
+      'Transaction',
+      'Quick Expense',
+      'Income Allowance',
+      'Income / Allowance',
+    };
+    return generic.contains(normalized) ? '' : normalized;
+  }
+
+  String _smartTimeRangeLabel(SmartEntryTimeRange range) {
+    switch (range) {
+      case SmartEntryTimeRange.today:
+        return 'today';
+      case SmartEntryTimeRange.yesterday:
+        return 'yesterday';
+      case SmartEntryTimeRange.thisWeek:
+        return 'this week';
+      case SmartEntryTimeRange.lastWeek:
+        return 'last week';
+      case SmartEntryTimeRange.thisMonth:
+        return 'this month';
+      case SmartEntryTimeRange.lastMonth:
+        return 'last month';
+      case SmartEntryTimeRange.allTime:
+        return 'all time';
+    }
+  }
+
+  Future<void> _handleSmartEntryMutationCommand(
+    SmartInputPlan plan,
+  ) async {
+    final command = plan.parsed;
+    final mutation = plan.command as MutationCommand;
+    final deleting = mutation.deleting;
+    if (!deleting && mutation.patch.isEmpty) {
+      _showTransactionError(
+        "Say what to change, for example: 'change burger amount to 600' or 'headphones ka naam Kurch karo'.",
+        title: 'Change required',
+      );
+      return;
+    }
+    if (mutation.patch.amount != null && mutation.patch.amount! <= 0) {
+      _showTransactionError(
+        'The new amount must be greater than zero.',
+        title: 'Invalid amount',
       );
       return;
     }
@@ -2769,6 +3286,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               'jazz cash',
               'jazzcash',
             ],
+      selectorTitle: mutation.selector.title,
+      selectorAmount: mutation.selector.amount,
+      selectorDate: mutation.selector.date,
     );
 
     if (match.status == SmartEntryMatchStatus.notFound) {
@@ -2779,6 +3299,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         title: 'Entry not found',
       );
       return;
+    }
+
+    if (match.status == SmartEntryMatchStatus.unique) {
+      final confidence = const ConfidenceEvaluator().evaluate(
+        plan.command,
+        context: ConfidenceContext(
+          hasUniqueTarget: true,
+          targetConfidence: match.confidence,
+        ),
+      );
+      if (!confidence.canAutoExecute) {
+        _showTransactionError(
+          'The matching entry is not certain enough to change automatically. Add its amount, date, or wallet.',
+          title: 'Review target entry',
+        );
+        return;
+      }
     }
 
     Expense? target;
@@ -2811,11 +3348,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         }
       }
 
-      final deleted = await ref
-          .read(expenseProvider.notifier)
-          .deleteExpense(target.id);
+      final deleteResult = await ref
+          .read(transactionExecutorProvider)
+          .execute(DeleteTransactionCommand(target.id));
       if (!mounted) return;
-      if (!deleted) {
+      if (!deleteResult.succeeded) {
         _showTransactionError(
           'The entry changed before it could be deleted. Try again.',
           title: 'Entry not deleted',
@@ -2834,11 +3371,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         title: 'Entry deleted',
         actionLabel: 'Undo',
         onAction: () async {
-          final restored = await ref
-              .read(expenseProvider.notifier)
-              .addExpense(deletedEntry);
+          final restoreResult = await ref
+              .read(transactionExecutorProvider)
+              .execute(CreateTransactionCommand(
+                deletedEntry,
+                action: TransactionAction.restore,
+              ));
           if (!mounted) return;
-          if (restored) {
+          if (restoreResult.succeeded) {
             _showTransactionInfo(
               'The deleted entry was restored.',
               title: 'Deletion undone',
@@ -2855,20 +3395,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     final originalEntry = target;
-    final updatedEntry = originalEntry.copyWith(amount: command.amount);
-    if ((updatedEntry.amount - originalEntry.amount).abs() < 0.005) {
+    String? updatedCategory = mutation.patch.category;
+    if (updatedCategory != null) {
+      final categories = ref.read(categoryProvider);
+      final matches = categories.where(
+        (category) =>
+            category.toLowerCase() == updatedCategory!.toLowerCase(),
+      );
+      if (matches.isEmpty) {
+        _showTransactionError(
+          'Choose an existing category: ${categories.join(', ')}.',
+          title: 'Category not found',
+        );
+        return;
+      }
+      updatedCategory = matches.first;
+    }
+    final updatedEntry = originalEntry.copyWith(
+      amount: mutation.patch.amount,
+      title: mutation.patch.title,
+      category: updatedCategory,
+      date: mutation.patch.date,
+      walletId: mutation.patch.walletId,
+    );
+    if (updatedEntry.amount == originalEntry.amount &&
+        updatedEntry.title == originalEntry.title &&
+        updatedEntry.category == originalEntry.category &&
+        updatedEntry.date == originalEntry.date &&
+        updatedEntry.walletId == originalEntry.walletId) {
       _showTransactionInfo(
-        'The entry already has this amount.',
+        'The entry already has these details.',
         title: 'No change needed',
       );
       return;
     }
 
-    final updated = await ref
-        .read(expenseProvider.notifier)
-        .editExpense(originalEntry.id, updatedEntry);
+    final updateResult = await ref
+        .read(transactionExecutorProvider)
+        .execute(UpdateTransactionCommand(
+          existingId: originalEntry.id,
+          updated: updatedEntry,
+        ));
     if (!mounted) return;
-    if (!updated) {
+    if (!updateResult.succeeded) {
       _showTransactionError(
         'The wallet cannot support this change, or the entry changed. Review its balance and try again.',
         title: 'Entry not updated',
@@ -2879,22 +3448,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _smartInputCtrl.clear();
     await HapticFeedback.lightImpact();
     if (!mounted) return;
-    final oldAmount = originalEntry.amount.toStringAsFixed(0);
-    final newAmount = updatedEntry.amount.toStringAsFixed(0);
     _showTransactionSuccess(
-      originalEntry.title +
-          ' · Rs. ' +
-          oldAmount +
-          ' → Rs. ' +
-          newAmount,
+      '${updatedEntry.title} · Rs. ${updatedEntry.amount.toStringAsFixed(0)} · ${updatedEntry.category}',
       title: 'Entry updated',
       actionLabel: 'Undo',
       onAction: () async {
-        final restored = await ref
-            .read(expenseProvider.notifier)
-            .editExpense(originalEntry.id, originalEntry);
+        final restoreResult = await ref
+            .read(transactionExecutorProvider)
+            .execute(UpdateTransactionCommand(
+              existingId: originalEntry.id,
+              updated: originalEntry,
+            ));
         if (!mounted) return;
-        if (restored) {
+        if (restoreResult.succeeded) {
           _showTransactionInfo(
             'The previous amount was restored.',
             title: 'Edit undone',
@@ -2909,16 +3475,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Future<void> _processNLP(String text) async {
+  Future<void> _processNLP(
+    String text, {
+    SmartInputSource source = SmartInputSource.typed,
+  }) async {
     _dismissKeyboard();
     final normalized = text.trim();
     if (normalized.isEmpty) return;
 
     final categories = ref.read(categoryProvider);
-<<<<<<< HEAD
-    final command =
-        LocalNlpService().parseCommand(normalized, categories);
-=======
     final plan = SmartInputEngine().parse(
       normalized,
       categories,
@@ -2927,11 +3492,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _debugSmartInputPlan(plan);
     final command = plan.parsed;
     final canonicalInput = plan.normalizedText;
->>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
     if (!command.intent.isTransactionAddition) {
       if (command.intent == SmartEntryIntent.deleteEntry ||
           command.intent == SmartEntryIntent.editEntry) {
-        await _handleSmartEntryMutationCommand(command);
+        await _handleSmartEntryMutationCommand(plan);
         return;
       }
 
@@ -2941,11 +3505,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         case SmartEntryIntent.transfer:
           await _handleSmartEntryTransferCommand(command);
           return;
+        case SmartEntryIntent.repeatEntry:
+          await _handleSmartEntryRepeatCommand(command);
+          return;
         case SmartEntryIntent.query:
-          title = 'Question recognized';
-          message =
-              'Financial questions will be enabled in a later Smart Entry phase.';
-          break;
+          _handleSmartEntryQuery(command);
+          return;
+        case SmartEntryIntent.searchEntries:
+          _handleSmartEntrySearch(command);
+          return;
+        case SmartEntryIntent.navigate:
+          await _handleSmartEntryNavigation(command);
+          return;
         case SmartEntryIntent.unknown:
           title = 'Command not recognized';
           message = 'Try an expense or income command with an amount.';
@@ -2961,6 +3532,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     final result = command.toLegacyMap();
+    final learnedPreference = _learnedPreferenceFor(command.title);
+    if (result['type'] == 'expense' &&
+        result['category'] == 'General' &&
+        learnedPreference != null &&
+        categories.contains(learnedPreference.category)) {
+      result['category'] = learnedPreference.category;
+    }
     final amount = result['amount'];
     if (amount is! num || !amount.isFinite || amount <= 0) {
       _showTransactionError(
@@ -2995,15 +3573,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         )
         .toList(growable: false);
     final mentionedWalletId =
-        findMentionedSmartEntryAccountId(normalized, smartAccounts);
+        findMentionedSmartEntryAccountId(canonicalInput, smartAccounts);
     final configuredDefaultWallet =
         _selectedSmartEntryWallet(wallets);
+    String? learnedWalletId;
+    if (mentionedWalletId == null && configuredDefaultWallet == null) {
+      final candidateId = learnedPreference?.walletId;
+      if (candidateId != null &&
+          wallets.any((wallet) => wallet.id == candidateId)) {
+        learnedWalletId = candidateId;
+      }
+    }
     final resolvedWalletId = resolveSmartEntryAccount(
-      input: normalized,
+      input: canonicalInput,
       accounts: smartAccounts,
       transactionType: type,
       amount: amountValue,
-      preferredAccountId: configuredDefaultWallet?.id,
+      preferredAccountId: configuredDefaultWallet?.id ?? learnedWalletId,
+    );
+
+    final semanticConfidence = const ConfidenceEvaluator().evaluate(
+      plan.command,
+      context: ConfidenceContext(
+        hasResolvedWallet: resolvedWalletId != null,
+        hasExactAmount:
+            (command.confidenceByField['amount'] ?? 0) >= 0.9,
+      ),
     );
     assert(() {
       debugPrint(
@@ -3015,15 +3610,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return true;
     }());
 
-<<<<<<< HEAD
-    if (shouldAutoSaveSmartEntry(
-=======
     if (!plan.requiresAsrReview &&
         semanticConfidence.canAutoExecute &&
         shouldAutoSaveSmartEntry(
->>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
       result,
       hasResolvedWallet: resolvedWalletId != null,
+      semanticConfidence: semanticConfidence.score,
     )) {
       final wallet = wallets.firstWhere(
         (item) => item.id == resolvedWalletId,
@@ -3044,10 +3636,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         walletId: resolvedWalletId!,
       );
 
-      final saved =
-          await ref.read(expenseProvider.notifier).addExpense(entry);
+      final execution = await ref
+          .read(transactionExecutorProvider)
+          .execute(CreateTransactionCommand(entry));
       if (!mounted) return;
-      if (!saved) {
+      if (!execution.succeeded) {
         _showTransactionError(
           'The selected wallet changed or no longer has enough balance. Try the entry again.',
           title: 'Smart Entry not saved',
@@ -3055,6 +3648,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         return;
       }
 
+      await _rememberSmartEntryPreference(entry);
       _smartInputCtrl.clear();
       FocusScope.of(context).unfocus();
       await HapticFeedback.lightImpact();
@@ -3064,11 +3658,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         title: type == 'income' ? 'Income added' : 'Expense saved',
         actionLabel: 'Undo',
         onAction: () async {
-          final deleted = await ref
-              .read(expenseProvider.notifier)
-              .deleteExpense(entry.id);
+          final deleteResult = await ref
+              .read(transactionExecutorProvider)
+              .execute(DeleteTransactionCommand(entry.id));
           if (!mounted) return;
-          if (deleted) {
+          if (deleteResult.succeeded) {
             _showTransactionInfo(
               'The instant Smart Entry was removed.',
               title: 'Entry undone',
@@ -3086,22 +3680,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }).toList(growable: false);
     final defaultsAreEmpty = defaultAccounts.isEmpty ||
         defaultAccounts.every((account) => account.availableBalance <= 0);
-<<<<<<< HEAD
-    final reviewMessage = mentionedWalletId != null
-=======
     final reviewMessage = plan.requiresAsrReview
         ? 'Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.'
         : resolvedWalletId != null &&
             !semanticConfidence.canAutoExecute
         ? 'Review the detected title, amount, category, date, and wallet before saving.'
         : mentionedWalletId != null
->>>>>>> 646bbf79a3fb418ebded08aaed117ecc6ceea1a9
         ? 'The named wallet cannot cover this expense. Choose another wallet before saving.'
         : configuredDefaultWallet != null
             ? 'Your default wallet, ${configuredDefaultWallet.name}, cannot cover this expense. Choose another funded account.'
-            : defaultsAreEmpty
-                ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
-                : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
+            : learnedWalletId != null
+                ? 'The wallet previously used for this entry cannot cover it. Choose another funded wallet.'
+                : defaultsAreEmpty
+                    ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
+                    : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
 
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
@@ -3113,7 +3705,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       prefilledDate: result['date'] is DateTime
           ? result['date'] as DateTime
           : DateTime.now(),
-      preselectedWalletId: mentionedWalletId,
+      preselectedWalletId: mentionedWalletId ??
+          configuredDefaultWallet?.id ??
+          learnedWalletId,
       initialType: type,
       reviewMessage: reviewMessage,
     );
@@ -3197,6 +3791,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return title;
   }
 
+}
+
+String _normalizeLearningTitle(String value) {
+  final normalized = value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  const ignored = {
+    '',
+    'quick expense',
+    'income allowance',
+    'transaction',
+    'general',
+  };
+  return ignored.contains(normalized) ? '' : normalized;
+}
+
+class _LearnedSmartEntryPreference {
+  final String category;
+  final String walletId;
+  final int uses;
+  final int updatedAt;
+
+  const _LearnedSmartEntryPreference({
+    required this.category,
+    required this.walletId,
+    required this.uses,
+    required this.updatedAt,
+  });
+
+  static _LearnedSmartEntryPreference? fromStored(dynamic value) {
+    if (value is! Map) return null;
+    final category = value['category']?.toString().trim() ?? '';
+    final walletId = value['walletId']?.toString().trim() ?? '';
+    final uses = value['uses'];
+    final updatedAt = value['updatedAt'];
+    if (category.isEmpty || walletId.isEmpty) return null;
+    return _LearnedSmartEntryPreference(
+      category: category,
+      walletId: walletId,
+      uses: uses is num ? uses.toInt() : 1,
+      updatedAt: updatedAt is num ? updatedAt.toInt() : 0,
+    );
+  }
+
+  Map<String, dynamic> toStored() => {
+        'category': category,
+        'walletId': walletId,
+        'uses': uses,
+        'updatedAt': updatedAt,
+      };
 }
 
 
