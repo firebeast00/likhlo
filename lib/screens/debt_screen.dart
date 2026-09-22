@@ -222,15 +222,6 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                     ? Colors.green
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(12),
-                                boxShadow: type == 'lent'
-                                    ? [
-                                        BoxShadow(
-                                            color: Colors.green
-                                                .withValues(alpha: 0.3),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2))
-                                      ]
-                                    : [],
                               ),
                               child: Center(
                                 child: Text("I Gave (Lent)",
@@ -255,15 +246,6 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                     ? Colors.red
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(12),
-                                boxShadow: type == 'borrowed'
-                                    ? [
-                                        BoxShadow(
-                                            color: Colors.red
-                                                .withValues(alpha: 0.3),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2))
-                                      ]
-                                    : [],
                               ),
                               child: Center(
                                 child: Text("I Took (Borrowed)",
@@ -490,13 +472,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                      color:
-                          primaryColor.withValues(alpha: isDark ? 0.25 : 0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8))
-                ]),
+              ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

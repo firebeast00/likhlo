@@ -309,13 +309,33 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     Duration retention = const Duration(days: 30),
   }) async {
     final cutoff = DateTime.now().subtract(retention);
-    final expired = state.deletedExpenses
-        .where((entry) => entry.deletedAt?.isBefore(cutoff) ?? false)
-        .map((entry) => entry.id)
-        .toList(growable: false);
-    for (final id in expired) {
-      await permanentlyDelete(id);
+    final expiredIds = <String>{};
+    for (final entry in state.deletedExpenses) {
+      if (!(entry.deletedAt?.isBefore(cutoff) ?? false)) continue;
+      if (entry.category != 'Transfer') {
+        expiredIds.add(entry.id);
+        continue;
+      }
+      final transferId = entry.id.endsWith('_out')
+          ? entry.id.substring(0, entry.id.length - 4)
+          : entry.id.endsWith('_in')
+              ? entry.id.substring(0, entry.id.length - 3)
+              : entry.id;
+      expiredIds.addAll({'${transferId}_out', '${transferId}_in'});
     }
+    if (expiredIds.isEmpty) return;
+
+    final keys = expiredIds
+        .map(_findKeyForId)
+        .where((key) => key != null)
+        .toList(growable: false);
+    await _box.deleteAll(keys);
+    state = ExpenseState(
+      allExpenses: state.allExpenses,
+      deletedExpenses: state.deletedExpenses
+          .where((entry) => !expiredIds.contains(entry.id))
+          .toList(growable: false),
+    );
   }
 
   Future<void> reassignWallet(String fromWalletId, String toWalletId) async {

@@ -11,6 +11,14 @@ class WorkspacesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final workspaceState = ref.watch(workspaceProvider);
     final records = ref.watch(expenseProvider).allRecords;
+    final transactionCounts = <String, int>{};
+    for (final record in records) {
+      transactionCounts.update(
+        record.workspaceId,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+    }
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: ListView(
@@ -37,7 +45,7 @@ class WorkspacesScreen extends ConsumerWidget {
                 ),
                 title: Text(workspace.name),
                 subtitle: Text(
-                  '${records.where((entry) => entry.workspaceId == workspace.id).length} transactions${workspace.isDefault ? ' · default' : ''}',
+                  '${transactionCounts[workspace.id] ?? 0} transactions${workspace.isDefault ? ' · default' : ''}',
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,

@@ -29,6 +29,8 @@ void main() async {
     // Register Adapters
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
     if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(DebtEntryAdapter());
+    // Read-only compatibility for older encrypted backups. The removed Mess
+    // feature is not opened during normal startup.
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(MessEntryAdapter());
     if (!Hive.isAdapterRegistered(8)) {
       Hive.registerAdapter(WalletAdapter()); // 🚀 ADDED (TypeId 8)

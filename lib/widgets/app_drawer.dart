@@ -38,13 +38,6 @@ class AppDrawer extends ConsumerWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: isDark ? 0.3 : 0.35),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                )
-              ],
             ),
             child: Row(
               children: [
@@ -99,6 +92,8 @@ class AppDrawer extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               children: [
                 _buildDrawerItem(context, 'Workspaces', Icons.workspaces_outline,
+                    primaryColor, isDark),
+                _buildDrawerItem(context, 'Udhaar', Icons.handshake_outlined,
                     primaryColor, isDark),
                 _buildDrawerItem(context, 'Settings', Icons.settings_rounded,
                     primaryColor, isDark),

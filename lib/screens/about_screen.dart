@@ -25,12 +25,6 @@ class AboutScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(36),
                 border: Border.all(
                     color: primary.withValues(alpha: 0.15), width: 2),
-                boxShadow: [
-                  BoxShadow(
-                      color: primary.withValues(alpha: 0.1),
-                      blurRadius: 30,
-                      spreadRadius: 5)
-                ],
               ),
               child: Image.asset(
                 'assets/app_logo.png',
@@ -77,12 +71,6 @@ class AboutScreen extends StatelessWidget {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                      color: primary.withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8))
-                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,12 +180,6 @@ class AboutScreen extends StatelessWidget {
                     color: isDark
                         ? Colors.white10
                         : Colors.grey.withValues(alpha: 0.1)),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5))
-                ],
               ),
               child: Column(
                 children: [

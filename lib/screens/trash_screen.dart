@@ -5,9 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../models/debt_model.dart';
 import '../models/expense_model.dart';
-import '../models/mess_entry_model.dart';
 import '../providers/expense_provider.dart';
-import '../providers/mess_provider.dart';
 import '../services/transaction_executor.dart';
 
 class TrashScreen extends ConsumerStatefulWidget {
@@ -32,17 +30,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
             )
             .toList()
         : <DebtEntry>[];
-    final orphanMess = Hive.isBoxOpen('mess_khata')
-        ? Hive.box<MessEntry>('mess_khata')
-            .values
-            .where(
-              (entry) =>
-                  entry.deletedAt != null && !deletedIds.contains(entry.id),
-            )
-            .toList()
-        : <MessEntry>[];
-    final orphanRecords = <Object>[...orphanDebts, ...orphanMess];
-    final totalCount = visible.length + orphanRecords.length;
+    final totalCount = visible.length + orphanDebts.length;
     final primary = Theme.of(context).colorScheme.primary;
 
     if (totalCount == 0) {
@@ -84,7 +72,6 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                   ref,
                   deleted,
                   orphanDebts,
-                  orphanMess,
                 ),
                 icon: const Icon(Icons.delete_forever_outlined, size: 19),
                 label: const Text('Empty Trash'),
@@ -102,8 +89,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
               if (index >= visible.length) {
                 return _buildOrphanCard(
                   context,
-                  ref,
-                  orphanRecords[index - visible.length],
+                  orphanDebts[index - visible.length],
                   primary,
                 );
               }
@@ -204,7 +190,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
       }
       return;
     }
-    await _restoreLinkedRecord(ref, entry.id);
+    await _restoreLinkedRecord(entry.id);
     if (context.mounted) _message(context, 'Entry restored to its original wallet.');
   }
 
@@ -218,7 +204,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
           builder: (dialogContext) => AlertDialog(
             title: const Text('Delete permanently?'),
             content: const Text(
-              'This entry and any linked Udhaar or Mess record cannot be recovered.',
+              'This entry and any linked Udhaar record cannot be recovered.',
             ),
             actions: [
               TextButton(
@@ -238,7 +224,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final result = await ref.read(transactionExecutorProvider).execute(
           PermanentlyDeleteTransactionCommand(entry.id),
         );
-    if (result.succeeded) await _deleteLinkedRecord(ref, entry.id);
+    if (result.succeeded) await _deleteLinkedRecord(entry.id);
     if (context.mounted) {
       _message(
         context,
@@ -253,14 +239,13 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     WidgetRef ref,
     List<Expense> deleted,
     List<DebtEntry> orphanDebts,
-    List<MessEntry> orphanMess,
   ) async {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text('Empty Trash?'),
             content: Text(
-              'Permanently delete all ${deleted.length + orphanDebts.length + orphanMess.length} entries? This cannot be undone.',
+              'Permanently delete all ${deleted.length + orphanDebts.length} entries? This cannot be undone.',
             ),
             actions: [
               TextButton(
@@ -278,7 +263,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         false;
     if (!confirmed) return;
     for (final entry in deleted) {
-      await _deleteLinkedRecord(ref, entry.id);
+      await _deleteLinkedRecord(entry.id);
     }
     await ref
         .read(transactionExecutorProvider)
@@ -289,36 +274,20 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         await box.delete(entry.key ?? entry.id);
       }
     }
-    for (final entry in orphanMess) {
-      await ref.read(messProvider.notifier).permanentlyDelete(entry.id);
-    }
     if (mounted) setState(() {});
     if (context.mounted) _message(context, 'Trash emptied.');
   }
 
   Widget _buildOrphanCard(
     BuildContext context,
-    WidgetRef ref,
-    Object record,
+    DebtEntry record,
     Color primary,
   ) {
-    late final String id;
-    late final String title;
-    late final double amount;
-    late final DateTime? deletedAt;
-    if (record is DebtEntry) {
-      id = record.id;
-      title =
-          '${record.type == 'lent' ? 'Udhaar to' : 'Borrowed from'} ${record.borrowerName}';
-      amount = record.amount;
-      deletedAt = record.deletedAt;
-    } else {
-      final mess = record as MessEntry;
-      id = mess.id;
-      title = mess.title;
-      amount = mess.totalAmount;
-      deletedAt = mess.deletedAt;
-    }
+    final id = record.id;
+    final title =
+        '${record.type == 'lent' ? 'Udhaar to' : 'Borrowed from'} ${record.borrowerName}';
+    final amount = record.amount;
+    final deletedAt = record.deletedAt;
     return Card(
       elevation: 0,
       child: ListTile(
@@ -334,14 +303,10 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
               tooltip: 'Restore',
               icon: Icon(Icons.restore_rounded, color: primary),
               onPressed: () async {
-                if (record is DebtEntry) {
-                  await Hive.box<DebtEntry>('debts').put(
-                    record.key ?? id,
-                    record.copyWith(clearDeletedAt: true),
-                  );
-                } else {
-                  await ref.read(messProvider.notifier).restoreEntry(id);
-                }
+                await Hive.box<DebtEntry>('debts').put(
+                  record.key ?? id,
+                  record.copyWith(clearDeletedAt: true),
+                );
                 if (mounted) setState(() {});
               },
             ),
@@ -351,11 +316,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
               onPressed: () async {
                 final confirmed = await _confirmPermanentDelete(context);
                 if (!confirmed) return;
-                if (record is DebtEntry) {
-                  await Hive.box<DebtEntry>('debts').delete(record.key ?? id);
-                } else {
-                  await ref.read(messProvider.notifier).permanentlyDelete(id);
-                }
+                await Hive.box<DebtEntry>('debts').delete(record.key ?? id);
                 if (mounted) setState(() {});
               },
             ),
@@ -386,10 +347,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
         false;
   }
 
-  Future<void> _restoreLinkedRecord(WidgetRef ref, String id) async {
-    if (Hive.isBoxOpen('mess_khata')) {
-      await ref.read(messProvider.notifier).restoreEntry(id);
-    }
+  Future<void> _restoreLinkedRecord(String id) async {
     if (Hive.isBoxOpen('debts')) {
       final box = Hive.box<DebtEntry>('debts');
       for (final entry in box.values.where((entry) => entry.id == id)) {
@@ -403,10 +361,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     }
   }
 
-  Future<void> _deleteLinkedRecord(WidgetRef ref, String id) async {
-    if (Hive.isBoxOpen('mess_khata')) {
-      await ref.read(messProvider.notifier).permanentlyDelete(id);
-    }
+  Future<void> _deleteLinkedRecord(String id) async {
     if (Hive.isBoxOpen('debts')) {
       final box = Hive.box<DebtEntry>('debts');
       for (final entry in box.values.where((entry) => entry.id == id)) {

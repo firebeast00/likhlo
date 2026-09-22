@@ -16,9 +16,11 @@ import '../providers/wallet_provider.dart';
 import '../providers/workspace_provider.dart';
 import '../models/expense_model.dart';
 import '../models/debt_model.dart';
-import '../models/mess_entry_model.dart';
 import '../models/wallet_model.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/dashboard_content.dart';
+import '../widgets/transaction_message_card.dart';
+import '../widgets/workspace_selector.dart';
 import 'debt_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
@@ -33,7 +35,6 @@ import '../services/confidence_evaluator.dart';
 import '../services/speech_recognition_provider.dart';
 import '../services/speech_command_completeness.dart';
 import '../services/transaction_title_policy.dart';
-import "./mess_khata_screen.dart";
 import './income_accounts_screen.dart';
 import './trash_screen.dart';
 import './receipt_review_screen.dart';
@@ -52,10 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       'smart_entry_default_wallet_id';
   static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
   static const _smartEntryLearningKey = 'smart_entry_learning_v1';
-  static const _dashboardViews = ['Dashboard', 'Udhaar', 'Mess Khata'];
   String _currentView = 'Dashboard';
-  final PageController _dashboardPageController = PageController();
-  bool _dashboardBoxesReady = false;
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
   bool _isSearching = false;
@@ -142,7 +140,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       const ShortcutItem(type: 'action_add_expense', localizedTitle: 'Add Transaction', icon: 'ic_add'),
     ]);
     _setupNativeQuickTile();
-    unawaited(_prepareDashboardBoxes());
 
     NotificationService().onActionTriggered = _handleNotificationAction;
 
@@ -153,14 +150,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _queuePersistentNotificationUpdate(
         delay: const Duration(seconds: 2),
       );
-      final workspaceState = ref.read(workspaceProvider);
-      final customIndex = workspaceState.workspaces
-          .where((workspace) => !workspace.isDefault)
-          .toList()
-          .indexWhere((workspace) => workspace.id == workspaceState.selectedId);
-      if (customIndex >= 0 && _dashboardPageController.hasClients) {
-        _dashboardPageController.jumpToPage(customIndex + 3);
-      }
     });
   }
 
@@ -292,28 +281,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _activeMessageEntry?.remove();
     _activeMessageEntry = null;
     _categoryScrollCtrl.dispose();
-    _dashboardPageController.dispose();
     _smartInputCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _prepareDashboardBoxes() async {
-    try {
-      if (!Hive.isBoxOpen('debts')) {
-        await Hive.openBox<DebtEntry>('debts');
-      }
-      if (!Hive.isBoxOpen('mess_khata')) {
-        await Hive.openBox<MessEntry>('mess_khata');
-      }
-      if (mounted) setState(() => _dashboardBoxesReady = true);
-    } catch (error) {
-      if (mounted) {
-        _showTransactionError(
-          'Udhaar and Mess Khata could not be opened. Your main ledger is still available.',
-          title: 'Dashboard pages unavailable',
-        );
-      }
-    }
   }
 
   void _queuePersistentNotificationUpdate({
@@ -430,9 +399,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (!mounted || view == _currentView) return;
 
     try {
-      if (view == 'Mess Khata' && !Hive.isBoxOpen('mess_khata')) {
-        await Hive.openBox<MessEntry>('mess_khata');
-      } else if (view == 'Udhaar' && !Hive.isBoxOpen('debts')) {
+      if (view == 'Udhaar' && !Hive.isBoxOpen('debts')) {
         await Hive.openBox<DebtEntry>('debts');
       }
     } catch (error) {
@@ -443,15 +410,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     if (!mounted) return;
-    var dashboardIndex = _dashboardViews.indexOf(view);
-    if (view == 'Dashboard') {
-      final workspaceState = ref.read(workspaceProvider);
-      final customIndex = workspaceState.workspaces
-          .where((workspace) => !workspace.isDefault)
-          .toList()
-          .indexWhere((workspace) => workspace.id == workspaceState.selectedId);
-      if (customIndex >= 0) dashboardIndex = customIndex + 3;
-    }
     setState(() {
       _currentView = view;
       _isSearching = false;
@@ -461,40 +419,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _smartEntrySearchAllHistory = false;
     });
 
-    if (dashboardIndex >= 0 && _dashboardPageController.hasClients) {
-      await _dashboardPageController.animateToPage(
-        dashboardIndex,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
-    }
-
-    if (view == 'Dashboard') _queuePersistentNotificationUpdate();
-  }
-
-  void _onDashboardPageChanged(int index) {
-    if (!mounted || index < 0) return;
-    final workspaceState = ref.read(workspaceProvider);
-    final customWorkspaces = workspaceState.workspaces
-        .where((workspace) => !workspace.isDefault)
-        .toList();
-    if (index >= 3) {
-      final customIndex = index - 3;
-      if (customIndex >= customWorkspaces.length) return;
-      unawaited(
-        ref.read(workspaceProvider.notifier).select(
-              customWorkspaces[customIndex].id,
-            ),
-      );
-    } else if (index == 0) {
-      unawaited(ref.read(workspaceProvider.notifier).select('personal'));
-    }
-    final view = index >= 3 ? 'Dashboard' : _dashboardViews[index];
-    setState(() {
-      _currentView = view;
-      _isSearching = false;
-      _searchQuery = '';
-    });
     if (view == 'Dashboard') _queuePersistentNotificationUpdate();
   }
 
@@ -676,8 +600,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           builder: (context, setModalState) => Container(
             decoration: BoxDecoration(
                 color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, -10))]
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(32),
+                ),
             ),
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 24, left: 24, right: 24, top: 12),
             child: SingleChildScrollView(
@@ -966,7 +891,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       String message, {
         String title = 'Unable to continue',
       }) {
-    _showTopMessage(title: title, message: message, tone: _MessageTone.error);
+    _showTopMessage(
+      title: title,
+      message: message,
+      tone: TransactionMessageTone.error,
+    );
   }
 
   void _showTransactionSuccess(
@@ -978,7 +907,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _showTopMessage(
       title: title,
       message: message,
-      tone: _MessageTone.success,
+      tone: TransactionMessageTone.success,
       actionLabel: actionLabel,
       onAction: onAction,
     );
@@ -988,15 +917,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       String message, {
         String title = 'Information',
       }) {
-    _showTopMessage(title: title, message: message, tone: _MessageTone.info);
+    _showTopMessage(
+      title: title,
+      message: message,
+      tone: TransactionMessageTone.info,
+    );
   }
 
   void _showExpenseMessage(String message, {String title = 'Expense saved'}) {
-    _showTopMessage(title: title, message: message, tone: _MessageTone.expense);
+    _showTopMessage(
+      title: title,
+      message: message,
+      tone: TransactionMessageTone.expense,
+    );
   }
 
   void _showIncomeMessage(String message, {String title = 'Income added'}) {
-    _showTopMessage(title: title, message: message, tone: _MessageTone.income);
+    _showTopMessage(
+      title: title,
+      message: message,
+      tone: TransactionMessageTone.income,
+    );
   }
 
   void _showTransferMessage(
@@ -1008,7 +949,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _showTopMessage(
       title: title,
       message: message,
-      tone: _MessageTone.transfer,
+      tone: TransactionMessageTone.transfer,
       actionLabel: actionLabel,
       onAction: onAction,
     );
@@ -1023,7 +964,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _showTopMessage(
       title: title,
       message: message,
-      tone: _MessageTone.deletion,
+      tone: TransactionMessageTone.deletion,
       actionLabel: actionLabel,
       onAction: onAction,
     );
@@ -1032,7 +973,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   void _showTopMessage({
     required String title,
     required String message,
-    required _MessageTone tone,
+    required TransactionMessageTone tone,
     String? actionLabel,
     Future<void> Function()? onAction,
   }) {
@@ -1057,7 +998,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         right: 16,
         child: Align(
           alignment: Alignment.topCenter,
-          child: _TopMessageCard(
+          child: TransactionMessageCard(
             title: title,
             message: message,
             tone: tone,
@@ -1145,7 +1086,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final primaryColor = Theme.of(context).colorScheme.primary;
     final workspaceState = ref.watch(workspaceProvider);
 
-    if (!_dashboardViews.contains(_currentView)) {
+    if (_currentView != 'Dashboard') {
       return Scaffold(
         drawer: AppDrawer(
           currentView: _currentView,
@@ -1172,6 +1113,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final ledger = ref.watch(monthlyLedgerProvider(_focusedMonth));
     final categories = ref.watch(categoryProvider);
     final wallets = ref.watch(walletProvider);
+    final allExpenses = ref.watch(
+      expenseProvider.select((state) => state.allExpenses),
+    );
 
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
@@ -1184,14 +1128,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
     );
     final showMoneySetup = totalAvailable.abs() < 0.000001 &&
-        ref.watch(expenseProvider).allExpenses.isEmpty;
+        allExpenses.isEmpty;
 
     var displayExpenses = List<Expense>.from(
       _isSearching && _smartEntrySearchAllHistory
           ? visibleTransactions(
-              ref
-                  .watch(expenseProvider)
-                  .allExpenses
+              allExpenses
                   .where(
                     (entry) => entry.workspaceId == workspaceState.selectedId,
                   ),
@@ -1227,20 +1169,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: _isSearching ? TextField(style: const TextStyle(fontSize: 15), decoration: InputDecoration(border: InputBorder.none, hintText: "Search transactions...", hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14)), onChanged: (v)=>setState(()=>_searchQuery=v)) : Text(
-          _currentView == 'Dashboard'
-              ? workspaceState.workspaces.isEmpty
-                  ? 'Personal'
-                  : workspaceState.workspaces
-                      .firstWhere(
-                        (workspace) =>
-                            workspace.id == workspaceState.selectedId,
-                        orElse: () => workspaceState.workspaces.first,
-                      )
-                      .name
-              : _currentView,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-        ),
+        title: _isSearching
+            ? TextField(
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Search transactions...',
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 14,
+                  ),
+                ),
+                onChanged: (value) => setState(() => _searchQuery = value),
+              )
+            : WorkspaceSelector(
+                workspaces: workspaceState.workspaces,
+                selectedId: workspaceState.selectedId,
+                onSelected: (id) {
+                  unawaited(ref.read(workspaceProvider.notifier).select(id));
+                },
+              ),
         centerTitle: true,
         leading: Builder(
           builder: (context) => IconButton(
@@ -1285,55 +1233,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               },
             ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: _buildDashboardSelector(primaryColor, workspaceState),
-        ),
       ),
-      body: PageView(
-        controller: _dashboardPageController,
-        onPageChanged: _onDashboardPageChanged,
-        children: [
-          _buildResponsiveBody(
-            isLandscape,
-            isDark,
-            primaryColor,
-            totalAvailable,
-            globalSpent,
-            wallets,
-            categories,
-            displayExpenses,
-            showMoneySetup,
-          ),
-          _dashboardBoxesReady
-              ? const DebtScreen(
-                  key: PageStorageKey('dashboard-udhaar'),
-                  embedded: true,
-                )
-              : const Center(child: CircularProgressIndicator()),
-          _dashboardBoxesReady
-              ? const MessKhataScreen(
-                  key: PageStorageKey('dashboard-mess'),
-                  embedded: true,
-                )
-              : const Center(child: CircularProgressIndicator()),
-          for (final workspace
-              in workspaceState.workspaces.where((item) => !item.isDefault))
-            KeyedSubtree(
-              key: PageStorageKey('workspace-${workspace.id}'),
-              child: _buildResponsiveBody(
-                isLandscape,
-                isDark,
-                primaryColor,
-                totalAvailable,
-                globalSpent,
-                wallets,
-                categories,
-                displayExpenses,
-                showMoneySetup,
-              ),
-            ),
-        ],
+      body: DashboardContent(
+        isLandscape: isLandscape,
+        isSearching: _isSearching,
+        moneySetupCard:
+            showMoneySetup ? _buildMoneySetupCard(primaryColor) : null,
+        monthSelector: _buildMonthSelector(isDark),
+        heroCard: _buildHeroCard(
+          totalAvailable,
+          globalSpent,
+          wallets,
+          primaryColor,
+        ),
+        smartInputBar: _buildSmartInputBar(primaryColor, isDark, wallets),
+        categoryTabs: _buildCategoryTabsWidget(
+          categories,
+          primaryColor,
+          isDark,
+        ),
+        transactionListBuilder: (isSliver) => _buildExpenseList(
+          displayExpenses,
+          primaryColor,
+          isDark,
+          isSliver: isSliver,
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: (_currentView == 'Dashboard') ? GestureDetector(
@@ -1344,224 +1268,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           scale: _fabScale,
           child: Container(
             height: 52, padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withValues(alpha: 0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))]),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  primaryColor,
+                  primaryColor.withValues(alpha: 0.8),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(26),
+            ),
             child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text("Add Transaction", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))]),
           ),
         ),
       ) : null,
-    );
-  }
-
-  Widget _buildResponsiveBody(
-      bool isLandscape,
-      bool isDark,
-      Color primaryColor,
-      double totalAvailable,
-      double spent,
-      List<Wallet> wallets,
-      List<String> categories,
-      List<Expense> displayExpenses,
-      bool showMoneySetup,
-      ) {
-    if (isLandscape && !_isSearching) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 80),
-              child: Column(
-                children: [
-                  if (showMoneySetup) ...[
-                    _buildMoneySetupCard(primaryColor),
-                    const SizedBox(height: 10),
-                  ],
-                  _buildMonthSelector(isDark),
-                  const SizedBox(height: 8),
-                  _buildHeroCard(
-                    totalAvailable,
-                    spent,
-                    wallets,
-                    primaryColor,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildSmartInputBar(primaryColor, isDark, wallets),
-                  const SizedBox(height: 8),
-                  _buildCategoryTabsWidget(
-                    categories,
-                    primaryColor,
-                    isDark,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: _buildExpenseList(
-              displayExpenses,
-              primaryColor,
-              isDark,
-              isSliver: false,
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (_isSearching) {
-      return Column(
-        children: [
-          const SizedBox(height: 4),
-          Expanded(
-            child: _buildExpenseList(
-              displayExpenses,
-              primaryColor,
-              isDark,
-              isSliver: false,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        if (showMoneySetup)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-              child: _buildMoneySetupCard(primaryColor),
-            ),
-          ),
-        SliverToBoxAdapter(
-          child: _buildMonthSelector(isDark),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: _buildHeroCard(
-              totalAvailable,
-              spent,
-              wallets,
-              primaryColor,
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 14, bottom: 8),
-            child: _buildSmartInputBar(primaryColor, isDark, wallets),
-          ),
-        ),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _StickyHeaderDelegate(
-            minHeight: 56,
-            maxHeight: 56,
-            child: ColoredBox(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: _buildCategoryTabsWidget(
-                categories,
-                primaryColor,
-                isDark,
-              ),
-            ),
-          ),
-        ),
-        _buildExpenseList(
-          displayExpenses,
-          primaryColor,
-          isDark,
-          isSliver: true,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDashboardSelector(
-    Color primaryColor,
-    WorkspaceState workspaceState,
-  ) {
-    final customWorkspaces = workspaceState.workspaces
-        .where((workspace) => !workspace.isDefault)
-        .toList();
-    final labels = [
-      'Personal',
-      'Udhaar',
-      'Mess Khata',
-      ...customWorkspaces.map((workspace) => workspace.name),
-    ];
-    return Container(
-      height: 40,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: primaryColor.withValues(alpha: 0.12)),
-      ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 4),
-        itemBuilder: (context, index) {
-          final isWorkspace = index == 0 || index >= 3;
-          final workspaceId = index == 0
-              ? 'personal'
-              : index >= 3
-                  ? customWorkspaces[index - 3].id
-                  : null;
-          final selected = isWorkspace
-              ? _currentView == 'Dashboard' &&
-                  workspaceState.selectedId == workspaceId
-              : _currentView == _dashboardViews[index];
-          return SizedBox(
-            width: 104,
-            child: InkWell(
-                borderRadius: BorderRadius.circular(11),
-                onTap: () async {
-                  if (workspaceId != null) {
-                    await ref
-                        .read(workspaceProvider.notifier)
-                        .select(workspaceId);
-                  }
-                  if (_dashboardPageController.hasClients) {
-                    await _dashboardPageController.animateToPage(
-                      index,
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                    );
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? primaryColor.withValues(alpha: 0.14)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Text(
-                    labels[index],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: selected
-                          ? FontWeight.w800
-                          : FontWeight.w600,
-                      color: selected
-                          ? primaryColor
-                          : Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ),
-          );
-        },
-      ),
     );
   }
 
@@ -1647,7 +1368,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildOtherViews() {
-    if (_currentView == 'Mess Khata') return const MessKhataScreen();
     if (_currentView == 'Udhaar') return const DebtScreen();
     if (_currentView == 'Stats') return const StatsScreen();
     if (_currentView == 'Settings') return const SettingsScreen();
@@ -1961,13 +1681,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               ? Colors.red.withValues(alpha: 0.7)
               : primaryColor.withValues(alpha: isDark ? 0.24 : 0.12),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.055),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2497,13 +2210,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: primary.withValues(alpha: 0.20),
-            blurRadius: 16,
-            offset: const Offset(0, 7),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3869,8 +3575,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       title: source.type == 'income' ? 'Income repeated' : 'Expense repeated',
       message: '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
       tone: source.type == 'income'
-          ? _MessageTone.income
-          : _MessageTone.expense,
+          ? TransactionMessageTone.income
+          : TransactionMessageTone.expense,
       actionLabel: 'Undo',
       onAction: () async {
         await ref
@@ -4051,7 +3757,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final target = command.navigationTarget;
     if (target == null) {
       _showTransactionInfo(
-        'Try Home, Stats, Wallets, Udhaar, Mess Khata, Settings, or About.',
+        'Try Home, Stats, Wallets, Udhaar, Settings, or About.',
         title: 'Screen not recognized',
       );
       return;
@@ -4549,7 +4255,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         title: type == 'income' ? 'Income added' : 'Expense saved',
         message:
             '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} · ${wallet.name}',
-        tone: type == 'income' ? _MessageTone.income : _MessageTone.expense,
+        tone: type == 'income'
+            ? TransactionMessageTone.income
+            : TransactionMessageTone.expense,
         actionLabel: 'Undo',
         onAction: () async {
           final deleteResult = await ref
@@ -4745,202 +4453,6 @@ class _LearnedSmartEntryPreference {
 }
 
 
-enum _MessageTone {
-  error,
-  deletion,
-  expense,
-  income,
-  transfer,
-  success,
-  info,
-  warning,
-}
-
-class _TopMessageCard extends StatelessWidget {
-  final String title;
-  final String message;
-  final _MessageTone tone;
-  final String? actionLabel;
-  final Future<void> Function()? onAction;
-  final VoidCallback onDismiss;
-
-  const _TopMessageCard({
-    required this.title,
-    required this.message,
-    required this.tone,
-    required this.actionLabel,
-    required this.onAction,
-    required this.onDismiss,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final Color accent;
-    final Color background;
-    final Color foreground;
-    final IconData icon;
-
-    switch (tone) {
-      case _MessageTone.error:
-        accent = scheme.error;
-        background = scheme.errorContainer;
-        foreground = scheme.onErrorContainer;
-        icon = Icons.error_outline_rounded;
-      case _MessageTone.deletion:
-        accent = const Color(0xFFB91C1C);
-        background = isDark ? const Color(0xFF3F1117) : const Color(0xFFFEF2F2);
-        foreground = isDark ? const Color(0xFFFECACA) : const Color(0xFF7F1D1D);
-        icon = Icons.delete_outline_rounded;
-      case _MessageTone.expense:
-        accent = const Color(0xFFDC2626);
-        background = isDark ? const Color(0xFF35161A) : const Color(0xFFFFF1F2);
-        foreground = isDark ? const Color(0xFFFDA4AF) : const Color(0xFF881337);
-        icon = Icons.north_east_rounded;
-      case _MessageTone.income:
-        accent = const Color(0xFF16A34A);
-        background = isDark ? const Color(0xFF123524) : const Color(0xFFF0FDF4);
-        foreground = isDark ? const Color(0xFFDCFCE7) : const Color(0xFF14532D);
-        icon = Icons.south_west_rounded;
-      case _MessageTone.transfer:
-        accent = const Color(0xFF2563EB);
-        background = isDark ? const Color(0xFF12264B) : const Color(0xFFEFF6FF);
-        foreground = isDark ? const Color(0xFFDBEAFE) : const Color(0xFF1E3A8A);
-        icon = Icons.swap_horiz_rounded;
-      case _MessageTone.success:
-        accent = const Color(0xFF16A34A);
-        background = isDark ? const Color(0xFF123524) : const Color(0xFFF0FDF4);
-        foreground = isDark ? const Color(0xFFDCFCE7) : const Color(0xFF14532D);
-        icon = Icons.check_circle_outline_rounded;
-      case _MessageTone.info:
-        accent = scheme.primary;
-        background = scheme.primaryContainer;
-        foreground = scheme.onPrimaryContainer;
-        icon = Icons.info_outline_rounded;
-      case _MessageTone.warning:
-        accent = const Color(0xFFD97706);
-        background = isDark ? const Color(0xFF3A260B) : const Color(0xFFFFFBEB);
-        foreground = isDark ? const Color(0xFFFDE68A) : const Color(0xFF78350F);
-        icon = Icons.warning_amber_rounded;
-    }
-
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      tween: Tween(begin: 0, end: 1),
-      builder: (context, value, child) => Opacity(
-        opacity: value,
-        child: Transform.translate(
-          offset: Offset(0, -14 * (1 - value)),
-          child: child,
-        ),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Material(
-          color: Colors.transparent,
-          child: Semantics(
-            container: true,
-            liveRegion: true,
-            label: '$title. $message',
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(14, 13, 8, 13),
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: accent.withValues(alpha: 0.28)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.14),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: accent, size: 21),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            color: foreground,
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          message,
-                          style: TextStyle(
-                            color: foreground.withValues(alpha: 0.82),
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (actionLabel != null && onAction != null) ...[
-                          const SizedBox(height: 7),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              foregroundColor: accent,
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(0, 30),
-                              tapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: () async {
-                              onDismiss();
-                              await onAction!();
-                            },
-                            child: Text(
-                              actionLabel!,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: 'Dismiss message',
-                    onPressed: onDismiss,
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: foreground.withValues(alpha: 0.65),
-                      size: 19,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 String _mergeSpeechTranscripts(String previous, String next) {
   final left = previous.trim();
   final right = next.trim();
@@ -4971,15 +4483,4 @@ String _mergeSpeechTranscripts(String previous, String next) {
   }
 
   return [...leftWords, ...rightWords.skip(overlap)].join(' ');
-}
-
-class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double minHeight;
-  final double maxHeight;
-  final Widget child;
-  _StickyHeaderDelegate({required this.minHeight, required this.maxHeight, required this.child});
-  @override double get minExtent => minHeight;
-  @override double get maxExtent => maxHeight;
-  @override Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => SizedBox.expand(child: child);
-  @override bool shouldRebuild(_StickyHeaderDelegate oldDelegate) => maxHeight != oldDelegate.maxHeight || minHeight != oldDelegate.minHeight || child != oldDelegate.child;
 }

@@ -175,7 +175,6 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                 _CountRow('Wallets', preview.wallets),
                 _CountRow('Categories', preview.categories),
                 _CountRow('Udhar records', preview.debts),
-                _CountRow('Mess Khata records', preview.messEntries),
                 const SizedBox(height: 16),
                 const Text(
                   'Current data will be replaced. Likhlo will first keep one local recovery snapshot.',
@@ -268,7 +267,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       leading: const Icon(Icons.backup_rounded),
                       title: const Text('Create encrypted backup'),
                       subtitle: const Text(
-                        'Wallets, transactions, categories, settings, Udhar and Mess Khata',
+                        'Wallets, transactions, categories, settings and Udhar',
                       ),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: _busy ? null : _createBackup,

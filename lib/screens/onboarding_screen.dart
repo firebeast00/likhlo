@@ -127,9 +127,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => const HomeScreen(),
-          transitionsBuilder: (_, animation, __, child) =>
-              FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 450),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         ),
       );
     } catch (_) {

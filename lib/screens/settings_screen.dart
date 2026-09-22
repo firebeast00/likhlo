@@ -196,12 +196,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   border: isSelected
                       ? Border.all(color: Colors.white, width: 3)
                       : null,
-                  boxShadow: [
-                    BoxShadow(
-                        color: Color(colorValue).withValues(alpha: 0.4),
-                        blurRadius: isSelected ? 12 : 6,
-                        offset: const Offset(0, 4))
-                  ],
                 ),
                 child: isSelected
                     ? const Icon(Icons.check_rounded,
@@ -260,12 +254,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(32),
-                boxShadow: [
-                  BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.35),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10))
-                ],
               ),
               child: Row(
                 children: [
@@ -274,12 +262,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     height: 65,
                     decoration: BoxDecoration(
                         color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 10)
-                        ]),
+                        shape: BoxShape.circle),
                     child: Center(
                       child: Text(
                         displayName.isNotEmpty
@@ -600,12 +583,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             color: isDark
                 ? Colors.white.withValues(alpha: 0.05)
                 : Colors.grey.withValues(alpha: 0.1)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 20,
-              offset: const Offset(0, 8))
-        ],
       ),
       child: Column(children: children),
     );

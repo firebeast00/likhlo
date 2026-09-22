@@ -15,6 +15,7 @@ class BackupPreview {
   final int expenses;
   final int wallets;
   final int debts;
+  // Retained in the payload schema so existing backups remain restorable.
   final int messEntries;
   final int categories;
 

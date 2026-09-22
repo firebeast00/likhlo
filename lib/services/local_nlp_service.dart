@@ -1243,7 +1243,6 @@ class LocalNlpService {
     if (RegExp(r'\b(wallet|wallets)\b').hasMatch(input)) return 'Wallets';
     if (RegExp(r'\b(stats|statistics)\b').hasMatch(input)) return 'Stats';
     if (RegExp(r'\b(udhaar|udhar)\b').hasMatch(input)) return 'Udhaar';
-    if (RegExp(r'\b(mess|khata)\b').hasMatch(input)) return 'Mess Khata';
     if (RegExp(r'\b(settings|setting)\b').hasMatch(input)) return 'Settings';
     if (RegExp(r'\babout\b').hasMatch(input)) return 'About';
     if (RegExp(r'\b(home|dashboard)\b').hasMatch(input)) return 'Dashboard';

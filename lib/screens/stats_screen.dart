@@ -51,14 +51,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.08)
                           : Colors.grey.withValues(alpha: 0.12)),
-                  boxShadow: [
-                    BoxShadow(
-                        color: isDark
-                            ? Colors.black26
-                            : Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 15,
-                        offset: const Offset(0, 8))
-                  ]),
+                ),
               child: BarChart(BarChartData(
                   alignment: BarChartAlignment.spaceAround,
                   maxY: stats.maxMonthTotal == 0
@@ -272,14 +265,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           color: isDark
                               ? Colors.white.withValues(alpha: 0.08)
                               : Colors.grey.withValues(alpha: 0.12)),
-                      boxShadow: [
-                        BoxShadow(
-                            color: isDark
-                                ? Colors.black26
-                                : Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4))
-                      ]),
+                    ),
                   child: Column(
                     children: [
                       Row(
@@ -289,13 +275,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               height: 14,
                               decoration: BoxDecoration(
                                   color: color,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: color.withValues(alpha: 0.4),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2))
-                                  ])),
+                                  shape: BoxShape.circle)),
                           const SizedBox(width: 14),
                           Expanded(
                               child: Text(
@@ -348,12 +328,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         color: isDark ? Colors.grey.shade800 : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-              color: color.withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4))
-        ],
       ),
       child: Text("$text (${percent.toStringAsFixed(0)}%)",
           style: TextStyle(
