@@ -297,8 +297,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           initialDate: DateTime.now(),
                           firstDate: DateTime.now(),
                           lastDate: DateTime(2030));
-                      if (date != null)
+                      if (date != null) {
                         setModalState(() => selectedDate = date);
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -682,7 +683,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             if (mounted) setState(() {});
                             return true;
                           }
-                          if (mounted) {
+                          if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(

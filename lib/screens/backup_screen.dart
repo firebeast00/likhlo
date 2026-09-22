@@ -213,8 +213,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       if (mounted) _showMessage(error.message);
     } catch (error) {
       debugPrint('Backup operation failed: $error');
-      if (mounted)
+      if (mounted) {
         _showMessage('Backup operation failed. No data was deleted.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

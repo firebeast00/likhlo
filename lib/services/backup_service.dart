@@ -107,7 +107,7 @@ class BackupService {
             .map((item) => _workspaceFromJson(_requiredMap(item)))
             .toList(growable: false)
         : <Workspace>[
-            const Workspace(
+            Workspace(
               id: 'personal',
               name: 'Personal',
               colorValue: 0xFF2563EB,

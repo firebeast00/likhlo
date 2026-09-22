@@ -150,7 +150,7 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
             const SizedBox(height: 16),
             if (_mode == _ReceiptSaveMode.total) ...[
               DropdownButtonFormField<String>(
-                value: wallets.any((wallet) => wallet.id == _walletId)
+                initialValue: wallets.any((wallet) => wallet.id == _walletId)
                     ? _walletId
                     : null,
                 decoration: const InputDecoration(
@@ -169,7 +169,8 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: categories.contains(_category) ? _category : null,
+                initialValue:
+                    categories.contains(_category) ? _category : null,
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
@@ -351,7 +352,7 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: wallets.any(
+                          initialValue: wallets.any(
                             (wallet) => wallet.id == row.walletId,
                           )
                               ? row.walletId
@@ -381,7 +382,7 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: categories.contains(row.category)
+                          initialValue: categories.contains(row.category)
                               ? row.category
                               : null,
                           isExpanded: true,
@@ -561,14 +562,13 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
 class _ReceiptRow {
   final TextEditingController title;
   final TextEditingController amount;
-  bool included;
+  bool included = true;
   String? walletId;
   String? category;
 
   _ReceiptRow({
     required this.title,
     required this.amount,
-    this.included = true,
     this.walletId,
     this.category,
   });

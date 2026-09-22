@@ -31,7 +31,7 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
     if (!_box.containsKey('personal')) {
       _box.put(
         'personal',
-        const Workspace(
+        Workspace(
           id: 'personal',
           name: 'Personal',
           colorValue: 0xFF2563EB,

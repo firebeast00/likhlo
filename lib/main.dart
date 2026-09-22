@@ -30,8 +30,9 @@ void main() async {
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
     if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(DebtEntryAdapter());
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(MessEntryAdapter());
-    if (!Hive.isAdapterRegistered(8))
+    if (!Hive.isAdapterRegistered(8)) {
       Hive.registerAdapter(WalletAdapter()); // 🚀 ADDED (TypeId 8)
+    }
     if (!Hive.isAdapterRegistered(9)) {
       Hive.registerAdapter(WorkspaceAdapter());
     }

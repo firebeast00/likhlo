@@ -20,7 +20,7 @@ class Workspace extends HiveObject {
   @HiveField(5)
   final bool isDefault;
 
-  const Workspace({
+  Workspace({
     required this.id,
     required this.name,
     required this.colorValue,

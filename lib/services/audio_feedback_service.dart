@@ -74,7 +74,7 @@ class AudioFeedbackService {
 
   String? _walletLabel(String title, String marker) {
     final match = RegExp(
-      '\\b$marker\\s+(.+)$',
+      '\\b${RegExp.escape(marker)}\\s+(.+)\$',
       caseSensitive: false,
     ).firstMatch(title.trim());
     final value = match?.group(1)?.trim();

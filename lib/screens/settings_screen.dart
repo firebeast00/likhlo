@@ -757,7 +757,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 headerStyle: pw.TextStyle(
                     fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                headerDecoration: pw.BoxDecoration(color: pdfPrimaryColor),
+                headerDecoration: const pw.BoxDecoration(color: pdfPrimaryColor),
                 rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
                 cellPadding:
                     const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),

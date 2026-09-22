@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:student_expense_manager/services/confidence_evaluator.dart';
+import 'package:student_expense_manager/services/local_nlp_service.dart';
 import 'package:student_expense_manager/services/smart_command.dart';
 import 'package:student_expense_manager/services/smart_input_engine.dart';
 

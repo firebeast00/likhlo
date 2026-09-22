@@ -80,9 +80,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         final wallets = ref.read(walletProvider);
         final walletNotifier = ref.read(walletProvider.notifier);
         for (final wallet in wallets) {
-          if (wallet.walletType == 'cash' && cash! > 0) {
+          if (wallet.walletType == 'cash' && cash > 0) {
             await walletNotifier.updateWallet(wallet, currentBalance: cash);
-          } else if (wallet.walletType == 'jazzcash' && jazzCash! > 0) {
+          } else if (wallet.walletType == 'jazzcash' && jazzCash > 0) {
             await walletNotifier.updateWallet(
               wallet,
               currentBalance: jazzCash,
@@ -90,14 +90,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           }
         }
 
-        if (target! > 0) {
+        if (target > 0) {
           await ref.read(budgetProvider.notifier).setBudget(
                 target,
                 DateTime.now(),
               );
         }
 
-        if (income! > 0 && wallets.isNotEmpty) {
+        if (income > 0 && wallets.isNotEmpty) {
           final selectedWallet = wallets.firstWhere(
             (wallet) => wallet.id == _incomeWalletId,
             orElse: () => wallets.first,

@@ -266,7 +266,9 @@ class _HeadlessTransactionStore implements TransactionStore {
           existingEntries: _active,
           proposedEntries: [entry],
           replacedIds: {id},
-        )) return false;
+        )) {
+      return false;
+    }
     await _box.put(key, entry);
     return true;
   }
@@ -322,7 +324,9 @@ class _HeadlessTransactionStore implements TransactionStore {
       openingBalances: _openingBalances,
       existingEntries: _active,
       proposedEntries: [restored],
-    )) return false;
+    )) {
+      return false;
+    }
     await _box.put(key, restored);
     return true;
   }
@@ -341,7 +345,9 @@ class _HeadlessTransactionStore implements TransactionStore {
           openingBalances: _openingBalances,
           existingEntries: _active,
           proposedEntries: records,
-        )) return false;
+        )) {
+      return false;
+    }
     await _box.putAll({for (final entry in records) entry.id: entry});
     return true;
   }

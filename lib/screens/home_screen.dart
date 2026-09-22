@@ -1029,10 +1029,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  void _showWarningMessage(String message, {String title = 'Check this entry'}) {
-    _showTopMessage(title: title, message: message, tone: _MessageTone.warning);
-  }
-
   void _showTopMessage({
     required String title,
     required String message,

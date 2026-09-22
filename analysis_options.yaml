@@ -14,6 +14,8 @@ analyzer:
     # Local editor backup; the active implementation is the file without
     # " - previous" in its name.
     - "lib/services/local_nlp_service - previous.dart"
+    # Historical phase snapshot; the active application lives under lib/.
+    - "phase2/**"
 
 linter:
   # The lint rules applied to this project can be customized in the
