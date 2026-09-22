@@ -1,11 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
+import 'workspace_provider.dart';
 
 class ExpenseState {
   final List<Expense> allExpenses;
-  ExpenseState({required this.allExpenses});
+  final List<Expense> deletedExpenses;
+
+  const ExpenseState({
+    required this.allExpenses,
+    this.deletedExpenses = const [],
+  });
+
+  List<Expense> get allRecords => [...allExpenses, ...deletedExpenses];
 }
 
 class MonthlyLedgerSummary {
@@ -23,13 +33,28 @@ class MonthlyLedgerSummary {
 class ExpenseNotifier extends StateNotifier<ExpenseState> {
   final Box<Expense> _box = Hive.box<Expense>('expenses');
 
-  ExpenseNotifier() : super(ExpenseState(allExpenses: [])) {
+  ExpenseNotifier() : super(const ExpenseState(allExpenses: [])) {
     _loadExpenses();
+    unawaited(cleanupExpiredTrash());
   }
 
   bool containsAnyTransactionId(Iterable<String> ids) {
     final candidates = ids.toSet();
-    return state.allExpenses.any((entry) => candidates.contains(entry.id));
+    return state.allRecords.any((entry) => candidates.contains(entry.id));
+  }
+
+  Expense? findById(String id) {
+    for (final entry in state.allExpenses) {
+      if (entry.id == id) return entry;
+    }
+    return null;
+  }
+
+  Expense? findDeletedById(String id) {
+    for (final entry in state.deletedExpenses) {
+      if (entry.id == id) return entry;
+    }
+    return null;
   }
 
   List<Expense> _sortByNewest(Iterable<Expense> expenses) {
@@ -39,7 +64,22 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 
   void _loadExpenses() {
-    state = ExpenseState(allExpenses: _sortByNewest(_box.values));
+    final active = <Expense>[];
+    final deleted = <Expense>[];
+    for (final entry in _box.values) {
+      final normalized = entry.workspaceId.trim().isEmpty
+          ? entry.copyWith(workspaceId: 'personal')
+          : entry;
+      if (normalized.deletedAt == null) {
+        active.add(normalized);
+      } else {
+        deleted.add(normalized);
+      }
+    }
+    state = ExpenseState(
+      allExpenses: _sortByNewest(active),
+      deletedExpenses: _sortByNewest(deleted),
+    );
   }
 
   dynamic _findKeyForId(String id) {
@@ -62,7 +102,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     final additions = expenses.toList(growable: false);
     if (!isValidTransactionBatch(
       additions,
-      existingIds: state.allExpenses.map((entry) => entry.id).toSet(),
+      existingIds: state.allRecords.map((entry) => entry.id).toSet(),
     )) {
       return false;
     }
@@ -84,6 +124,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
         ...state.allExpenses.where((entry) => !addedIds.contains(entry.id)),
         ...additions,
       ]),
+      deletedExpenses: state.deletedExpenses,
     );
     return true;
   }
@@ -107,27 +148,43 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 
     final updatedExpenses =
         state.allExpenses.map((entry) => entry.id == id ? updated : entry);
-    state = ExpenseState(allExpenses: _sortByNewest(updatedExpenses));
-    return true;
-  }
-
-  Future<bool> deleteExpense(String id) async {
-    final keyToDelete = _findKeyForId(id);
-
-    if (keyToDelete != null) {
-      await _box.delete(keyToDelete);
-    } else {
-      return false;
-    }
-
-    // Updates the UI synchronously so Flutter knows the item is gone!
     state = ExpenseState(
-      allExpenses: state.allExpenses.where((entry) => entry.id != id).toList(),
+      allExpenses: _sortByNewest(updatedExpenses),
+      deletedExpenses: state.deletedExpenses,
     );
     return true;
   }
 
-  Future<void> deleteTransferPair(String transactionId) async {
+  Future<bool> deleteExpense(String id) async {
+    final existing = findById(id);
+    if (existing == null) return false;
+    if (existing.type == 'income' &&
+        !keepsWalletBalancesNonNegative(
+          openingBalances: {
+            for (final wallet in Hive.box<Wallet>('wallets').values)
+              wallet.id: wallet.balance,
+          },
+          existingEntries: state.allExpenses,
+          proposedEntries: const [],
+          replacedIds: {id},
+        )) {
+      return false;
+    }
+    final keyToDelete = _findKeyForId(id);
+    if (keyToDelete == null) return false;
+    final deleted = existing.copyWith(deletedAt: DateTime.now());
+    await _box.put(keyToDelete, deleted);
+    state = ExpenseState(
+      allExpenses: state.allExpenses.where((entry) => entry.id != id).toList(),
+      deletedExpenses: _sortByNewest([
+        ...state.deletedExpenses.where((entry) => entry.id != id),
+        deleted,
+      ]),
+    );
+    return true;
+  }
+
+  Future<bool> deleteTransferPair(String transactionId) async {
     final separator = transactionId.endsWith('_out')
         ? '_out'
         : transactionId.endsWith('_in')
@@ -137,17 +194,128 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
         ? transactionId
         : transactionId.substring(0, transactionId.length - separator.length);
 
-    final keys = <dynamic>[
-      _findKeyForId('${transferId}_out'),
-      _findKeyForId('${transferId}_in'),
-    ].where((key) => key != null).toList(growable: false);
-    await _box.deleteAll(keys);
+    final ids = {'${transferId}_out', '${transferId}_in'};
+    final timestamp = DateTime.now();
+    final records = state.allExpenses
+        .where((entry) => ids.contains(entry.id))
+        .map((entry) => entry.copyWith(deletedAt: timestamp))
+        .toList(growable: false);
+    if (records.length != 2) return false;
+    await _box.putAll({for (final entry in records) entry.id: entry});
     state = ExpenseState(
       allExpenses: state.allExpenses
-          .where((entry) =>
-              entry.id != '${transferId}_out' && entry.id != '${transferId}_in')
+          .where((entry) => !ids.contains(entry.id))
           .toList(),
+      deletedExpenses: _sortByNewest([
+        ...state.deletedExpenses.where((entry) => !ids.contains(entry.id)),
+        ...records,
+      ]),
     );
+    return true;
+  }
+
+  Future<bool> restoreExpense(String id) async {
+    final deleted = findDeletedById(id);
+    if (deleted == null) return false;
+    if (!Hive.box<Wallet>('wallets').containsKey(deleted.walletId)) return false;
+    final restored = deleted.copyWith(clearDeletedAt: true);
+    if (!keepsWalletBalancesNonNegative(
+      openingBalances: {
+        for (final wallet in Hive.box<Wallet>('wallets').values)
+          wallet.id: wallet.balance,
+      },
+      existingEntries: state.allExpenses,
+      proposedEntries: [restored],
+    )) {
+      return false;
+    }
+    await _box.put(id, restored);
+    state = ExpenseState(
+      allExpenses: _sortByNewest([...state.allExpenses, restored]),
+      deletedExpenses:
+          state.deletedExpenses.where((entry) => entry.id != id).toList(),
+    );
+    return true;
+  }
+
+  Future<bool> restoreTransferPair(String transactionId) async {
+    final transferId = transactionId.endsWith('_out')
+        ? transactionId.substring(0, transactionId.length - 4)
+        : transactionId.endsWith('_in')
+            ? transactionId.substring(0, transactionId.length - 3)
+            : transactionId;
+    final ids = {'${transferId}_out', '${transferId}_in'};
+    final pair = state.deletedExpenses
+        .where((entry) => ids.contains(entry.id))
+        .toList(growable: false);
+    if (pair.length != 2 ||
+        pair.any(
+          (entry) => !Hive.box<Wallet>('wallets').containsKey(entry.walletId),
+        ) ||
+        !keepsWalletBalancesNonNegative(
+          openingBalances: {
+            for (final wallet in Hive.box<Wallet>('wallets').values)
+              wallet.id: wallet.balance,
+          },
+          existingEntries: state.allExpenses,
+          proposedEntries: pair,
+        )) {
+      return false;
+    }
+    final restored =
+        pair.map((entry) => entry.copyWith(clearDeletedAt: true)).toList();
+    await _box.putAll({for (final entry in restored) entry.id: entry});
+    state = ExpenseState(
+      allExpenses: _sortByNewest([...state.allExpenses, ...restored]),
+      deletedExpenses:
+          state.deletedExpenses.where((entry) => !ids.contains(entry.id)).toList(),
+    );
+    return true;
+  }
+
+  Future<bool> permanentlyDelete(String id) async {
+    final deleted = findDeletedById(id);
+    if (deleted == null) return false;
+    final transferId = deleted.category == 'Transfer'
+        ? (id.endsWith('_out')
+            ? id.substring(0, id.length - 4)
+            : id.endsWith('_in')
+                ? id.substring(0, id.length - 3)
+                : id)
+        : null;
+    final ids = transferId == null
+        ? {id}
+        : {'${transferId}_out', '${transferId}_in'};
+    final keys = ids.map(_findKeyForId).where((key) => key != null).toList();
+    await _box.deleteAll(keys);
+    state = ExpenseState(
+      allExpenses: state.allExpenses,
+      deletedExpenses:
+          state.deletedExpenses.where((entry) => !ids.contains(entry.id)).toList(),
+    );
+    return true;
+  }
+
+  Future<void> emptyTrash() async {
+    final keys = state.deletedExpenses
+        .map((entry) => _findKeyForId(entry.id))
+        .where((key) => key != null)
+        .toList(growable: false);
+    await _box.deleteAll(keys);
+    state = ExpenseState(allExpenses: state.allExpenses);
+  }
+
+  Future<void> cleanupExpiredTrash({
+    Duration retention = const Duration(days: 30),
+  }) async {
+    final cutoff = DateTime.now().subtract(retention);
+    final expired = state.deletedExpenses
+        .where((entry) => entry.deletedAt?.isBefore(cutoff) ?? false)
+        .map((entry) => entry.id)
+        .toList(growable: false);
+    for (final id in expired) {
+      await permanentlyDelete(id);
+    }
   }
 
   Future<void> reassignWallet(String fromWalletId, String toWalletId) async {
@@ -168,7 +336,25 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
               ? entry.copyWith(walletId: toWalletId)
               : entry)
           .toList(),
+      deletedExpenses: state.deletedExpenses
+          .map((entry) => entry.walletId == fromWalletId
+              ? entry.copyWith(walletId: toWalletId)
+              : entry)
+          .toList(),
     );
+  }
+
+  Future<void> reassignWorkspace(String fromId, String toId) async {
+    if (fromId == toId) return;
+    final updates = <dynamic, Expense>{};
+    for (final key in _box.keys) {
+      final entry = _box.get(key);
+      if (entry != null && entry.workspaceId == fromId) {
+        updates[key] = entry.copyWith(workspaceId: toId);
+      }
+    }
+    await _box.putAll(updates);
+    _loadExpenses();
   }
 }
 
@@ -252,11 +438,13 @@ bool isValidTransactionBatch(
 final monthlyLedgerProvider =
     Provider.family<MonthlyLedgerSummary, DateTime>((ref, focusedMonth) {
   final allExpenses = ref.watch(expenseProvider).allExpenses;
+  final workspaceId = ref.watch(selectedWorkspaceIdProvider);
   final transactions = <Expense>[];
   double income = 0;
   double spent = 0;
 
   for (final entry in allExpenses) {
+    if (entry.workspaceId != workspaceId) continue;
     if (entry.date.year != focusedMonth.year ||
         entry.date.month != focusedMonth.month) {
       continue;

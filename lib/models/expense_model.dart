@@ -26,6 +26,12 @@ class Expense extends HiveObject {
   @HiveField(7)
   final String walletId; // Links to a Wallet
 
+  @HiveField(8)
+  final String workspaceId;
+
+  @HiveField(9)
+  final DateTime? deletedAt;
+
   Expense({
     required this.id,
     required this.title,
@@ -35,6 +41,8 @@ class Expense extends HiveObject {
     required this.colorValue,
     this.type = 'expense',
     this.walletId = 'default_cash',
+    this.workspaceId = 'personal',
+    this.deletedAt,
   });
 
   Expense copyWith({
@@ -46,6 +54,9 @@ class Expense extends HiveObject {
     int? colorValue,
     String? type,
     String? walletId,
+    String? workspaceId,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -56,6 +67,8 @@ class Expense extends HiveObject {
       colorValue: colorValue ?? this.colorValue,
       type: type ?? this.type,
       walletId: walletId ?? this.walletId,
+      workspaceId: workspaceId ?? this.workspaceId,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 }
@@ -80,13 +93,15 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
       colorValue: fields[5] as int,
       type: fields[6] as String? ?? 'expense',
       walletId: fields[7] as String? ?? 'default_cash',
+      workspaceId: fields[8] as String? ?? 'personal',
+      deletedAt: fields[9] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Expense obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -102,6 +117,10 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
       ..writeByte(6)
       ..write(obj.type)
       ..writeByte(7)
-      ..write(obj.walletId);
+      ..write(obj.walletId)
+      ..writeByte(8)
+      ..write(obj.workspaceId)
+      ..writeByte(9)
+      ..write(obj.deletedAt);
   }
 }

@@ -10,6 +10,7 @@ import 'models/expense_model.dart';
 import 'models/debt_model.dart';
 import 'models/mess_entry_model.dart';
 import "models/wallet_model.dart";
+import 'models/workspace_model.dart';
 
 // Services
 import "./services/notification_service.dart";
@@ -31,12 +32,16 @@ void main() async {
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(MessEntryAdapter());
     if (!Hive.isAdapterRegistered(8))
       Hive.registerAdapter(WalletAdapter()); // 🚀 ADDED (TypeId 8)
+    if (!Hive.isAdapterRegistered(9)) {
+      Hive.registerAdapter(WorkspaceAdapter());
+    }
 
     await Future.wait([
       Hive.openBox<Expense>('expenses'),
       Hive.openBox('settings'),
       Hive.openBox('preferences'),
       Hive.openBox<Wallet>('wallets'),
+      Hive.openBox<Workspace>('workspaces'),
     ]);
   } catch (e) {
     storageError = e;

@@ -98,23 +98,11 @@ class AppDrawer extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               children: [
-                _buildDrawerItem(context, 'Dashboard', Icons.dashboard_rounded,
-                    primaryColor, isDark),
-                _buildDrawerItem(context, 'Mess Khata', Icons.money_rounded,
-                    primaryColor, isDark),
-                _buildDrawerItem(context, 'Udhaar', Icons.handshake_rounded,
-                    primaryColor, isDark),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Divider(
-                      height: 20,
-                      thickness: 1,
-                      color: Colors.grey.withValues(alpha: 0.15)),
-                ),
-                _buildDrawerItem(context, 'Stats', Icons.bar_chart_rounded,
+                _buildDrawerItem(context, 'Workspaces', Icons.workspaces_outline,
                     primaryColor, isDark),
                 _buildDrawerItem(context, 'Settings', Icons.settings_rounded,
+                    primaryColor, isDark),
+                _buildDrawerItem(context, 'Trash', Icons.delete_outline_rounded,
                     primaryColor, isDark),
                 _buildDrawerItem(context, 'About', Icons.info_outline_rounded,
                     primaryColor, isDark),

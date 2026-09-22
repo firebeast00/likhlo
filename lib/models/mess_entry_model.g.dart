@@ -23,13 +23,14 @@ class MessEntryAdapter extends TypeAdapter<MessEntry> {
       paidBy: fields[3] as String,
       splitCount: fields[4] as int,
       date: fields[5] as DateTime,
+      deletedAt: fields[6] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, MessEntry obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +42,9 @@ class MessEntryAdapter extends TypeAdapter<MessEntry> {
       ..writeByte(4)
       ..write(obj.splitCount)
       ..writeByte(5)
-      ..write(obj.date);
+      ..write(obj.date)
+      ..writeByte(6)
+      ..write(obj.deletedAt);
   }
 
   @override

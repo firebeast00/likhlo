@@ -6,6 +6,7 @@ import '../models/debt_model.dart';
 import '../models/expense_model.dart';
 import '../models/mess_entry_model.dart';
 import '../models/wallet_model.dart';
+import '../models/workspace_model.dart';
 import 'backup_codec.dart';
 import 'biometric_service.dart';
 
@@ -34,6 +35,7 @@ class ValidatedBackup {
   final List<Wallet> wallets;
   final List<DebtEntry> debts;
   final List<MessEntry> messEntries;
+  final List<Workspace> workspaces;
   final Map<dynamic, dynamic> settings;
   final Map<dynamic, dynamic> preferences;
 
@@ -44,13 +46,14 @@ class ValidatedBackup {
     required this.wallets,
     required this.debts,
     required this.messEntries,
+    required this.workspaces,
     required this.settings,
     required this.preferences,
   });
 }
 
 class BackupService {
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
   static const int maxBackupBytes = 25 * 1024 * 1024;
   static const String _recoveryBoxName = 'restore_recovery';
   static const String _recoveryKey = 'latest_snapshot';
@@ -66,6 +69,7 @@ class BackupService {
         'wallets': boxes.wallets.values.map(_walletToJson).toList(),
         'debts': boxes.debts.values.map(_debtToJson).toList(),
         'messEntries': boxes.mess.values.map(_messToJson).toList(),
+        'workspaces': boxes.workspaces.values.map(_workspaceToJson).toList(),
         'settings': _entriesToJson(boxes.settings),
         'preferences': _entriesToJson(boxes.preferences),
       },
@@ -73,7 +77,8 @@ class BackupService {
   }
 
   ValidatedBackup validate(Map<String, dynamic> payload) {
-    if (payload['schemaVersion'] != schemaVersion ||
+    final incomingVersion = payload['schemaVersion'];
+    if ((incomingVersion != 1 && incomingVersion != schemaVersion) ||
         payload['app'] != 'Likhlo') {
       throw const BackupException(
         'This backup version is not supported by this Likhlo release.',
@@ -97,6 +102,20 @@ class BackupService {
     final messEntries = _requiredList(data['messEntries'])
         .map((item) => _messFromJson(_requiredMap(item)))
         .toList(growable: false);
+    final workspaces = data['workspaces'] is List
+        ? _requiredList(data['workspaces'])
+            .map((item) => _workspaceFromJson(_requiredMap(item)))
+            .toList(growable: false)
+        : <Workspace>[
+            const Workspace(
+              id: 'personal',
+              name: 'Personal',
+              colorValue: 0xFF2563EB,
+              iconCodePoint: 0xe491,
+              position: 0,
+              isDefault: true,
+            ),
+          ];
     final settings = _entriesFromJson(_requiredList(data['settings']));
     final preferences = _entriesFromJson(_requiredList(data['preferences']));
 
@@ -104,13 +123,21 @@ class BackupService {
     _requireUnique(wallets.map((e) => e.id), 'wallet');
     _requireUnique(debts.map((e) => e.id), 'Udhar');
     _requireUnique(messEntries.map((e) => e.id), 'Mess Khata');
+    _requireUnique(workspaces.map((e) => e.id), 'workspace');
     if (wallets.isEmpty) {
       throw const BackupException('A backup must contain a wallet.');
     }
     final walletIds = wallets.map((wallet) => wallet.id).toSet();
+    final workspaceIds = workspaces.map((workspace) => workspace.id).toSet();
     if (expenses.any((entry) => !walletIds.contains(entry.walletId))) {
       throw const BackupException(
         'A transaction refers to a missing wallet.',
+      );
+    }
+    if (!workspaceIds.contains('personal') ||
+        expenses.any((entry) => !workspaceIds.contains(entry.workspaceId))) {
+      throw const BackupException(
+        'A transaction refers to a missing workspace.',
       );
     }
     final categories = preferences['categories'];
@@ -132,6 +159,7 @@ class BackupService {
       wallets: wallets,
       debts: debts,
       messEntries: messEntries,
+      workspaces: workspaces,
       settings: settings,
       preferences: preferences,
     );
@@ -193,6 +221,10 @@ class BackupService {
     await boxes.debts.putAll({for (final e in backup.debts) e.id: e});
     await boxes.mess.clear();
     await boxes.mess.putAll({for (final e in backup.messEntries) e.id: e});
+    await boxes.workspaces.clear();
+    await boxes.workspaces.putAll({
+      for (final workspace in backup.workspaces) workspace.id: workspace,
+    });
     await boxes.settings.clear();
     await boxes.settings.putAll(backup.settings);
     await boxes.preferences.clear();
@@ -210,11 +242,15 @@ class BackupService {
     final mess = Hive.isBoxOpen('mess_khata')
         ? Hive.box<MessEntry>('mess_khata')
         : await Hive.openBox<MessEntry>('mess_khata');
+    final workspaces = Hive.isBoxOpen('workspaces')
+        ? Hive.box<Workspace>('workspaces')
+        : await Hive.openBox<Workspace>('workspaces');
     return _BackupBoxes(
       expenses: Hive.box<Expense>('expenses'),
       wallets: Hive.box<Wallet>('wallets'),
       debts: debts,
       mess: mess,
+      workspaces: workspaces,
       settings: Hive.box('settings'),
       preferences: Hive.box('preferences'),
     );
@@ -297,13 +333,21 @@ class BackupService {
         'colorValue': e.colorValue,
         'type': e.type,
         'walletId': e.walletId,
+        'workspaceId': e.workspaceId,
+        'deletedAt': e.deletedAt?.toUtc().toIso8601String(),
       };
 
   static Expense _expenseFromJson(Map<String, dynamic> value) {
     final amount = _positiveDouble(value['amount'], 'transaction amount');
     final date = DateTime.tryParse(_requiredString(value['date']));
     final type = _requiredString(value['type']);
-    if (date == null || (type != 'expense' && type != 'income')) {
+    final deletedAtValue = value['deletedAt'];
+    final deletedAt = deletedAtValue == null
+        ? null
+        : DateTime.tryParse(_requiredString(deletedAtValue))?.toLocal();
+    if (date == null ||
+        (type != 'expense' && type != 'income') ||
+        (deletedAtValue != null && deletedAt == null)) {
       throw const BackupException('A transaction is invalid.');
     }
     return Expense(
@@ -315,6 +359,31 @@ class BackupService {
       colorValue: _requiredInt(value['colorValue']),
       type: type,
       walletId: _requiredString(value['walletId']),
+      workspaceId: value['workspaceId'] is String &&
+              (value['workspaceId'] as String).trim().isNotEmpty
+          ? value['workspaceId'] as String
+          : 'personal',
+      deletedAt: deletedAt,
+    );
+  }
+
+  static Map<String, dynamic> _workspaceToJson(Workspace workspace) => {
+        'id': workspace.id,
+        'name': workspace.name,
+        'colorValue': workspace.colorValue,
+        'iconCodePoint': workspace.iconCodePoint,
+        'position': workspace.position,
+        'isDefault': workspace.isDefault,
+      };
+
+  static Workspace _workspaceFromJson(Map<String, dynamic> value) {
+    return Workspace(
+      id: _requiredString(value['id']),
+      name: _requiredString(value['name']),
+      colorValue: _requiredInt(value['colorValue']),
+      iconCodePoint: _requiredInt(value['iconCodePoint']),
+      position: _requiredInt(value['position']),
+      isDefault: value['isDefault'] == true,
     );
   }
 
@@ -345,6 +414,7 @@ class BackupService {
         'amount': d.amount,
         'type': d.type,
         'dueDate': d.dueDate?.toUtc().toIso8601String(),
+        'deletedAt': d.deletedAt?.toUtc().toIso8601String(),
       };
 
   static DebtEntry _debtFromJson(Map<String, dynamic> value) {
@@ -353,8 +423,13 @@ class BackupService {
     final dueDate = dueDateValue == null
         ? null
         : DateTime.tryParse(_requiredString(dueDateValue))?.toLocal();
+    final deletedAtValue = value['deletedAt'];
+    final deletedAt = deletedAtValue == null
+        ? null
+        : DateTime.tryParse(_requiredString(deletedAtValue))?.toLocal();
     if ((type != 'lent' && type != 'borrowed') ||
-        (dueDateValue != null && dueDate == null)) {
+        (dueDateValue != null && dueDate == null) ||
+        (deletedAtValue != null && deletedAt == null)) {
       throw const BackupException('An Udhar record is invalid.');
     }
     return DebtEntry(
@@ -363,6 +438,7 @@ class BackupService {
       amount: _positiveDouble(value['amount'], 'Udhar amount'),
       type: type,
       dueDate: dueDate,
+      deletedAt: deletedAt,
     );
   }
 
@@ -373,12 +449,19 @@ class BackupService {
         'paidBy': m.paidBy,
         'splitCount': m.splitCount,
         'date': m.date.toUtc().toIso8601String(),
+        'deletedAt': m.deletedAt?.toUtc().toIso8601String(),
       };
 
   static MessEntry _messFromJson(Map<String, dynamic> value) {
     final date = DateTime.tryParse(_requiredString(value['date']));
     final splitCount = _requiredInt(value['splitCount']);
-    if (date == null || splitCount <= 0) {
+    final deletedAtValue = value['deletedAt'];
+    final deletedAt = deletedAtValue == null
+        ? null
+        : DateTime.tryParse(_requiredString(deletedAtValue))?.toLocal();
+    if (date == null ||
+        splitCount <= 0 ||
+        (deletedAtValue != null && deletedAt == null)) {
       throw const BackupException('A Mess Khata record is invalid.');
     }
     return MessEntry(
@@ -388,6 +471,7 @@ class BackupService {
       paidBy: _requiredString(value['paidBy']),
       splitCount: splitCount,
       date: date.toLocal(),
+      deletedAt: deletedAt,
     );
   }
 
@@ -436,6 +520,7 @@ class _BackupBoxes {
   final Box<Wallet> wallets;
   final Box<DebtEntry> debts;
   final Box<MessEntry> mess;
+  final Box<Workspace> workspaces;
   final Box settings;
   final Box preferences;
 
@@ -444,6 +529,7 @@ class _BackupBoxes {
     required this.wallets,
     required this.debts,
     required this.mess,
+    required this.workspaces,
     required this.settings,
     required this.preferences,
   });

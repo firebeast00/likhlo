@@ -10,7 +10,7 @@ class MessNotifier extends StateNotifier<List<MessEntry>> {
   void loadEntries() {
     if (!Hive.isBoxOpen('mess_khata')) return;
     final box = Hive.box<MessEntry>('mess_khata');
-    state = box.values.toList();
+    state = box.values.where((entry) => entry.deletedAt == null).toList();
   }
 
   Future<bool> addEntry(MessEntry entry) async {
@@ -30,7 +30,23 @@ class MessNotifier extends StateNotifier<List<MessEntry>> {
     final box = Hive.box<MessEntry>('mess_khata');
     final matches = box.values.where((entry) => entry.id == id);
     if (matches.isEmpty) return;
-    await matches.first.delete();
+    await box.put(id, matches.first.copyWith(deletedAt: DateTime.now()));
+    loadEntries();
+  }
+
+  Future<void> restoreEntry(String id) async {
+    final box = Hive.box<MessEntry>('mess_khata');
+    final entry = box.get(id);
+    if (entry == null || entry.deletedAt == null) return;
+    await box.put(id, entry.copyWith(clearDeletedAt: true));
+    loadEntries();
+  }
+
+  Future<void> permanentlyDelete(String id) async {
+    final box = Hive.box<MessEntry>('mess_khata');
+    final entry = box.get(id);
+    if (entry?.deletedAt == null) return;
+    await box.delete(id);
     loadEntries();
   }
 }

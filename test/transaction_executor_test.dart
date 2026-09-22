@@ -4,6 +4,7 @@ import 'package:student_expense_manager/services/transaction_executor.dart';
 
 class _FakeStore implements TransactionStore {
   final Map<String, Expense> entries = {};
+  final Map<String, Expense> deletedEntries = {};
 
   @override
   Future<bool> add(Expense entry) async {
@@ -23,13 +24,25 @@ class _FakeStore implements TransactionStore {
   }
 
   @override
-  Future<bool> delete(String id) async => entries.remove(id) != null;
+  Future<bool> delete(String id) async {
+    final entry = entries.remove(id);
+    if (entry == null) return false;
+    deletedEntries[id] = entry.copyWith(deletedAt: DateTime(2026, 9, 22));
+    return true;
+  }
 
   @override
   Future<bool> deleteTransfer(String transactionId) async {
     final base = transactionId.replaceFirst(RegExp(r'_(out|in)$'), '');
     final out = entries.remove('${base}_out');
     final incoming = entries.remove('${base}_in');
+    if (out != null) {
+      deletedEntries[out.id] = out.copyWith(deletedAt: DateTime(2026, 9, 22));
+    }
+    if (incoming != null) {
+      deletedEntries[incoming.id] =
+          incoming.copyWith(deletedAt: DateTime(2026, 9, 22));
+    }
     return out != null || incoming != null;
   }
 
@@ -39,6 +52,48 @@ class _FakeStore implements TransactionStore {
     entries[id] = entry;
     return true;
   }
+
+  @override
+  Expense? findById(String id) => entries[id];
+
+  @override
+  Expense? findDeletedById(String id) => deletedEntries[id];
+
+  @override
+  Future<bool> restore(String id) async {
+    final entry = deletedEntries.remove(id);
+    if (entry == null) return false;
+    entries[id] = entry.copyWith(clearDeletedAt: true);
+    return true;
+  }
+
+  @override
+  Future<bool> restoreTransfer(String transactionId) async {
+    final base = transactionId.replaceFirst(RegExp(r'_(out|in)$'), '');
+    final out = deletedEntries.remove('${base}_out');
+    final incoming = deletedEntries.remove('${base}_in');
+    if (out == null || incoming == null) return false;
+    entries[out.id] = out.copyWith(clearDeletedAt: true);
+    entries[incoming.id] = incoming.copyWith(clearDeletedAt: true);
+    return true;
+  }
+
+  @override
+  Future<bool> permanentlyDelete(String id) async {
+    final entry = deletedEntries[id];
+    if (entry == null) return false;
+    if (entry.category == 'Transfer') {
+      final base = id.replaceFirst(RegExp(r'_(out|in)$'), '');
+      deletedEntries.remove('${base}_out');
+      deletedEntries.remove('${base}_in');
+    } else {
+      deletedEntries.remove(id);
+    }
+    return true;
+  }
+
+  @override
+  Future<void> emptyTrash() async => deletedEntries.clear();
 }
 
 Expense _entry({
@@ -64,7 +119,7 @@ Expense _entry({
 void main() {
   test('creates and updates through one executor boundary', () async {
     final store = _FakeStore();
-    final executor = TransactionExecutor(store);
+    final executor = TransactionExecutor(store, enableAudio: false);
     final original = _entry(id: 'one', type: 'expense', walletId: 'cash');
 
     final created = await executor.execute(CreateTransactionCommand(original));
@@ -80,7 +135,7 @@ void main() {
 
   test('accepts only a complete balanced transfer pair', () async {
     final store = _FakeStore();
-    final executor = TransactionExecutor(store);
+    final executor = TransactionExecutor(store, enableAudio: false);
     final date = DateTime(2026, 9, 21);
     final outgoing = _entry(
       id: 'pair_out',
@@ -110,7 +165,7 @@ void main() {
 
   test('rejects a transfer with the same source and destination', () async {
     final store = _FakeStore();
-    final executor = TransactionExecutor(store);
+    final executor = TransactionExecutor(store, enableAudio: false);
     final outgoing = _entry(
       id: 'pair_out',
       type: 'expense',
@@ -135,7 +190,7 @@ void main() {
 
   test('stores only three core title words for creates and updates', () async {
     final store = _FakeStore();
-    final executor = TransactionExecutor(store);
+    final executor = TransactionExecutor(store, enableAudio: false);
     final original = _entry(
       id: 'compact',
       type: 'expense',
@@ -151,5 +206,89 @@ void main() {
       updated: original.copyWith(title: 'university admission form fee'),
     ));
     expect(store.entries['compact']?.title, 'university admission form');
+  });
+
+  test('receipt batch is all-or-nothing and requires discrepancy consent',
+      () async {
+    final store = _FakeStore();
+    final executor = TransactionExecutor(store, enableAudio: false);
+    final items = [
+      _entry(id: 'tea', type: 'expense', walletId: 'cash', amount: 100),
+      _entry(id: 'meal', type: 'expense', walletId: 'cash', amount: 200),
+    ];
+
+    final rejected = await executor.execute(
+      CreateBatchTransactionsCommand(
+        entries: items,
+        detectedTotal: 500,
+      ),
+    );
+    expect(rejected.status, TransactionResultStatus.rejected);
+    expect(store.entries, isEmpty);
+
+    final saved = await executor.execute(
+      CreateBatchTransactionsCommand(
+        entries: items,
+        detectedTotal: 500,
+        discrepancyConfirmed: true,
+      ),
+    );
+    expect(saved.succeeded, isTrue);
+    expect(store.entries.keys, containsAll(['tea', 'meal']));
+  });
+
+  test('new entries inherit the selected workspace without changing wallets',
+      () async {
+    final store = _FakeStore();
+    final executor = TransactionExecutor(
+      store,
+      enableAudio: false,
+      defaultWorkspaceId: 'freelance',
+    );
+    final entry = _entry(id: 'job', type: 'income', walletId: 'bank');
+
+    final saved = await executor.execute(CreateTransactionCommand(entry));
+
+    expect(saved.succeeded, isTrue);
+    expect(store.entries['job']?.workspaceId, 'freelance');
+    expect(store.entries['job']?.walletId, 'bank');
+  });
+
+  test('a transfer pair moves to Trash and restores together', () async {
+    final store = _FakeStore();
+    final executor = TransactionExecutor(store, enableAudio: false);
+    final date = DateTime(2026, 9, 21);
+    await executor.execute(
+      CreateTransferCommand(
+        outgoing: _entry(
+          id: 'trash_pair_out',
+          type: 'expense',
+          walletId: 'cash',
+          category: 'Transfer',
+        ).copyWith(date: date),
+        incoming: _entry(
+          id: 'trash_pair_in',
+          type: 'income',
+          walletId: 'bank',
+          category: 'Transfer',
+        ).copyWith(date: date),
+      ),
+    );
+
+    expect(
+      (await executor.execute(const DeleteTransferCommand('trash_pair_out')))
+          .succeeded,
+      isTrue,
+    );
+    expect(store.entries, isEmpty);
+    expect(store.deletedEntries.length, 2);
+
+    expect(
+      (await executor.execute(const RestoreTransferCommand('trash_pair_in')))
+          .succeeded,
+      isTrue,
+    );
+    expect(store.entries.length, 2);
+    expect(store.deletedEntries, isEmpty);
   });
 }

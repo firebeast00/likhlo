@@ -12,7 +12,9 @@ import '../services/ocr_scanner_service.dart';
 import '../services/transaction_executor.dart';
 
 class MessKhataScreen extends ConsumerStatefulWidget {
-  const MessKhataScreen({super.key});
+  final bool embedded;
+
+  const MessKhataScreen({super.key, this.embedded = false});
 
   @override
   ConsumerState<MessKhataScreen> createState() => _MessKhataScreenState();
@@ -349,7 +351,8 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                       if (titleCtrl.text.isNotEmpty && amt > 0 && count > 0) {
                         final expenseId = const Uuid().v4();
 
-                        await ref.read(messProvider.notifier).addEntry(
+                        final messSaved =
+                            await ref.read(messProvider.notifier).addEntry(
                               MessEntry(
                                 id: expenseId,
                                 title: titleCtrl.text,
@@ -359,8 +362,11 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                                 date: DateTime.now(),
                               ),
                             );
+                        if (!messSaved) return;
 
-                        await ref.read(transactionExecutorProvider).execute(
+                        final ledgerResult = await ref
+                            .read(transactionExecutorProvider)
+                            .execute(
                               CreateTransactionCommand(
                                 Expense(
                                   id: expenseId,
@@ -373,6 +379,22 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                                 ),
                               ),
                             );
+                        if (!ledgerResult.succeeded) {
+                          await Hive.box<MessEntry>('mess_khata')
+                              .delete(expenseId);
+                          ref.read(messProvider.notifier).loadEntries();
+                          if (!ctx.mounted) return;
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                ledgerResult.reason ??
+                                    'Mess entry could not be saved to the ledger.',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
 
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
@@ -426,9 +448,7 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
 
     double totalMessSpend = entries.fold(0.0, (sum, e) => sum + e.totalAmount);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: ListView(
+    final body = ListView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
         children: [
@@ -682,12 +702,14 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
                         InkWell(
                           borderRadius: BorderRadius.circular(6),
                           onTap: () async {
-                            await ref
-                                .read(messProvider.notifier)
-                                .deleteEntry(item.id);
-                            await ref
+                            final result = await ref
                                 .read(transactionExecutorProvider)
                                 .execute(DeleteTransactionCommand(item.id));
+                            if (result.succeeded) {
+                              await ref
+                                  .read(messProvider.notifier)
+                                  .deleteEntry(item.id);
+                            }
 
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -710,15 +732,27 @@ class _MessKhataScreenState extends ConsumerState<MessKhataScreen> {
               );
             }).toList(),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
+      );
+    final addButton = FloatingActionButton.extended(
         onPressed: () => _showAddDialog(context, ref),
         icon: const Icon(Icons.add_rounded),
         label: const Text("Add Split Bill"),
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 6,
-      ),
+      );
+    if (widget.embedded) {
+      return Stack(
+        children: [
+          Positioned.fill(child: body),
+          Positioned(right: 18, bottom: 18, child: addButton),
+        ],
+      );
+    }
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: body,
+      floatingActionButton: addButton,
     );
   }
 }

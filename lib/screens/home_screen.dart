@@ -8,10 +8,12 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import "../services/notification_service.dart";
+import '../services/notification_entry_service.dart';
 import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
+import '../providers/workspace_provider.dart';
 import '../models/expense_model.dart';
 import '../models/debt_model.dart';
 import '../models/mess_entry_model.dart';
@@ -33,6 +35,9 @@ import '../services/speech_command_completeness.dart';
 import '../services/transaction_title_policy.dart';
 import "./mess_khata_screen.dart";
 import './income_accounts_screen.dart';
+import './trash_screen.dart';
+import './receipt_review_screen.dart';
+import './workspaces_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -47,7 +52,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       'smart_entry_default_wallet_id';
   static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
   static const _smartEntryLearningKey = 'smart_entry_learning_v1';
+  static const _dashboardViews = ['Dashboard', 'Udhaar', 'Mess Khata'];
   String _currentView = 'Dashboard';
+  final PageController _dashboardPageController = PageController();
+  bool _dashboardBoxesReady = false;
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
   bool _isSearching = false;
@@ -134,6 +142,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       const ShortcutItem(type: 'action_add_expense', localizedTitle: 'Add Transaction', icon: 'ic_add'),
     ]);
     _setupNativeQuickTile();
+    unawaited(_prepareDashboardBoxes());
 
     NotificationService().onActionTriggered = _handleNotificationAction;
 
@@ -144,16 +153,113 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _queuePersistentNotificationUpdate(
         delay: const Duration(seconds: 2),
       );
+      final workspaceState = ref.read(workspaceProvider);
+      final customIndex = workspaceState.workspaces
+          .where((workspace) => !workspace.isDefault)
+          .toList()
+          .indexWhere((workspace) => workspace.id == workspaceState.selectedId);
+      if (customIndex >= 0 && _dashboardPageController.hasClients) {
+        _dashboardPageController.jumpToPage(customIndex + 3);
+      }
     });
   }
 
   void _handleNotificationAction(String action) {
     if (!mounted) return;
     if (action == 'action_voice_log') {
-      _listenForExpense();
+      _showNotificationVoiceEntrySheet();
     } else if (action == 'action_add_expense') {
       _showAddOrEditModal();
+    } else if (action == NotificationService.reviewEntryActionId) {
+      _reviewPendingNotificationEntry();
     }
+  }
+
+  Future<void> _reviewPendingNotificationEntry() async {
+    final stored = Hive.box('preferences').get(
+      NotificationEntryService.pendingReviewKey,
+    );
+    final text = stored is Map ? stored['text']?.toString().trim() : null;
+    if (text == null || text.isEmpty) {
+      _showTransactionInfo(
+        'There is no notification entry waiting for review.',
+        title: 'Nothing to review',
+      );
+      return;
+    }
+    _smartInputCtrl.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    final saved =
+        await _processNLP(text, source: SmartInputSource.notification);
+    if (saved && Hive.isBoxOpen('preferences')) {
+      await Hive.box('preferences').delete(
+        NotificationEntryService.pendingReviewKey,
+      );
+    }
+  }
+
+  Future<void> _showNotificationVoiceEntrySheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          4,
+          20,
+          20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Voice entry',
+              style: Theme.of(sheetContext).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Speak one complete expense or income. Your transcript stays here if recognition or saving fails.',
+            ),
+            const SizedBox(height: 16),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _smartInputCtrl,
+              builder: (_, value, __) => TextField(
+                controller: _smartInputCtrl,
+                minLines: 2,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  labelText: _isListening ? 'Listening…' : 'Voice transcript',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _listenForExpense,
+                    icon: const Icon(Icons.mic_rounded),
+                    label: const Text('Speak'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: const Text('Done'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _setupNativeQuickTile() {
@@ -186,8 +292,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _activeMessageEntry?.remove();
     _activeMessageEntry = null;
     _categoryScrollCtrl.dispose();
+    _dashboardPageController.dispose();
     _smartInputCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _prepareDashboardBoxes() async {
+    try {
+      if (!Hive.isBoxOpen('debts')) {
+        await Hive.openBox<DebtEntry>('debts');
+      }
+      if (!Hive.isBoxOpen('mess_khata')) {
+        await Hive.openBox<MessEntry>('mess_khata');
+      }
+      if (mounted) setState(() => _dashboardBoxesReady = true);
+    } catch (error) {
+      if (mounted) {
+        _showTransactionError(
+          'Udhaar and Mess Khata could not be opened. Your main ledger is still available.',
+          title: 'Dashboard pages unavailable',
+        );
+      }
+    }
   }
 
   void _queuePersistentNotificationUpdate({
@@ -317,6 +443,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     if (!mounted) return;
+    var dashboardIndex = _dashboardViews.indexOf(view);
+    if (view == 'Dashboard') {
+      final workspaceState = ref.read(workspaceProvider);
+      final customIndex = workspaceState.workspaces
+          .where((workspace) => !workspace.isDefault)
+          .toList()
+          .indexWhere((workspace) => workspace.id == workspaceState.selectedId);
+      if (customIndex >= 0) dashboardIndex = customIndex + 3;
+    }
     setState(() {
       _currentView = view;
       _isSearching = false;
@@ -326,6 +461,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _smartEntrySearchAllHistory = false;
     });
 
+    if (dashboardIndex >= 0 && _dashboardPageController.hasClients) {
+      await _dashboardPageController.animateToPage(
+        dashboardIndex,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    if (view == 'Dashboard') _queuePersistentNotificationUpdate();
+  }
+
+  void _onDashboardPageChanged(int index) {
+    if (!mounted || index < 0) return;
+    final workspaceState = ref.read(workspaceProvider);
+    final customWorkspaces = workspaceState.workspaces
+        .where((workspace) => !workspace.isDefault)
+        .toList();
+    if (index >= 3) {
+      final customIndex = index - 3;
+      if (customIndex >= customWorkspaces.length) return;
+      unawaited(
+        ref.read(workspaceProvider.notifier).select(
+              customWorkspaces[customIndex].id,
+            ),
+      );
+    } else if (index == 0) {
+      unawaited(ref.read(workspaceProvider.notifier).select('personal'));
+    }
+    final view = index >= 3 ? 'Dashboard' : _dashboardViews[index];
+    setState(() {
+      _currentView = view;
+      _isSearching = false;
+      _searchQuery = '';
+    });
     if (view == 'Dashboard') _queuePersistentNotificationUpdate();
   }
 
@@ -431,7 +600,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_selectedCategoryTab == category) {
       setState(() => _selectedCategoryTab = 'All');
     }
-    _showTransactionSuccess(
+    _showDeletionMessage(
       "Category '$category' was deleted.",
       title: 'Category deleted',
     );
@@ -760,6 +929,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           }
                         }
                         if (ctx.mounted) Navigator.pop(ctx, true);
+                        if (reviewMessage == null && mounted) {
+                          if (transactionType == 'transfer') {
+                            _showTransferMessage(
+                              'Money was moved between the selected wallets.',
+                            );
+                          } else if (transactionType == 'income') {
+                            _showIncomeMessage(
+                              'The income was added to the selected wallet.',
+                            );
+                          } else {
+                            _showExpenseMessage(
+                              'The expense was saved to the selected wallet.',
+                            );
+                          }
+                        }
                         if (preferenceEntry != null) {
                           unawaited(
                             _rememberSmartEntryPreference(preferenceEntry),
@@ -807,6 +991,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _showTopMessage(title: title, message: message, tone: _MessageTone.info);
   }
 
+  void _showExpenseMessage(String message, {String title = 'Expense saved'}) {
+    _showTopMessage(title: title, message: message, tone: _MessageTone.expense);
+  }
+
+  void _showIncomeMessage(String message, {String title = 'Income added'}) {
+    _showTopMessage(title: title, message: message, tone: _MessageTone.income);
+  }
+
+  void _showTransferMessage(
+    String message, {
+    String title = 'Transfer completed',
+    String? actionLabel,
+    Future<void> Function()? onAction,
+  }) {
+    _showTopMessage(
+      title: title,
+      message: message,
+      tone: _MessageTone.transfer,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
+  }
+
+  void _showDeletionMessage(
+    String message, {
+    String title = 'Moved to Trash',
+    String? actionLabel,
+    Future<void> Function()? onAction,
+  }) {
+    _showTopMessage(
+      title: title,
+      message: message,
+      tone: _MessageTone.deletion,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
+  }
+
+  void _showWarningMessage(String message, {String title = 'Check this entry'}) {
+    _showTopMessage(title: title, message: message, tone: _MessageTone.warning);
+  }
+
   void _showTopMessage({
     required String title,
     required String message,
@@ -849,10 +1075,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     _activeMessageEntry = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
-    _messageTimer = Timer(
-      Duration(seconds: actionLabel == null ? 5 : 10),
-      dismiss,
-    );
+    _messageTimer = Timer(const Duration(seconds: 5), dismiss);
   }
 
   Widget _buildSegment(String current, String type, String label, Color color, VoidCallback onTap) {
@@ -924,8 +1147,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final workspaceState = ref.watch(workspaceProvider);
 
-    if (_currentView != 'Dashboard') {
+    if (!_dashboardViews.contains(_currentView)) {
       return Scaffold(
         drawer: AppDrawer(
           currentView: _currentView,
@@ -939,14 +1163,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
           ),
           centerTitle: true,
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu_rounded, size: 24),
-              onPressed: () {
-                _dismissKeyboard();
-                Scaffold.of(context).openDrawer();
-              },
-            ),
+          leading: IconButton(
+            tooltip: 'Back to dashboard',
+            icon: const Icon(Icons.arrow_back_rounded, size: 24),
+            onPressed: () => _changeView('Dashboard'),
           ),
         ),
         body: _buildOtherViews(),
@@ -967,10 +1187,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       0,
           (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
     );
+    final showMoneySetup = totalAvailable.abs() < 0.000001 &&
+        ref.watch(expenseProvider).allExpenses.isEmpty;
 
     var displayExpenses = List<Expense>.from(
       _isSearching && _smartEntrySearchAllHistory
-          ? visibleTransactions(ref.watch(expenseProvider).allExpenses)
+          ? visibleTransactions(
+              ref
+                  .watch(expenseProvider)
+                  .allExpenses
+                  .where(
+                    (entry) => entry.workspaceId == workspaceState.selectedId,
+                  ),
+            )
           : monthlyTransactions,
     );
 
@@ -1002,7 +1231,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: _isSearching ? TextField(style: const TextStyle(fontSize: 15), decoration: InputDecoration(border: InputBorder.none, hintText: "Search transactions...", hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14)), onChanged: (v)=>setState(()=>_searchQuery=v)) : Text(_currentView, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        title: _isSearching ? TextField(style: const TextStyle(fontSize: 15), decoration: InputDecoration(border: InputBorder.none, hintText: "Search transactions...", hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14)), onChanged: (v)=>setState(()=>_searchQuery=v)) : Text(
+          _currentView == 'Dashboard'
+              ? workspaceState.workspaces.isEmpty
+                  ? 'Personal'
+                  : workspaceState.workspaces
+                      .firstWhere(
+                        (workspace) =>
+                            workspace.id == workspaceState.selectedId,
+                        orElse: () => workspaceState.workspaces.first,
+                      )
+                      .name
+              : _currentView,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+        ),
         centerTitle: true,
         leading: Builder(
           builder: (context) => IconButton(
@@ -1014,6 +1256,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           ),
         ),
         actions: [
+          if (_currentView == 'Dashboard' && !_isSearching)
+            IconButton(
+              tooltip: 'Manage workspaces',
+              icon: const Icon(Icons.workspaces_outline, size: 21),
+              onPressed: () => _changeView('Workspaces'),
+            ),
           if (_currentView == 'Dashboard' && !_isSearching)
             IconButton(
               tooltip: 'Wallets',
@@ -1041,16 +1289,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               },
             ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: _buildDashboardSelector(primaryColor, workspaceState),
+        ),
       ),
-      body: _buildResponsiveBody(
-        isLandscape,
-        isDark,
-        primaryColor,
-        totalAvailable,
-        globalSpent,
-        wallets,
-        categories,
-        displayExpenses,
+      body: PageView(
+        controller: _dashboardPageController,
+        onPageChanged: _onDashboardPageChanged,
+        children: [
+          _buildResponsiveBody(
+            isLandscape,
+            isDark,
+            primaryColor,
+            totalAvailable,
+            globalSpent,
+            wallets,
+            categories,
+            displayExpenses,
+            showMoneySetup,
+          ),
+          _dashboardBoxesReady
+              ? const DebtScreen(
+                  key: PageStorageKey('dashboard-udhaar'),
+                  embedded: true,
+                )
+              : const Center(child: CircularProgressIndicator()),
+          _dashboardBoxesReady
+              ? const MessKhataScreen(
+                  key: PageStorageKey('dashboard-mess'),
+                  embedded: true,
+                )
+              : const Center(child: CircularProgressIndicator()),
+          for (final workspace
+              in workspaceState.workspaces.where((item) => !item.isDefault))
+            KeyedSubtree(
+              key: PageStorageKey('workspace-${workspace.id}'),
+              child: _buildResponsiveBody(
+                isLandscape,
+                isDark,
+                primaryColor,
+                totalAvailable,
+                globalSpent,
+                wallets,
+                categories,
+                displayExpenses,
+                showMoneySetup,
+              ),
+            ),
+        ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: (_currentView == 'Dashboard') ? GestureDetector(
@@ -1078,9 +1365,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       List<Wallet> wallets,
       List<String> categories,
       List<Expense> displayExpenses,
+      bool showMoneySetup,
       ) {
-    if (_currentView != 'Dashboard') return _buildOtherViews();
-
     if (isLandscape && !_isSearching) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,6 +1376,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               padding: const EdgeInsets.only(bottom: 80),
               child: Column(
                 children: [
+                  if (showMoneySetup) ...[
+                    _buildMoneySetupCard(primaryColor),
+                    const SizedBox(height: 10),
+                  ],
                   _buildMonthSelector(isDark),
                   const SizedBox(height: 8),
                   _buildHeroCard(
@@ -1141,6 +1431,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
+        if (showMoneySetup)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+              child: _buildMoneySetupCard(primaryColor),
+            ),
+          ),
         SliverToBoxAdapter(
           child: _buildMonthSelector(isDark),
         ),
@@ -1186,12 +1483,181 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
+  Widget _buildDashboardSelector(
+    Color primaryColor,
+    WorkspaceState workspaceState,
+  ) {
+    final customWorkspaces = workspaceState.workspaces
+        .where((workspace) => !workspace.isDefault)
+        .toList();
+    final labels = [
+      'Personal',
+      'Udhaar',
+      'Mess Khata',
+      ...customWorkspaces.map((workspace) => workspace.name),
+    ];
+    return Container(
+      height: 40,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.12)),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        itemBuilder: (context, index) {
+          final isWorkspace = index == 0 || index >= 3;
+          final workspaceId = index == 0
+              ? 'personal'
+              : index >= 3
+                  ? customWorkspaces[index - 3].id
+                  : null;
+          final selected = isWorkspace
+              ? _currentView == 'Dashboard' &&
+                  workspaceState.selectedId == workspaceId
+              : _currentView == _dashboardViews[index];
+          return SizedBox(
+            width: 104,
+            child: InkWell(
+                borderRadius: BorderRadius.circular(11),
+                onTap: () async {
+                  if (workspaceId != null) {
+                    await ref
+                        .read(workspaceProvider.notifier)
+                        .select(workspaceId);
+                  }
+                  if (_dashboardPageController.hasClients) {
+                    await _dashboardPageController.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? primaryColor.withValues(alpha: 0.14)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Text(
+                    labels[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: selected
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                      color: selected
+                          ? primaryColor
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMoneySetupCard(Color primaryColor) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.rocket_launch_outlined,
+                  color: primaryColor,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 11),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Set up your first money',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Your total balance automatically equals all wallet balances.',
+                      style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ActionChip(
+                avatar: const Icon(Icons.south_west_rounded, size: 17),
+                label: const Text('Add first income'),
+                onPressed: () => _showAddOrEditModal(initialType: 'income'),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.account_balance_wallet_outlined, size: 17),
+                label: const Text('Set wallet balance'),
+                onPressed: _openIncomeAccounts,
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.auto_awesome_rounded, size: 17),
+                label: const Text('Try Smart Entry'),
+                onPressed: () {
+                  _smartInputCtrl.text = '5000 salary JazzCash mein add karo';
+                  _smartInputCtrl.selection = TextSelection.collapsed(
+                    offset: _smartInputCtrl.text.length,
+                  );
+                  _showTransactionInfo(
+                    'Review the example, then tap Send.',
+                    title: 'Smart Entry example ready',
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOtherViews() {
     if (_currentView == 'Mess Khata') return const MessKhataScreen();
     if (_currentView == 'Udhaar') return const DebtScreen();
     if (_currentView == 'Stats') return const StatsScreen();
     if (_currentView == 'Settings') return const SettingsScreen();
     if (_currentView == 'About') return const AboutScreen();
+    if (_currentView == 'Trash') return const TrashScreen();
+    if (_currentView == 'Workspaces') return const WorkspacesScreen();
     return const SizedBox.shrink();
   }
 
@@ -1285,22 +1751,115 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       direction: DismissDirection.endToStart,
       background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.delete_outline_rounded, color: Colors.white)),
       confirmDismiss: (direction) async {
-        return await showDialog(context: context, builder: (dialogCtx) => Dialog(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), backgroundColor: Theme.of(context).cardColor, child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 28)), const SizedBox(height: 16), Text(isTransfer ? "Delete Transfer?" : "Delete Transaction?", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Text(isTransfer ? "Delete this complete transfer? Both linked wallet entries will be removed." : "Are you sure you want to delete '${e.title}'? This action cannot be undone.", textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.4)), const SizedBox(height: 24), Row(children: [Expanded(child: TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))), const SizedBox(width: 12), Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.of(dialogCtx).pop(true), child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold))))])]))));
-      },
-      onDismissed: (direction) async {
-        if (isTransfer) {
-          await ref
+        final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (dialogCtx) => Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                backgroundColor: Theme.of(context).cardColor,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Colors.red,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        isTransfer
+                            ? 'Move Transfer to Trash?'
+                            : 'Move Transaction to Trash?',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isTransfer
+                            ? 'Both linked wallet entries will move together and can be restored.'
+                            : "Move '${e.title}' to Trash? It can be restored for 30 days.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade500,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.of(dialogCtx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () => Navigator.of(dialogCtx).pop(true),
+                              child: const Text('Move to Trash'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ) ??
+            false;
+        if (!confirmed) return false;
+        final result = isTransfer
+            ? await ref
               .read(transactionExecutorProvider)
-              .execute(DeleteTransferCommand(e.id));
-        } else {
-          await ref
+              .execute(DeleteTransferCommand(e.id))
+            : await ref
               .read(transactionExecutorProvider)
               .execute(DeleteTransactionCommand(e.id));
+        if (!mounted) return false;
+        if (!result.succeeded) {
+          _showTransactionError(
+            result.reason ?? 'The entry could not be moved to Trash.',
+          );
+          return false;
         }
-        if (!mounted) return;
-        _showTransactionSuccess(
-          "'${e.title}' was removed from your records.",
-          title: isTransfer ? 'Transfer deleted' : 'Transaction deleted',
+        return true;
+      },
+      onDismissed: (direction) {
+        _showDeletionMessage(
+          "'${e.title}' can be restored from Trash.",
+          title: isTransfer ? 'Transfer moved to Trash' : 'Moved to Trash',
+          actionLabel: 'Undo',
+          onAction: () async {
+            final restored = isTransfer
+                ? await ref
+                    .read(transactionExecutorProvider)
+                    .execute(RestoreTransferCommand(e.id))
+                : await ref
+                    .read(transactionExecutorProvider)
+                    .execute(RestoreTransactionCommand(e.id));
+            if (!mounted) return;
+            if (restored.succeeded) {
+              _showTransactionInfo('The entry was restored.', title: 'Restored');
+            }
+          },
         );
       },
       child: GestureDetector(
@@ -2002,6 +2561,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 child: _buildBalanceMetric(
                   label: 'Spent this month',
                   value: 'Rs. ${spent.toStringAsFixed(0)}',
+                  onTap: () => _changeView('Stats'),
+                  semanticHint: 'Open monthly statistics',
                 ),
               ),
               const SizedBox(width: 10),
@@ -2009,6 +2570,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 child: _buildBalanceMetric(
                   label: 'All wallets',
                   value: '${wallets.length}',
+                  onTap: _openIncomeAccounts,
+                  semanticHint: 'Open wallet accounts',
                 ),
               ),
             ],
@@ -2073,38 +2636,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Widget _buildBalanceMetric({
     required String label,
     required String value,
+    VoidCallback? onTap,
+    String? semanticHint,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.68),
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+    return Semantics(
+      button: onTap != null,
+      label: label,
+      value: value,
+      hint: semanticHint,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.11),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: Colors.white.withValues(alpha: 0.62),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -2789,38 +3381,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _dismissKeyboard();
     setState(() => _isScanningReceipt = true);
     try {
-      final receiptData = await OcrScannerService().scanReceipt();
-      if (!mounted || receiptData == null) return;
+      final receipt = await OcrScannerService().scanReceiptDetailed();
+      if (!mounted || receipt == null) return;
 
-      final amount = receiptData['amount'];
-      if (amount is! num || !amount.isFinite || amount <= 0) {
+      if (receipt.total <= 0 && receipt.items.isEmpty) {
         _showTransactionError(
-          'No reliable receipt total was detected. Retake the photo with the full receipt visible and good lighting.',
-          title: 'Receipt total not found',
+          'No reliable receipt items or total were detected. Retake the photo with the full receipt visible and good lighting.',
+          title: 'Receipt details not found',
         );
         return;
       }
 
-      final title = receiptData['title']?.toString().trim() ?? '';
-      final confidence =
-          (receiptData['confidence'] as num?)?.toDouble() ?? 0.0;
-      final confidencePercent = (confidence * 100).round();
-      final reviewMessage = confidence < 0.7
-          ? 'Scan confidence is $confidencePercent%. Carefully verify the amount, wallet, category, and date.'
-          : 'Receipt details were detected with $confidencePercent% confidence. Verify every field before saving.';
-
-      final confirmed = await _showAddOrEditModal(
-        prefilledAmount: amount.toDouble() ==
-            amount.toDouble().truncateToDouble()
-            ? amount.toStringAsFixed(0)
-            : amount.toStringAsFixed(2),
-        prefilledTitle: title.isEmpty ? 'Receipt purchase' : title,
-        prefilledCategory: receiptData['category']?.toString(),
-        initialType: 'expense',
-        reviewMessage: reviewMessage,
+      final confirmed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ReceiptReviewScreen(receipt: receipt),
+        ),
       );
       if (confirmed == true && mounted) {
-        _showTransactionSuccess(
+        _showExpenseMessage(
           'The reviewed receipt was added to your records.',
           title: 'Receipt saved',
         );
@@ -2885,7 +3463,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         required bool deleting,
         bool repeating = false,
       }) async {
-    final allEntries = ref.read(expenseProvider).allExpenses;
+    final selectedWorkspaceId = ref.read(selectedWorkspaceIdProvider);
+    final allEntries = ref
+        .read(expenseProvider)
+        .allExpenses
+        .where((entry) => entry.workspaceId == selectedWorkspaceId);
     final entriesById = {
       for (final entry in allEntries) entry.id: entry,
     };
@@ -3166,7 +3748,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final transferAmount = command.amount.toStringAsFixed(
       command.amount == command.amount.truncateToDouble() ? 0 : 2,
     );
-    _showTransactionSuccess(
+    _showTransferMessage(
       'Rs. $transferAmount · ${source.name} → ${destination.name}',
       title: 'Transfer completed',
       actionLabel: 'Undo',
@@ -3217,7 +3799,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     for (final account in accounts) {
       if (account.id == walletId) mentionedAccount = account;
     }
-    final allEntries = ref.read(expenseProvider).allExpenses;
+    final selectedWorkspaceId = ref.read(selectedWorkspaceIdProvider);
+    final allEntries = ref
+        .read(expenseProvider)
+        .allExpenses
+        .where((entry) => entry.workspaceId == selectedWorkspaceId)
+        .toList(growable: false);
     final match = matchSmartEntryTransaction(
       command: command,
       entries: allEntries.map(
@@ -3282,9 +3869,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     _smartInputCtrl.clear();
-    _showTransactionSuccess(
-      '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
+    _showTopMessage(
       title: source.type == 'income' ? 'Income repeated' : 'Expense repeated',
+      message: '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
+      tone: source.type == 'income'
+          ? _MessageTone.income
+          : _MessageTone.expense,
       actionLabel: 'Undo',
       onAction: () async {
         await ref
@@ -3363,6 +3953,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     var entries = ref
         .read(expenseProvider)
         .allExpenses
+        .where(
+          (entry) =>
+              entry.workspaceId == ref.read(selectedWorkspaceIdProvider),
+        )
         .where((entry) => entry.category != 'Transfer')
         .where((entry) => matchesSmartEntryTimeRange(
       entry.date,
@@ -3565,7 +4159,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
     }
 
-    final allEntries = ref.read(expenseProvider).allExpenses;
+    final selectedWorkspaceId = ref.read(selectedWorkspaceIdProvider);
+    final allEntries = ref
+        .read(expenseProvider)
+        .allExpenses
+        .where((entry) => entry.workspaceId == selectedWorkspaceId)
+        .toList(growable: false);
     final match = matchSmartEntryTransaction(
       command: command,
       entries: allEntries.map(
@@ -3667,17 +4266,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       final deletedEntry = target;
       final deletedAmount =
       deletedEntry.amount.toStringAsFixed(0);
-      _showTransactionSuccess(
+      _showDeletionMessage(
         '${deletedEntry.title} — Rs. $deletedAmount',
-        title: 'Entry deleted',
+        title: 'Entry moved to Trash',
         actionLabel: 'Undo',
         onAction: () async {
           final restoreResult = await ref
               .read(transactionExecutorProvider)
-              .execute(CreateTransactionCommand(
-            deletedEntry,
-            action: TransactionAction.restore,
-          ));
+              .execute(RestoreTransactionCommand(deletedEntry.id));
           if (!mounted) return;
           if (restoreResult.succeeded) {
             _showTransactionInfo(
@@ -3953,9 +4549,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
       _smartInputCtrl.clear();
       FocusScope.of(context).unfocus();
-      _showTransactionSuccess(
-        '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} · ${wallet.name}',
+      _showTopMessage(
         title: type == 'income' ? 'Income added' : 'Expense saved',
+        message:
+            '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} · ${wallet.name}',
+        tone: type == 'income' ? _MessageTone.income : _MessageTone.expense,
         actionLabel: 'Undo',
         onAction: () async {
           final deleteResult = await ref
@@ -4016,10 +4614,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (confirmed == true && mounted) {
       _smartInputCtrl.clear();
-      _showTransactionSuccess(
-        'The Smart Entry was saved to the selected wallet.',
-        title: 'Transaction saved',
-      );
+      if (type == 'income') {
+        _showIncomeMessage('The Smart Entry was saved to the selected wallet.');
+      } else {
+        _showExpenseMessage('The Smart Entry was saved to the selected wallet.');
+      }
     }
     if (mounted) FocusScope.of(context).unfocus();
     return confirmed == true && mounted;
@@ -4150,7 +4749,16 @@ class _LearnedSmartEntryPreference {
 }
 
 
-enum _MessageTone { error, success, info }
+enum _MessageTone {
+  error,
+  deletion,
+  expense,
+  income,
+  transfer,
+  success,
+  info,
+  warning,
+}
 
 class _TopMessageCard extends StatelessWidget {
   final String title;
@@ -4185,6 +4793,26 @@ class _TopMessageCard extends StatelessWidget {
         background = scheme.errorContainer;
         foreground = scheme.onErrorContainer;
         icon = Icons.error_outline_rounded;
+      case _MessageTone.deletion:
+        accent = const Color(0xFFB91C1C);
+        background = isDark ? const Color(0xFF3F1117) : const Color(0xFFFEF2F2);
+        foreground = isDark ? const Color(0xFFFECACA) : const Color(0xFF7F1D1D);
+        icon = Icons.delete_outline_rounded;
+      case _MessageTone.expense:
+        accent = const Color(0xFFDC2626);
+        background = isDark ? const Color(0xFF35161A) : const Color(0xFFFFF1F2);
+        foreground = isDark ? const Color(0xFFFDA4AF) : const Color(0xFF881337);
+        icon = Icons.north_east_rounded;
+      case _MessageTone.income:
+        accent = const Color(0xFF16A34A);
+        background = isDark ? const Color(0xFF123524) : const Color(0xFFF0FDF4);
+        foreground = isDark ? const Color(0xFFDCFCE7) : const Color(0xFF14532D);
+        icon = Icons.south_west_rounded;
+      case _MessageTone.transfer:
+        accent = const Color(0xFF2563EB);
+        background = isDark ? const Color(0xFF12264B) : const Color(0xFFEFF6FF);
+        foreground = isDark ? const Color(0xFFDBEAFE) : const Color(0xFF1E3A8A);
+        icon = Icons.swap_horiz_rounded;
       case _MessageTone.success:
         accent = const Color(0xFF16A34A);
         background = isDark ? const Color(0xFF123524) : const Color(0xFFF0FDF4);
@@ -4195,6 +4823,11 @@ class _TopMessageCard extends StatelessWidget {
         background = scheme.primaryContainer;
         foreground = scheme.onPrimaryContainer;
         icon = Icons.info_outline_rounded;
+      case _MessageTone.warning:
+        accent = const Color(0xFFD97706);
+        background = isDark ? const Color(0xFF3A260B) : const Color(0xFFFFFBEB);
+        foreground = isDark ? const Color(0xFFFDE68A) : const Color(0xFF78350F);
+        icon = Icons.warning_amber_rounded;
     }
 
     return TweenAnimationBuilder<double>(

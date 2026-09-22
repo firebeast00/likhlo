@@ -1,16 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
+import '../providers/workspace_provider.dart';
 import 'transaction_title_policy.dart';
+import 'audio_feedback_service.dart';
+import 'deterministic_feedback_service.dart';
 
 enum TransactionAction {
   create,
+  batch,
   transfer,
   update,
   delete,
   repeat,
   restore,
+  permanentlyDelete,
+  emptyTrash,
 }
 
 enum TransactionResultStatus { succeeded, rejected, notFound }
@@ -46,6 +54,18 @@ class CreateTransactionCommand extends LedgerCommand {
   }) : super(action);
 }
 
+class CreateBatchTransactionsCommand extends LedgerCommand {
+  final List<Expense> entries;
+  final double detectedTotal;
+  final bool discrepancyConfirmed;
+
+  const CreateBatchTransactionsCommand({
+    required this.entries,
+    required this.detectedTotal,
+    this.discrepancyConfirmed = false,
+  }) : super(TransactionAction.batch);
+}
+
 class CreateTransferCommand extends LedgerCommand {
   final Expense outgoing;
   final Expense incoming;
@@ -79,12 +99,42 @@ class DeleteTransferCommand extends LedgerCommand {
       : super(TransactionAction.delete);
 }
 
+class RestoreTransactionCommand extends LedgerCommand {
+  final String id;
+
+  const RestoreTransactionCommand(this.id) : super(TransactionAction.restore);
+}
+
+class RestoreTransferCommand extends LedgerCommand {
+  final String transactionId;
+
+  const RestoreTransferCommand(this.transactionId)
+      : super(TransactionAction.restore);
+}
+
+class PermanentlyDeleteTransactionCommand extends LedgerCommand {
+  final String id;
+
+  const PermanentlyDeleteTransactionCommand(this.id)
+      : super(TransactionAction.permanentlyDelete);
+}
+
+class EmptyTrashCommand extends LedgerCommand {
+  const EmptyTrashCommand() : super(TransactionAction.emptyTrash);
+}
+
 abstract interface class TransactionStore {
   Future<bool> add(Expense entry);
   Future<bool> addAll(Iterable<Expense> entries);
   Future<bool> update(String id, Expense entry);
   Future<bool> delete(String id);
   Future<bool> deleteTransfer(String transactionId);
+  Expense? findById(String id);
+  Expense? findDeletedById(String id);
+  Future<bool> restore(String id);
+  Future<bool> restoreTransfer(String transactionId);
+  Future<bool> permanentlyDelete(String id);
+  Future<void> emptyTrash();
 }
 
 class ExpenseTransactionStore implements TransactionStore {
@@ -108,33 +158,57 @@ class ExpenseTransactionStore implements TransactionStore {
 
   @override
   Future<bool> deleteTransfer(String transactionId) async {
-    final baseId = transactionId.endsWith('_out')
-        ? transactionId.substring(0, transactionId.length - 4)
-        : transactionId.endsWith('_in')
-            ? transactionId.substring(0, transactionId.length - 3)
-            : transactionId;
-    final exists = notifier.containsAnyTransactionId([
-      '${baseId}_out',
-      '${baseId}_in',
-    ]);
-    if (!exists) return false;
-    await notifier.deleteTransferPair(transactionId);
-    return true;
+    return notifier.deleteTransferPair(transactionId);
   }
+
+  @override
+  Expense? findById(String id) => notifier.findById(id);
+
+  @override
+  Expense? findDeletedById(String id) => notifier.findDeletedById(id);
+
+  @override
+  Future<bool> restore(String id) => notifier.restoreExpense(id);
+
+  @override
+  Future<bool> restoreTransfer(String transactionId) =>
+      notifier.restoreTransferPair(transactionId);
+
+  @override
+  Future<bool> permanentlyDelete(String id) => notifier.permanentlyDelete(id);
+
+  @override
+  Future<void> emptyTrash() => notifier.emptyTrash();
 }
 
 /// The only application service allowed to translate a resolved command into
 /// ledger mutations. Parsing, speech, and UI feedback stay outside this class.
 class TransactionExecutor {
   final TransactionStore store;
+  final AudioFeedbackService audioFeedback;
+  final bool enableAudio;
+  final String defaultWorkspaceId;
 
-  const TransactionExecutor(this.store);
+  TransactionExecutor(
+    this.store, {
+    AudioFeedbackService? audioFeedback,
+    this.enableAudio = true,
+    this.defaultWorkspaceId = 'personal',
+  }) : audioFeedback = audioFeedback ?? AudioFeedbackService();
 
   Future<TransactionResult> execute(LedgerCommand command) async {
     switch (command) {
       case CreateTransactionCommand():
-        final entry = _withCoreTitle(command.entry);
+        final entry = _prepareNewEntry(command.entry);
         final saved = await store.add(entry);
+        if (saved && enableAudio) {
+          unawaited(
+            audioFeedback.announce(
+              action: _feedbackAction(command.action, entry),
+              entry: entry,
+            ),
+          );
+        }
         return TransactionResult(
           status: saved
               ? TransactionResultStatus.succeeded
@@ -142,6 +216,59 @@ class TransactionExecutor {
           action: command.action,
           affectedIds: saved ? [entry.id] : const [],
           reason: saved ? null : 'Ledger validation rejected the transaction.',
+        );
+      case CreateBatchTransactionsCommand():
+        if (command.entries.isEmpty ||
+            !command.detectedTotal.isFinite ||
+            command.detectedTotal < 0 ||
+            command.entries.any(
+              (entry) => !entry.amount.isFinite || entry.amount <= 0,
+            ) ||
+            command.entries.map((entry) => entry.id).toSet().length !=
+                command.entries.length) {
+          return const TransactionResult(
+            status: TransactionResultStatus.rejected,
+            action: TransactionAction.batch,
+            reason: 'Every selected receipt item needs a valid amount.',
+          );
+        }
+        final selectedTotal = command.entries.fold<double>(
+          0,
+          (sum, entry) => sum + entry.amount,
+        );
+        final discrepancy = (selectedTotal - command.detectedTotal).abs();
+        final discrepancyLimit = command.detectedTotal * 0.05 > 5
+            ? command.detectedTotal * 0.05
+            : 5.0;
+        if (command.detectedTotal > 0 &&
+            discrepancy > discrepancyLimit &&
+            !command.discrepancyConfirmed) {
+          return const TransactionResult(
+            status: TransactionResultStatus.rejected,
+            action: TransactionAction.batch,
+            reason: 'Confirm the receipt total difference before saving.',
+          );
+        }
+        final entries = command.entries.map(_prepareNewEntry).toList();
+        final saved = await store.addAll(entries);
+        if (saved && enableAudio) {
+          unawaited(
+            audioFeedback.announce(
+              action: FinancialFeedbackAction.expense,
+              entry: entries.first,
+            ),
+          );
+        }
+        return TransactionResult(
+          status: saved
+              ? TransactionResultStatus.succeeded
+              : TransactionResultStatus.rejected,
+          action: TransactionAction.batch,
+          affectedIds:
+              saved ? entries.map((entry) => entry.id).toList() : const [],
+          reason: saved
+              ? null
+              : 'The receipt could not be saved. No items were added.',
         );
       case CreateTransferCommand():
         if (!_isValidTransfer(command)) {
@@ -151,9 +278,18 @@ class TransactionExecutor {
             reason: 'A transfer requires a valid outgoing and incoming pair.',
           );
         }
-        final outgoing = _withCoreTitle(command.outgoing);
-        final incoming = _withCoreTitle(command.incoming);
+        final outgoing = _prepareNewEntry(command.outgoing);
+        final incoming = _prepareNewEntry(command.incoming);
         final saved = await store.addAll([outgoing, incoming]);
+        if (saved && enableAudio) {
+          unawaited(
+            audioFeedback.announce(
+              action: FinancialFeedbackAction.transfer,
+              entry: outgoing,
+              pairedEntry: incoming,
+            ),
+          );
+        }
         return TransactionResult(
           status: saved
               ? TransactionResultStatus.succeeded
@@ -169,6 +305,14 @@ class TransactionExecutor {
           command.existingId,
           updatedEntry,
         );
+        if (updated && enableAudio) {
+          unawaited(
+            audioFeedback.announce(
+              action: FinancialFeedbackAction.edit,
+              entry: updatedEntry,
+            ),
+          );
+        }
         return TransactionResult(
           status: updated
               ? TransactionResultStatus.succeeded
@@ -178,7 +322,16 @@ class TransactionExecutor {
           reason: updated ? null : 'The transaction could not be updated.',
         );
       case DeleteTransactionCommand():
+        final existing = store.findById(command.id);
         final deleted = await store.delete(command.id);
+        if (deleted && existing != null && enableAudio) {
+          unawaited(
+            audioFeedback.announce(
+              action: FinancialFeedbackAction.delete,
+              entry: existing,
+            ),
+          );
+        }
         return TransactionResult(
           status: deleted
               ? TransactionResultStatus.succeeded
@@ -188,7 +341,16 @@ class TransactionExecutor {
           reason: deleted ? null : 'The transaction no longer exists.',
         );
       case DeleteTransferCommand():
+        final existing = store.findById(command.transactionId);
         final deleted = await store.deleteTransfer(command.transactionId);
+        if (deleted && existing != null && enableAudio) {
+          unawaited(
+            audioFeedback.announce(
+              action: FinancialFeedbackAction.delete,
+              entry: existing,
+            ),
+          );
+        }
         return TransactionResult(
           status: deleted
               ? TransactionResultStatus.succeeded
@@ -197,7 +359,75 @@ class TransactionExecutor {
           affectedIds: deleted ? [command.transactionId] : const [],
           reason: deleted ? null : 'The transfer no longer exists.',
         );
+      case RestoreTransactionCommand():
+        final deleted = store.findDeletedById(command.id);
+        final restored = await store.restore(command.id);
+        if (restored && deleted != null && enableAudio) {
+          unawaited(
+            audioFeedback.announce(
+              action: deleted.type == 'income'
+                  ? FinancialFeedbackAction.income
+                  : FinancialFeedbackAction.expense,
+              entry: deleted.copyWith(clearDeletedAt: true),
+            ),
+          );
+        }
+        return TransactionResult(
+          status: restored
+              ? TransactionResultStatus.succeeded
+              : TransactionResultStatus.rejected,
+          action: TransactionAction.restore,
+          affectedIds: restored ? [command.id] : const [],
+          reason: restored
+              ? null
+              : 'The transaction cannot be restored to its original wallet.',
+        );
+      case RestoreTransferCommand():
+        final restored = await store.restoreTransfer(command.transactionId);
+        return TransactionResult(
+          status: restored
+              ? TransactionResultStatus.succeeded
+              : TransactionResultStatus.rejected,
+          action: TransactionAction.restore,
+          affectedIds: restored ? [command.transactionId] : const [],
+          reason: restored
+              ? null
+              : 'Both transfer wallets are required before restoring.',
+        );
+      case PermanentlyDeleteTransactionCommand():
+        final removed = await store.permanentlyDelete(command.id);
+        return TransactionResult(
+          status: removed
+              ? TransactionResultStatus.succeeded
+              : TransactionResultStatus.notFound,
+          action: TransactionAction.permanentlyDelete,
+          affectedIds: removed ? [command.id] : const [],
+          reason: removed ? null : 'The Trash entry no longer exists.',
+        );
+      case EmptyTrashCommand():
+        await store.emptyTrash();
+        return const TransactionResult(
+          status: TransactionResultStatus.succeeded,
+          action: TransactionAction.emptyTrash,
+        );
     }
+  }
+
+  FinancialFeedbackAction _feedbackAction(
+    TransactionAction action,
+    Expense entry,
+  ) {
+    if (action == TransactionAction.repeat) {
+      return FinancialFeedbackAction.repeat;
+    }
+    if (action == TransactionAction.restore) {
+      return entry.type == 'income'
+          ? FinancialFeedbackAction.income
+          : FinancialFeedbackAction.expense;
+    }
+    return entry.type == 'income'
+        ? FinancialFeedbackAction.income
+        : FinancialFeedbackAction.expense;
   }
 
   bool _isValidTransfer(CreateTransferCommand command) {
@@ -233,10 +463,19 @@ class TransactionExecutor {
     if (title == entry.title) return entry;
     return entry.copyWith(title: title);
   }
+
+  Expense _prepareNewEntry(Expense entry) {
+    final titled = _withCoreTitle(entry);
+    if (titled.workspaceId != 'personal' || defaultWorkspaceId == 'personal') {
+      return titled;
+    }
+    return titled.copyWith(workspaceId: defaultWorkspaceId);
+  }
 }
 
 final transactionExecutorProvider = Provider<TransactionExecutor>((ref) {
   return TransactionExecutor(
     ExpenseTransactionStore(ref.read(expenseProvider.notifier)),
+    defaultWorkspaceId: ref.watch(selectedWorkspaceIdProvider),
   );
 });

@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
+import '../providers/workspace_provider.dart';
 import '../services/notification_service.dart';
 import '../services/voice_privacy_service.dart';
 import 'backup_screen.dart';
@@ -652,7 +653,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // --- PROFESSIONAL PDF GENERATOR ---
   Future<void> _generatePdf(BuildContext context, WidgetRef ref) async {
     try {
-      final records = List.of(ref.read(expenseProvider).allExpenses);
+      final workspaceState = ref.read(workspaceProvider);
+      final workspaceId = workspaceState.selectedId;
+      final workspaceName = workspaceState.workspaces
+          .firstWhere(
+            (workspace) => workspace.id == workspaceId,
+            orElse: () => workspaceState.workspaces.first,
+          )
+          .name;
+      final records = ref
+          .read(expenseProvider)
+          .allExpenses
+          .where((entry) => entry.workspaceId == workspaceId)
+          .toList(growable: false);
       final expenses = visibleTransactions(records);
       final settings = ref.read(settingsProvider);
       final regularFont = pw.Font.ttf(
@@ -691,7 +704,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   fontWeight: pw.FontWeight.bold,
                                   color: pdfPrimaryColor)),
                           pw.SizedBox(height: 4),
-                          pw.Text("Financial Statement",
+                          pw.Text("$workspaceName Financial Statement",
                               style: const pw.TextStyle(
                                   fontSize: 14, color: PdfColors.grey700)),
                         ]),
@@ -721,7 +734,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text("Total Spending (all records):",
+                        pw.Text("Total Spending ($workspaceName):",
                             style: pw.TextStyle(
                                 fontSize: 16, fontWeight: pw.FontWeight.bold)),
                         pw.Text("Rs. ${totalSpent.toStringAsFixed(2)}",

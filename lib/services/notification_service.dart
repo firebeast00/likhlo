@@ -4,6 +4,17 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_10y.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:hive/hive.dart';
+import 'notification_entry_service.dart';
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse response) async {
+  if (response.actionId != NotificationService.inlineEntryActionId) return;
+  final result = await NotificationEntryService().process(
+    input: response.input ?? '',
+    notificationId: response.id ?? NotificationService.persistentBarId,
+  );
+  await NotificationService().showNotificationEntryResult(result);
+}
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -12,6 +23,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+  bool _initialized = false;
 
   // Notification ID Partitioning
   static const int persistentBarId = 700;
@@ -19,6 +31,9 @@ class NotificationService {
   static const int middayReminderId = 901;
   static const int eveningReminderId = 902;
   static const int weekendReviewId = 903;
+  static const int notificationEntryResultId = 904;
+  static const String inlineEntryActionId = 'action_inline_entry';
+  static const String reviewEntryActionId = 'action_review_notification';
 
   /// Callback hook for when notification action buttons are tapped
   void Function(String action)? onActionTriggered;
@@ -51,6 +66,7 @@ class NotificationService {
 
     await _notifications.initialize(
       settings,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final actionId = (response.actionId?.isNotEmpty ?? false)
             ? response.actionId!
@@ -66,6 +82,7 @@ class NotificationService {
         }
       },
     );
+    _initialized = true;
 
     final launchDetails =
         await _notifications.getNotificationAppLaunchDetails();
@@ -182,6 +199,18 @@ class NotificationService {
         isPersistent: true,
         actions: const [
           AndroidNotificationAction(
+            inlineEntryActionId,
+            '⌨️ Type Entry',
+            inputs: <AndroidNotificationActionInput>[
+              AndroidNotificationActionInput(
+                label: 'e.g. 500 biryani from JazzCash',
+              ),
+            ],
+            allowGeneratedReplies: true,
+            showsUserInterface: false,
+            cancelNotification: false,
+          ),
+          AndroidNotificationAction(
             'action_add_expense',
             '➕ Log Expense',
             showsUserInterface: true,
@@ -246,7 +275,7 @@ class NotificationService {
       id: eveningReminderId,
       title: "Daily Spending Wrap-up 🌙",
       body:
-          "Close out your daily ledger! Take 10 seconds to review today's expenses.",
+          "Close out your daily ledger! Take 5 seconds to review today's expenses.",
       hour: eveningHour,
       minute: eveningMinute,
       payload: 'action_add_expense',
@@ -316,6 +345,48 @@ class NotificationService {
     } catch (e) {
       debugPrint("❌ Error Showing Instant Notification: $e");
     }
+  }
+
+  Future<void> showNotificationEntryResult(
+    NotificationEntryResult result,
+  ) async {
+    if (!_initialized) {
+      const settings = InitializationSettings(
+        android: AndroidInitializationSettings('@drawable/ic_notification'),
+        iOS: DarwinInitializationSettings(),
+        macOS: DarwinInitializationSettings(),
+      );
+      await _notifications.initialize(
+        settings,
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+      );
+      _initialized = true;
+    }
+    final needsReview =
+        result.disposition == NotificationEntryDisposition.review ||
+            result.disposition == NotificationEntryDisposition.failed;
+    final details = await _getDetails(
+      actions: needsReview
+          ? const [
+              AndroidNotificationAction(
+                reviewEntryActionId,
+                'Review in Likhlo',
+                showsUserInterface: true,
+              ),
+            ]
+          : null,
+    );
+    await _notifications.show(
+      notificationEntryResultId,
+      result.disposition == NotificationEntryDisposition.saved
+          ? 'Entry saved'
+          : result.disposition == NotificationEntryDisposition.duplicate
+              ? 'Already handled'
+              : 'Review entry',
+      result.message,
+      details,
+      payload: needsReview ? reviewEntryActionId : null,
+    );
   }
   // ==================== ⏰ GENERIC SCHEDULING (Used by Udhaar) ====================
 

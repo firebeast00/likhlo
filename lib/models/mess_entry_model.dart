@@ -15,6 +15,8 @@ class MessEntry extends HiveObject {
   int splitCount; // Number of roommates sharing this cost
   @HiveField(5)
   DateTime date;
+  @HiveField(6)
+  DateTime? deletedAt;
 
   MessEntry({
     required this.id,
@@ -23,5 +25,18 @@ class MessEntry extends HiveObject {
     required this.paidBy,
     required this.splitCount,
     required this.date,
+    this.deletedAt,
   });
+
+  MessEntry copyWith({DateTime? deletedAt, bool clearDeletedAt = false}) {
+    return MessEntry(
+      id: id,
+      title: title,
+      totalAmount: totalAmount,
+      paidBy: paidBy,
+      splitCount: splitCount,
+      date: date,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+    );
+  }
 }

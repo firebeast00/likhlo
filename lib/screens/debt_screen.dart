@@ -14,7 +14,9 @@ import '../models/expense_model.dart';
 import '../services/transaction_executor.dart';
 
 class DebtScreen extends ConsumerStatefulWidget {
-  const DebtScreen({super.key});
+  final bool embedded;
+
+  const DebtScreen({super.key, this.embedded = false});
 
   @override
   ConsumerState<DebtScreen> createState() => _DebtScreenState();
@@ -377,7 +379,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
                         // 🔗 FIX: Cross-sync "I Gave" (Lent) to deduct from Main Budget
                         if (type == 'lent') {
-                          await ref
+                          final ledgerResult = await ref
                               .read(transactionExecutorProvider)
                               .execute(CreateTransactionCommand(Expense(
                                 id: debtId, // Link IDs so deletion syncs later
@@ -387,6 +389,20 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                 date: selectedDate ?? DateTime.now(),
                                 colorValue: Colors.red.toARGB32(),
                               )));
+                          if (!ledgerResult.succeeded) {
+                            await debtBox.delete(key);
+                            if (!ctx.mounted) return;
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  ledgerResult.reason ??
+                                      'Udhaar could not be saved to the ledger.',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
                         }
 
                         if (selectedDate != null &&
@@ -445,7 +461,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final debts = debtBox.values.toList();
+    final debts =
+        debtBox.values.where((entry) => entry.deletedAt == null).toList();
     final settings = ref.watch(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -458,9 +475,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         .fold(0.0, (sum, e) => sum + e.amount);
     double balance = iGave - iTook;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
+    final body = Column(
         children: [
           // 1. 🌟 SUMMARY HERO CARD
           Container(
@@ -654,19 +669,34 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             ],
                           ),
                         ),
-                        onDismissed: (_) async {
-                          // 1. Delete from Udhaar tab
-                          await item.delete();
-
-                          // 2. Delete from Main Expenses to restore the budget
-                          try {
-                            await ref
-                                .read(transactionExecutorProvider)
-                                .execute(DeleteTransactionCommand(item.id));
-                          } catch (_) {} // Catch in case it was a "borrowed" record that wasn't synced
-
+                        confirmDismiss: (_) async {
+                          final result = await ref
+                              .read(transactionExecutorProvider)
+                              .execute(DeleteTransactionCommand(item.id));
+                          if (result.succeeded ||
+                              result.status == TransactionResultStatus.notFound) {
+                            await debtBox.put(
+                              item.key ?? item.id,
+                              item.copyWith(deletedAt: DateTime.now()),
+                            );
+                            if (mounted) setState(() {});
+                            return true;
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result.reason ??
+                                      'This Udhaar record could not be settled.',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return false;
+                        },
+                        onDismissed: (_) {
                           if (!mounted) return;
-                          setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                               content: Text(
                                   "Settled Udhaar with ${item.borrowerName} 🤝",
@@ -762,15 +792,27 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
+      );
+    final addButton = FloatingActionButton.extended(
         icon: const Icon(Icons.add_rounded),
         label: const Text("Add Record"),
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 4,
         onPressed: _showAddDialog,
-      ),
+      );
+    if (widget.embedded) {
+      return Stack(
+        children: [
+          Positioned.fill(child: body),
+          Positioned(right: 18, bottom: 18, child: addButton),
+        ],
+      );
+    }
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: body,
+      floatingActionButton: addButton,
     );
   }
 

@@ -29,6 +29,7 @@ dependencies:
   cryptography: ^2.7.0
   file_picker: ^8.1.7
   local_auth: ^2.3.0
+  flutter_tts: ^4.2.3
 
 
 dev_dependencies:
