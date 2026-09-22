@@ -28,37 +28,28 @@ class SpeechSessionDecision {
 
 /// Keeps speech-recognition lifecycle events separate from financial actions.
 ///
-/// An explicit final result is preferred, but recognizer completion is not
-/// treated as command completion. Incomplete segments are retained and joined
-/// across a bounded number of listening cycles. Error callbacks preserve
-/// partial text instead of executing it.
+/// An explicit final result is preferred. Some device recognizers emit only
+/// partial callbacks and then end normally, so a normal stop promotes the best
+/// available transcript through the same semantic validation pipeline. Error
+/// callbacks still preserve partial text instead of executing it.
 class SpeechSessionController {
   final int maxRetries;
 
   SpeechSessionState _state = SpeechSessionState.idle;
-  String _committedTranscript = '';
-  String _segmentTranscript = '';
   String _latestDraft = '';
   String _finalTranscript = '';
   int _retryCount = 0;
   bool _decisionIssued = false;
 
-  SpeechSessionController({this.maxRetries = 1})
-      : assert(maxRetries >= 0);
+  SpeechSessionController({this.maxRetries = 1}) : assert(maxRetries >= 0);
 
   SpeechSessionState get state => _state;
   String get latestDraft => _latestDraft;
   int get retryCount => _retryCount;
 
-  String transcriptWithSegment(String transcript) =>
-      mergeSpeechTranscripts(_committedTranscript, transcript);
-
-  void start({String initialTranscript = ''}) {
-    final initialDraft = initialTranscript.trim();
+  void start() {
     _state = SpeechSessionState.listening;
-    _committedTranscript = initialDraft;
-    _segmentTranscript = '';
-    _latestDraft = initialDraft;
+    _latestDraft = '';
     _finalTranscript = '';
     _retryCount = 0;
     _decisionIssued = false;
@@ -67,7 +58,6 @@ class SpeechSessionController {
   SpeechSessionDecision recordTranscript(
     String transcript, {
     required bool isFinal,
-    bool isComplete = true,
   }) {
     if (_decisionIssued ||
         (_state != SpeechSessionState.listening &&
@@ -76,72 +66,36 @@ class SpeechSessionController {
     }
 
     final normalized = transcript.trim();
-    if (normalized.isNotEmpty) {
-      _segmentTranscript = normalized;
-      _latestDraft = mergeSpeechTranscripts(
-        _committedTranscript,
-        _segmentTranscript,
-      );
-    }
+    if (normalized.isNotEmpty) _latestDraft = normalized;
     if (!isFinal) return SpeechSessionDecision.none;
 
-    if (_latestDraft.isEmpty) return _failWithDraft();
-    if (!isComplete) return _continueOrPreserve();
+    if (normalized.isEmpty) {
+      _state = SpeechSessionState.failed;
+      _decisionIssued = true;
+      return _draftDecision();
+    }
 
-    _finalTranscript = _latestDraft;
+    _finalTranscript = normalized;
     _state = SpeechSessionState.finalizing;
     return _emitFinal();
   }
 
-  SpeechSessionDecision onRecognizerStopped({
-    bool isComplete = true,
-    bool retryWhenEmpty = false,
-  }) {
+  SpeechSessionDecision onRecognizerStopped() {
     if (_decisionIssued) return SpeechSessionDecision.none;
     if (_state != SpeechSessionState.listening &&
         _state != SpeechSessionState.finalizing) {
       return SpeechSessionDecision.none;
     }
-    if (_finalTranscript.isNotEmpty && isComplete) return _emitFinal();
-    if (_latestDraft.isNotEmpty && isComplete) {
+    if (_finalTranscript.isNotEmpty) return _emitFinal();
+    if (_latestDraft.isNotEmpty) {
       _finalTranscript = _latestDraft;
       _state = SpeechSessionState.finalizing;
       return _emitFinal();
     }
-    if (_latestDraft.isNotEmpty || retryWhenEmpty) {
-      return _continueOrPreserve();
-    }
 
-    return _failWithDraft();
-  }
-
-  /// Finalizes a command as soon as its meaning is complete and the partial
-  /// transcript has remained stable for the UI's short debounce period.
-  SpeechSessionDecision onStableTranscript({required bool isComplete}) {
-    if (_decisionIssued || _state != SpeechSessionState.listening) {
-      return SpeechSessionDecision.none;
-    }
-    if (!isComplete || _latestDraft.isEmpty) {
-      return SpeechSessionDecision.none;
-    }
-    _finalTranscript = _latestDraft;
-    _state = SpeechSessionState.finalizing;
-    return _emitFinal();
-  }
-
-  /// Ends the whole voice session without starting another recognizer cycle.
-  SpeechSessionDecision onSessionExpired({required bool isComplete}) {
-    if (_decisionIssued ||
-        (_state != SpeechSessionState.listening &&
-            _state != SpeechSessionState.finalizing)) {
-      return SpeechSessionDecision.none;
-    }
-    if (isComplete && _latestDraft.isNotEmpty) {
-      _finalTranscript = _latestDraft;
-      _state = SpeechSessionState.finalizing;
-      return _emitFinal();
-    }
-    return _failWithDraft();
+    _state = SpeechSessionState.failed;
+    _decisionIssued = true;
+    return _draftDecision();
   }
 
   SpeechSessionDecision onRecognizerError({required bool retryable}) {
@@ -153,7 +107,13 @@ class SpeechSessionController {
     if (_finalTranscript.isNotEmpty) return _emitFinal();
 
     if (retryable && _retryCount < maxRetries) {
-      return _continueListening();
+      _retryCount++;
+      _state = SpeechSessionState.listening;
+      _finalTranscript = '';
+      return SpeechSessionDecision(
+        SpeechSessionAction.retry,
+        transcript: _latestDraft,
+      );
     }
 
     _state = SpeechSessionState.failed;
@@ -180,8 +140,6 @@ class SpeechSessionController {
 
   void reset() {
     _state = SpeechSessionState.idle;
-    _committedTranscript = '';
-    _segmentTranscript = '';
     _latestDraft = '';
     _finalTranscript = '';
     _retryCount = 0;
@@ -203,60 +161,4 @@ class SpeechSessionController {
       transcript: _latestDraft,
     );
   }
-
-  SpeechSessionDecision _continueOrPreserve() {
-    if (_retryCount < maxRetries) return _continueListening();
-    return _failWithDraft();
-  }
-
-  SpeechSessionDecision _continueListening() {
-    _retryCount++;
-    _committedTranscript = _latestDraft;
-    _segmentTranscript = '';
-    _finalTranscript = '';
-    _state = SpeechSessionState.listening;
-    return SpeechSessionDecision(
-      SpeechSessionAction.retry,
-      transcript: _latestDraft,
-    );
-  }
-
-  SpeechSessionDecision _failWithDraft() {
-    _state = SpeechSessionState.failed;
-    _decisionIssued = true;
-    return _draftDecision();
-  }
-}
-
-/// Joins recognizer segments while removing the repeated words Android often
-/// includes at the boundary of a restarted listening cycle.
-String mergeSpeechTranscripts(String previous, String next) {
-  final left = previous.trim();
-  final right = next.trim();
-  if (left.isEmpty) return right;
-  if (right.isEmpty) return left;
-
-  final leftWords = left.split(RegExp(r'\s+'));
-  final rightWords = right.split(RegExp(r'\s+'));
-  final maximumOverlap = leftWords.length < rightWords.length
-      ? leftWords.length
-      : rightWords.length;
-  var overlap = 0;
-  for (var size = maximumOverlap; size > 0; size--) {
-    var matches = true;
-    for (var index = 0; index < size; index++) {
-      final leftWord = leftWords[leftWords.length - size + index];
-      final rightWord = rightWords[index];
-      if (leftWord.toLowerCase() != rightWord.toLowerCase()) {
-        matches = false;
-        break;
-      }
-    }
-    if (matches) {
-      overlap = size;
-      break;
-    }
-  }
-
-  return [...leftWords, ...rightWords.skip(overlap)].join(' ');
 }
