@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
-import 'workspace_provider.dart';
 
 class ExpenseState {
   final List<Expense> allExpenses;
@@ -67,7 +66,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     final active = <Expense>[];
     final deleted = <Expense>[];
     for (final entry in _box.values) {
-      final normalized = entry.workspaceId.trim().isEmpty
+      final normalized = entry.workspaceId != 'personal'
           ? entry.copyWith(workspaceId: 'personal')
           : entry;
       if (normalized.deletedAt == null) {
@@ -364,18 +363,6 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     );
   }
 
-  Future<void> reassignWorkspace(String fromId, String toId) async {
-    if (fromId == toId) return;
-    final updates = <dynamic, Expense>{};
-    for (final key in _box.keys) {
-      final entry = _box.get(key);
-      if (entry != null && entry.workspaceId == fromId) {
-        updates[key] = entry.copyWith(workspaceId: toId);
-      }
-    }
-    await _box.putAll(updates);
-    _loadExpenses();
-  }
 }
 
 final expenseProvider =
@@ -458,13 +445,11 @@ bool isValidTransactionBatch(
 final monthlyLedgerProvider =
     Provider.family<MonthlyLedgerSummary, DateTime>((ref, focusedMonth) {
   final allExpenses = ref.watch(expenseProvider).allExpenses;
-  final workspaceId = ref.watch(selectedWorkspaceIdProvider);
   final transactions = <Expense>[];
   double income = 0;
   double spent = 0;
 
   for (final entry in allExpenses) {
-    if (entry.workspaceId != workspaceId) continue;
     if (entry.date.year != focusedMonth.year ||
         entry.date.month != focusedMonth.month) {
       continue;

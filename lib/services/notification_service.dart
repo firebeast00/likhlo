@@ -4,6 +4,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_10y.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:hive/hive.dart';
+import '../models/expense_model.dart';
+import '../models/wallet_model.dart';
 import 'notification_entry_service.dart';
 
 @pragma('vm:entry-point')
@@ -13,7 +15,13 @@ void notificationTapBackground(NotificationResponse response) async {
     input: response.input ?? '',
     notificationId: response.id ?? NotificationService.persistentBarId,
   );
-  await NotificationService().showNotificationEntryResult(result);
+  try {
+    await NotificationService().showNotificationEntryResult(result);
+  } finally {
+    // Re-posting the pinned card clears Android's remote-input spinner and
+    // immediately displays the updated balance after a successful save.
+    await NotificationService().refreshPersistentStatusBarWidget();
+  }
 }
 
 class NotificationService {
@@ -47,6 +55,7 @@ class NotificationService {
 
   Future<void> init({void Function(String action)? onAction}) async {
     if (onAction != null) onActionTriggered = onAction;
+    if (_initialized) return;
     tz.initializeTimeZones();
 
     // Android Initialization Settings
@@ -200,7 +209,7 @@ class NotificationService {
         actions: const [
           AndroidNotificationAction(
             inlineEntryActionId,
-            '⌨️ Type Entry',
+            'Type entry',
             inputs: <AndroidNotificationActionInput>[
               AndroidNotificationActionInput(
                 label: 'e.g. 500 biryani from JazzCash',
@@ -211,14 +220,8 @@ class NotificationService {
             cancelNotification: false,
           ),
           AndroidNotificationAction(
-            'action_add_expense',
-            '➕ Log Expense',
-            showsUserInterface: true,
-            cancelNotification: false,
-          ),
-          AndroidNotificationAction(
             'action_voice_log',
-            '🎙️ Voice Log',
+            'Voice entry',
             showsUserInterface: true,
             cancelNotification: false,
           ),
@@ -227,14 +230,60 @@ class NotificationService {
 
       await _notifications.show(
         persistentBarId,
-        "Likhlo Quick Ledger ⚡",
-        "Today's Spend: Rs. ${spentToday.toStringAsFixed(0)} • Remaining: Rs. ${remainingToday.toStringAsFixed(0)}",
+        'Likhlo Quick Entry',
+        'Spent today: Rs. ${spentToday.toStringAsFixed(0)} • Balance: Rs. ${remainingToday.toStringAsFixed(0)}',
         details,
-        payload: 'action_add_expense',
       );
     } catch (e) {
       debugPrint("❌ Error showing Persistent Notification: $e");
     }
+  }
+
+  Future<void> setPersistentStatusBarEnabled(bool enabled) async {
+    if (Hive.isBoxOpen('preferences')) {
+      await Hive.box('preferences').put('persistent_bar_enabled', enabled);
+    }
+    if (!enabled) {
+      await cancelNotification(persistentBarId);
+      return;
+    }
+    if (!_initialized) await init();
+    await refreshPersistentStatusBarWidget();
+  }
+
+  Future<void> refreshPersistentStatusBarWidget() async {
+    if (!Hive.isBoxOpen('expenses') || !Hive.isBoxOpen('wallets')) return;
+    final entries = Hive.box<Expense>('expenses')
+        .values
+        .where((entry) => entry.deletedAt == null)
+        .toList(growable: false);
+    final wallets = Hive.box<Wallet>('wallets').values;
+    final movements = <String, double>{};
+    var spentToday = 0.0;
+    final now = DateTime.now();
+    for (final entry in entries) {
+      movements.update(
+        entry.walletId,
+        (value) => value +
+            (entry.type == 'income' ? entry.amount : -entry.amount),
+        ifAbsent: () => entry.type == 'income' ? entry.amount : -entry.amount,
+      );
+      if (entry.type == 'expense' &&
+          entry.category != 'Transfer' &&
+          entry.date.year == now.year &&
+          entry.date.month == now.month &&
+          entry.date.day == now.day) {
+        spentToday += entry.amount;
+      }
+    }
+    final totalAvailable = wallets.fold<double>(
+      0,
+      (sum, wallet) => sum + wallet.balance + (movements[wallet.id] ?? 0),
+    );
+    await updatePersistentStatusBarWidget(
+      remainingToday: totalAvailable,
+      spentToday: spentToday,
+    );
   }
 
   // ==================== ⏰ 2. SMART ENTRY REMINDERS ====================

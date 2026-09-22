@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
-import '../providers/workspace_provider.dart';
 import 'transaction_title_policy.dart';
 import 'audio_feedback_service.dart';
 import 'deterministic_feedback_service.dart';
@@ -187,19 +186,17 @@ class TransactionExecutor {
   final TransactionStore store;
   final AudioFeedbackService audioFeedback;
   final bool enableAudio;
-  final String defaultWorkspaceId;
 
   TransactionExecutor(
     this.store, {
     AudioFeedbackService? audioFeedback,
     this.enableAudio = true,
-    this.defaultWorkspaceId = 'personal',
   }) : audioFeedback = audioFeedback ?? AudioFeedbackService();
 
   Future<TransactionResult> execute(LedgerCommand command) async {
     switch (command) {
       case CreateTransactionCommand():
-        final entry = _prepareNewEntry(command.entry);
+        final entry = _prepareForMainLedger(command.entry);
         final saved = await store.add(entry);
         if (saved && enableAudio) {
           unawaited(
@@ -249,7 +246,7 @@ class TransactionExecutor {
             reason: 'Confirm the receipt total difference before saving.',
           );
         }
-        final entries = command.entries.map(_prepareNewEntry).toList();
+        final entries = command.entries.map(_prepareForMainLedger).toList();
         final saved = await store.addAll(entries);
         if (saved && enableAudio) {
           unawaited(
@@ -278,8 +275,8 @@ class TransactionExecutor {
             reason: 'A transfer requires a valid outgoing and incoming pair.',
           );
         }
-        final outgoing = _prepareNewEntry(command.outgoing);
-        final incoming = _prepareNewEntry(command.incoming);
+        final outgoing = _prepareForMainLedger(command.outgoing);
+        final incoming = _prepareForMainLedger(command.incoming);
         final saved = await store.addAll([outgoing, incoming]);
         if (saved && enableAudio) {
           unawaited(
@@ -300,7 +297,7 @@ class TransactionExecutor {
           reason: saved ? null : 'Ledger validation rejected the transfer.',
         );
       case UpdateTransactionCommand():
-        final updatedEntry = _withCoreTitle(command.updated);
+        final updatedEntry = _prepareForMainLedger(command.updated);
         final updated = await store.update(
           command.existingId,
           updatedEntry,
@@ -464,18 +461,16 @@ class TransactionExecutor {
     return entry.copyWith(title: title);
   }
 
-  Expense _prepareNewEntry(Expense entry) {
+  Expense _prepareForMainLedger(Expense entry) {
     final titled = _withCoreTitle(entry);
-    if (titled.workspaceId != 'personal' || defaultWorkspaceId == 'personal') {
-      return titled;
-    }
-    return titled.copyWith(workspaceId: defaultWorkspaceId);
+    return titled.workspaceId == 'personal'
+        ? titled
+        : titled.copyWith(workspaceId: 'personal');
   }
 }
 
 final transactionExecutorProvider = Provider<TransactionExecutor>((ref) {
   return TransactionExecutor(
     ExpenseTransactionStore(ref.read(expenseProvider.notifier)),
-    defaultWorkspaceId: ref.watch(selectedWorkspaceIdProvider),
   );
 });

@@ -91,10 +91,6 @@ class AppDrawer extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               children: [
-                _buildDrawerItem(context, 'Workspaces', Icons.workspaces_outline,
-                    primaryColor, isDark),
-                _buildDrawerItem(context, 'Udhaar', Icons.handshake_outlined,
-                    primaryColor, isDark),
                 _buildDrawerItem(context, 'Settings', Icons.settings_rounded,
                     primaryColor, isDark),
                 _buildDrawerItem(context, 'Trash', Icons.delete_outline_rounded,

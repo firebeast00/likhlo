@@ -14,6 +14,7 @@ import 'models/workspace_model.dart';
 
 // Services
 import "./services/notification_service.dart";
+import './services/workspace_retirement_service.dart';
 
 // Providers
 import 'providers/settings_provider.dart';
@@ -35,6 +36,8 @@ void main() async {
     if (!Hive.isAdapterRegistered(8)) {
       Hive.registerAdapter(WalletAdapter()); // 🚀 ADDED (TypeId 8)
     }
+    // Legacy schema support for backups created before custom dashboards were
+    // merged into the single Main ledger.
     if (!Hive.isAdapterRegistered(9)) {
       Hive.registerAdapter(WorkspaceAdapter());
     }
@@ -44,7 +47,6 @@ void main() async {
       Hive.openBox('settings'),
       Hive.openBox('preferences'),
       Hive.openBox<Wallet>('wallets'),
-      Hive.openBox<Workspace>('workspaces'),
     ]);
   } catch (e) {
     storageError = e;
@@ -60,14 +62,18 @@ void main() async {
   // Keep the first frame independent from notification plug-in work. The
   // native splash remains visible only while essential local storage opens.
   if (storageError == null) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 1200), () async {
-        try {
-          await NotificationService().init();
-        } catch (e) {
-          debugPrint("Notification Initialization Error: $e");
-        }
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await WorkspaceRetirementService.mergeIntoMain();
+      } catch (e) {
+        debugPrint('Workspace retirement migration error: $e');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      try {
+        await NotificationService().init();
+      } catch (e) {
+        debugPrint("Notification Initialization Error: $e");
+      }
     });
   }
 }

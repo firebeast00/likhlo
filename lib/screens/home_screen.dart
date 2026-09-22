@@ -13,15 +13,12 @@ import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
-import '../providers/workspace_provider.dart';
 import '../models/expense_model.dart';
-import '../models/debt_model.dart';
 import '../models/wallet_model.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/dashboard_content.dart';
+import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/transaction_message_card.dart';
-import '../widgets/workspace_selector.dart';
-import 'debt_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
 import 'about_screen.dart';
@@ -38,7 +35,6 @@ import '../services/transaction_title_policy.dart';
 import './income_accounts_screen.dart';
 import './trash_screen.dart';
 import './receipt_review_screen.dart';
-import './workspaces_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -62,6 +58,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   SmartEntryTimeRange? _smartEntrySearchRange;
   bool _smartEntrySearchAllHistory = false;
   final ScrollController _categoryScrollCtrl = ScrollController();
+  final PrimaryLedgerTabsController _primaryTabsController =
+      PrimaryLedgerTabsController();
+  PrimaryLedgerTab _activePrimaryTab = PrimaryLedgerTab.main;
 
   late AnimationController _fabController;
   late Animation<double> _fabScale;
@@ -281,6 +280,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _activeMessageEntry?.remove();
     _activeMessageEntry = null;
     _categoryScrollCtrl.dispose();
+    _primaryTabsController.dispose();
     _smartInputCtrl.dispose();
     super.dispose();
   }
@@ -289,33 +289,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     Duration delay = const Duration(milliseconds: 350),
   }) {
     _notificationUpdateTimer?.cancel();
-    _notificationUpdateTimer = Timer(delay, () {
+    _notificationUpdateTimer = Timer(delay, () async {
       if (!mounted) return;
-      final now = DateTime.now();
-      final expenses = ref.read(expenseProvider).allExpenses;
-      final wallets = ref.read(walletProvider);
-      final walletNotifier = ref.read(walletProvider.notifier);
-
-      final totalAvailable = wallets.fold<double>(
-        0,
-            (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
-      );
-
-      double spentToday = 0;
-      for (final entry in expenses) {
-        if (entry.category == 'Transfer') continue;
-        if (entry.type == 'expense' &&
-            entry.date.year == now.year &&
-            entry.date.month == now.month &&
-            entry.date.day == now.day) {
-          spentToday += entry.amount;
-        }
-      }
-
-      NotificationService().updatePersistentStatusBarWidget(
-        remainingToday: totalAvailable,
-        spentToday: spentToday,
-      );
+      await NotificationService().refreshPersistentStatusBarWidget();
     });
   }
 
@@ -396,18 +372,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   Future<void> _changeView(String view) async {
     _dismissKeyboard();
-    if (!mounted || view == _currentView) return;
-
-    try {
-      if (view == 'Udhaar' && !Hive.isBoxOpen('debts')) {
-        await Hive.openBox<DebtEntry>('debts');
-      }
-    } catch (error) {
-      if (mounted) {
-        _showTransactionError('Could not open $view. Please try again.');
+    if (view == 'Dashboard' || view == 'Main' || view == 'Udhaar' || view == 'Udhar') {
+      final tab = view == 'Udhaar' || view == 'Udhar'
+          ? PrimaryLedgerTab.udhar
+          : PrimaryLedgerTab.main;
+      if (!mounted) return;
+      setState(() {
+        _currentView = 'Dashboard';
+        _activePrimaryTab = tab;
+        _isSearching = false;
+        _searchQuery = '';
+        _smartEntryTypeFilter = null;
+        _smartEntrySearchRange = null;
+        _smartEntrySearchAllHistory = false;
+      });
+      _primaryTabsController.select(tab);
+      if (tab == PrimaryLedgerTab.main) {
+        _queuePersistentNotificationUpdate();
       }
       return;
     }
+    if (!mounted || view == _currentView) return;
 
     if (!mounted) return;
     setState(() {
@@ -418,8 +403,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _smartEntrySearchRange = null;
       _smartEntrySearchAllHistory = false;
     });
-
-    if (view == 'Dashboard') _queuePersistentNotificationUpdate();
   }
 
   void _showAddCategoryDialog() {
@@ -1084,7 +1067,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final workspaceState = ref.watch(workspaceProvider);
 
     if (_currentView != 'Dashboard') {
       return Scaffold(
@@ -1132,12 +1114,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     var displayExpenses = List<Expense>.from(
       _isSearching && _smartEntrySearchAllHistory
-          ? visibleTransactions(
-              allExpenses
-                  .where(
-                    (entry) => entry.workspaceId == workspaceState.selectedId,
-                  ),
-            )
+          ? visibleTransactions(allExpenses)
           : monthlyTransactions,
     );
 
@@ -1182,12 +1159,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 ),
                 onChanged: (value) => setState(() => _searchQuery = value),
               )
-            : WorkspaceSelector(
-                workspaces: workspaceState.workspaces,
-                selectedId: workspaceState.selectedId,
-                onSelected: (id) {
-                  unawaited(ref.read(workspaceProvider.notifier).select(id));
-                },
+            : Text(
+                _activePrimaryTab == PrimaryLedgerTab.main ? 'Main' : 'Udhar',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                ),
               ),
         centerTitle: true,
         leading: Builder(
@@ -1200,19 +1177,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           ),
         ),
         actions: [
-          if (_currentView == 'Dashboard' && !_isSearching)
-            IconButton(
-              tooltip: 'Manage workspaces',
-              icon: const Icon(Icons.workspaces_outline, size: 21),
-              onPressed: () => _changeView('Workspaces'),
-            ),
-          if (_currentView == 'Dashboard' && !_isSearching)
+          if (_activePrimaryTab == PrimaryLedgerTab.main && !_isSearching)
             IconButton(
               tooltip: 'Wallets',
               icon: const Icon(Icons.account_balance_wallet_outlined, size: 22),
               onPressed: _openIncomeAccounts,
             ),
-          if (_currentView == 'Dashboard')
+          if (_activePrimaryTab == PrimaryLedgerTab.main)
             IconButton(
               tooltip: _isSearching ? 'Close search' : 'Search',
               icon: Icon(
@@ -1234,33 +1205,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
         ],
       ),
-      body: DashboardContent(
-        isLandscape: isLandscape,
-        isSearching: _isSearching,
-        moneySetupCard:
-            showMoneySetup ? _buildMoneySetupCard(primaryColor) : null,
-        monthSelector: _buildMonthSelector(isDark),
-        heroCard: _buildHeroCard(
-          totalAvailable,
-          globalSpent,
-          wallets,
-          primaryColor,
-        ),
-        smartInputBar: _buildSmartInputBar(primaryColor, isDark, wallets),
-        categoryTabs: _buildCategoryTabsWidget(
-          categories,
-          primaryColor,
-          isDark,
-        ),
-        transactionListBuilder: (isSliver) => _buildExpenseList(
-          displayExpenses,
-          primaryColor,
-          isDark,
-          isSliver: isSliver,
+      body: PrimaryLedgerTabs(
+        controller: _primaryTabsController,
+        onChanged: (tab) {
+          if (!mounted || _activePrimaryTab == tab) return;
+          setState(() {
+            _activePrimaryTab = tab;
+            if (tab == PrimaryLedgerTab.udhar) {
+              _isSearching = false;
+              _searchQuery = '';
+              _smartEntryTypeFilter = null;
+              _smartEntrySearchRange = null;
+              _smartEntrySearchAllHistory = false;
+            }
+          });
+        },
+        mainTab: DashboardContent(
+          isLandscape: isLandscape,
+          isSearching: _isSearching,
+          moneySetupCard:
+              showMoneySetup ? _buildMoneySetupCard(primaryColor) : null,
+          monthSelector: _buildMonthSelector(isDark),
+          heroCard: _buildHeroCard(
+            totalAvailable,
+            globalSpent,
+            wallets,
+            primaryColor,
+          ),
+          smartInputBar: _buildSmartInputBar(primaryColor, isDark, wallets),
+          categoryTabs: _buildCategoryTabsWidget(
+            categories,
+            primaryColor,
+            isDark,
+          ),
+          transactionListBuilder: (isSliver) => _buildExpenseList(
+            displayExpenses,
+            primaryColor,
+            isDark,
+            isSliver: isSliver,
+          ),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: (_currentView == 'Dashboard') ? GestureDetector(
+      floatingActionButton: _activePrimaryTab == PrimaryLedgerTab.main
+          ? GestureDetector(
         onTapDown: (_) => _fabController.forward(),
         onTapUp: (_) { _fabController.reverse(); _showAddOrEditModal(); },
         onTapCancel: () => _fabController.reverse(),
@@ -1282,7 +1270,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text("Add Transaction", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))]),
           ),
         ),
-      ) : null,
+            )
+          : null,
     );
   }
 
@@ -1368,12 +1357,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildOtherViews() {
-    if (_currentView == 'Udhaar') return const DebtScreen();
     if (_currentView == 'Stats') return const StatsScreen();
     if (_currentView == 'Settings') return const SettingsScreen();
     if (_currentView == 'About') return const AboutScreen();
     if (_currentView == 'Trash') return const TrashScreen();
-    if (_currentView == 'Workspaces') return const WorkspacesScreen();
     return const SizedBox.shrink();
   }
 
@@ -3165,11 +3152,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         required bool deleting,
         bool repeating = false,
       }) async {
-    final selectedWorkspaceId = ref.read(selectedWorkspaceIdProvider);
     final allEntries = ref
         .read(expenseProvider)
-        .allExpenses
-        .where((entry) => entry.workspaceId == selectedWorkspaceId);
+        .allExpenses;
     final entriesById = {
       for (final entry in allEntries) entry.id: entry,
     };
@@ -3501,11 +3486,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     for (final account in accounts) {
       if (account.id == walletId) mentionedAccount = account;
     }
-    final selectedWorkspaceId = ref.read(selectedWorkspaceIdProvider);
     final allEntries = ref
         .read(expenseProvider)
         .allExpenses
-        .where((entry) => entry.workspaceId == selectedWorkspaceId)
         .toList(growable: false);
     final match = matchSmartEntryTransaction(
       command: command,
@@ -3655,10 +3638,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     var entries = ref
         .read(expenseProvider)
         .allExpenses
-        .where(
-          (entry) =>
-              entry.workspaceId == ref.read(selectedWorkspaceIdProvider),
-        )
         .where((entry) => entry.category != 'Transfer')
         .where((entry) => matchesSmartEntryTimeRange(
       entry.date,
@@ -3737,6 +3716,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
     setState(() {
       _currentView = 'Dashboard';
+      _activePrimaryTab = PrimaryLedgerTab.main;
       _isSearching = true;
       _searchQuery = query;
       _selectedCategoryTab = category;
@@ -3744,6 +3724,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _smartEntrySearchRange = command.timeRange;
       _smartEntrySearchAllHistory = true;
     });
+    _primaryTabsController.select(PrimaryLedgerTab.main);
     _smartInputCtrl.clear();
     _showTransactionInfo(
       'Close search to return to the normal monthly view.',
@@ -3861,11 +3842,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
     }
 
-    final selectedWorkspaceId = ref.read(selectedWorkspaceIdProvider);
     final allEntries = ref
         .read(expenseProvider)
         .allExpenses
-        .where((entry) => entry.workspaceId == selectedWorkspaceId)
         .toList(growable: false);
     final match = matchSmartEntryTransaction(
       command: command,

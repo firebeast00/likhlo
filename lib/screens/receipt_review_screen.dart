@@ -6,7 +6,6 @@ import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
-import '../providers/workspace_provider.dart';
 import '../services/ocr_scanner_service.dart';
 import '../services/transaction_executor.dart';
 
@@ -477,7 +476,6 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
     setState(() => _saving = true);
     try {
       final executor = ref.read(transactionExecutorProvider);
-      final workspaceId = ref.read(selectedWorkspaceIdProvider);
       TransactionResult result;
       if (_mode == _ReceiptSaveMode.total) {
         final amount = double.tryParse(_totalController.text.trim());
@@ -495,7 +493,6 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
               category: category,
               colorValue: 0xFFEF4444,
               walletId: walletId,
-              workspaceId: workspaceId,
             ),
           ),
         );
@@ -523,7 +520,6 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
               category: row.category!,
               colorValue: 0xFFEF4444,
               walletId: row.walletId!,
-              workspaceId: workspaceId,
             ),
           );
         }

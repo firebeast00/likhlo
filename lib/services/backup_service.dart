@@ -66,13 +66,21 @@ class BackupService {
       'createdAt': DateTime.now().toUtc().toIso8601String(),
       'app': 'Likhlo',
       'data': <String, dynamic>{
-        'expenses': boxes.expenses.values.map(_expenseToJson).toList(),
+        'expenses': boxes.expenses.values
+            .map((entry) => entry.copyWith(workspaceId: 'personal'))
+            .map(_expenseToJson)
+            .toList(),
         'wallets': boxes.wallets.values.map(_walletToJson).toList(),
         'debts': boxes.debts.values.map(_debtToJson).toList(),
         'messEntries': boxes.mess.values.map(_messToJson).toList(),
-        'workspaces': boxes.workspaces.values.map(_workspaceToJson).toList(),
+        // Schema compatibility only: custom dashboards were retired and all
+        // transactions now belong to the single Main ledger.
+        'workspaces': [_workspaceToJson(_mainWorkspace())],
         'settings': _entriesToJson(boxes.settings),
-        'preferences': _entriesToJson(boxes.preferences),
+        'preferences': _entriesToJson(
+          boxes.preferences,
+          excludedKeys: const {'selected_workspace_id_v1'},
+        ),
       },
     };
   }
@@ -215,7 +223,10 @@ class BackupService {
         ) ==
         true;
     await boxes.expenses.clear();
-    await boxes.expenses.putAll({for (final e in backup.expenses) e.id: e});
+    await boxes.expenses.putAll({
+      for (final e in backup.expenses)
+        e.id: e.copyWith(workspaceId: 'personal'),
+    });
     await boxes.wallets.clear();
     await boxes.wallets.putAll({for (final e in backup.wallets) e.id: e});
     await boxes.debts.clear();
@@ -223,13 +234,13 @@ class BackupService {
     await boxes.mess.clear();
     await boxes.mess.putAll({for (final e in backup.messEntries) e.id: e});
     await boxes.workspaces.clear();
-    await boxes.workspaces.putAll({
-      for (final workspace in backup.workspaces) workspace.id: workspace,
-    });
+    final mainWorkspace = _mainWorkspace();
+    await boxes.workspaces.put(mainWorkspace.id, mainWorkspace);
     await boxes.settings.clear();
     await boxes.settings.putAll(backup.settings);
     await boxes.preferences.clear();
     await boxes.preferences.putAll(backup.preferences);
+    await boxes.preferences.delete('selected_workspace_id_v1');
     await boxes.preferences.put(
       BiometricService.preferenceKey,
       localAppLockEnabled,
@@ -257,12 +268,25 @@ class BackupService {
     );
   }
 
-  static List<Map<String, dynamic>> _entriesToJson(Box box) => box.keys
+  static List<Map<String, dynamic>> _entriesToJson(
+    Box box, {
+    Set<dynamic> excludedKeys = const {},
+  }) => box.keys
+      .where((key) => !excludedKeys.contains(key))
       .map((key) => <String, dynamic>{
             'key': _jsonSafe(key),
             'value': _jsonSafe(box.get(key)),
           })
       .toList(growable: false);
+
+  static Workspace _mainWorkspace() => Workspace(
+        id: 'personal',
+        name: 'Main',
+        colorValue: 0xFF2563EB,
+        iconCodePoint: 0xe491,
+        position: 0,
+        isDefault: true,
+      );
 
   static Map<dynamic, dynamic> _entriesFromJson(List<dynamic> entries) {
     final result = <dynamic, dynamic>{};

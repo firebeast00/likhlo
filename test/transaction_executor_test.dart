@@ -237,20 +237,19 @@ void main() {
     expect(store.entries.keys, containsAll(['tea', 'meal']));
   });
 
-  test('new entries inherit the selected workspace without changing wallets',
-      () async {
+  test('new entries always use Main without changing wallets', () async {
     final store = _FakeStore();
     final executor = TransactionExecutor(
       store,
       enableAudio: false,
-      defaultWorkspaceId: 'freelance',
     );
-    final entry = _entry(id: 'job', type: 'income', walletId: 'bank');
+    final entry = _entry(id: 'job', type: 'income', walletId: 'bank')
+        .copyWith(workspaceId: 'freelance');
 
     final saved = await executor.execute(CreateTransactionCommand(entry));
 
     expect(saved.succeeded, isTrue);
-    expect(store.entries['job']?.workspaceId, 'freelance');
+    expect(store.entries['job']?.workspaceId, 'personal');
     expect(store.entries['job']?.walletId, 'bank');
   });
 

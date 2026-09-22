@@ -1,0 +1,191 @@
+import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import '../models/debt_model.dart';
+import '../screens/debt_screen.dart';
+
+enum PrimaryLedgerTab { main, udhar }
+
+class PrimaryLedgerTabsController extends ChangeNotifier {
+  PrimaryLedgerTab _selected = PrimaryLedgerTab.main;
+
+  PrimaryLedgerTab get selected => _selected;
+
+  void select(PrimaryLedgerTab tab) {
+    if (_selected == tab) return;
+    _selected = tab;
+    notifyListeners();
+  }
+}
+
+class PrimaryLedgerTabs extends StatefulWidget {
+  final PrimaryLedgerTabsController controller;
+  final Widget mainTab;
+  final ValueChanged<PrimaryLedgerTab>? onChanged;
+
+  const PrimaryLedgerTabs({
+    super.key,
+    required this.controller,
+    required this.mainTab,
+    this.onChanged,
+  });
+
+  @override
+  State<PrimaryLedgerTabs> createState() => _PrimaryLedgerTabsState();
+}
+
+class _PrimaryLedgerTabsState extends State<PrimaryLedgerTabs> {
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(
+      initialPage: _pageFor(widget.controller.selected),
+    );
+    widget.controller.addListener(_followController);
+  }
+
+  @override
+  void didUpdateWidget(PrimaryLedgerTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller == widget.controller) return;
+    oldWidget.controller.removeListener(_followController);
+    widget.controller.addListener(_followController);
+    _followController();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_followController);
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _followController() {
+    if (!_pageController.hasClients) return;
+    final page = _pageController.page?.round();
+    final targetPage = _pageFor(widget.controller.selected);
+    if (page != targetPage) {
+      _pageController.jumpToPage(targetPage);
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _select(PrimaryLedgerTab tab) {
+    widget.controller.select(tab);
+  }
+
+  void _onPageChanged(int index) {
+    final tab = index == 0 ? PrimaryLedgerTab.udhar : PrimaryLedgerTab.main;
+    widget.controller.select(tab);
+    widget.onChanged?.call(tab);
+  }
+
+  int _pageFor(PrimaryLedgerTab tab) =>
+      tab == PrimaryLedgerTab.main ? 1 : 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.controller.selected;
+    final primary = Theme.of(context).colorScheme.primary;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+          child: SegmentedButton<PrimaryLedgerTab>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(
+                value: PrimaryLedgerTab.main,
+                label: Text('Main'),
+                icon: Icon(Icons.home_outlined, size: 18),
+              ),
+              ButtonSegment(
+                value: PrimaryLedgerTab.udhar,
+                label: Text('Udhar'),
+                icon: Icon(Icons.handshake_outlined, size: 18),
+              ),
+            ],
+            selected: {selected},
+            onSelectionChanged: (selection) => _select(selection.first),
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              foregroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: 2,
+            onPageChanged: _onPageChanged,
+            itemBuilder: (context, index) => index == 0
+                ? const _LazyUdharTab()
+                : widget.mainTab,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LazyUdharTab extends StatefulWidget {
+  const _LazyUdharTab();
+
+  @override
+  State<_LazyUdharTab> createState() => _LazyUdharTabState();
+}
+
+class _LazyUdharTabState extends State<_LazyUdharTab> {
+  late Future<void> _ready;
+
+  @override
+  void initState() {
+    super.initState();
+    _ready = _openBox();
+  }
+
+  Future<void> _openBox() async {
+    if (!Hive.isBoxOpen('debts')) {
+      await Hive.openBox<DebtEntry>('debts');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _ready,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded, size: 42),
+                  const SizedBox(height: 12),
+                  const Text('Udhar records could not be opened.'),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => setState(() => _ready = _openBox()),
+                    child: const Text('Try again'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return const DebtScreen(embedded: true);
+      },
+    );
+  }
+}

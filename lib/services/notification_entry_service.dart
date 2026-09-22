@@ -3,7 +3,6 @@ import 'package:uuid/uuid.dart';
 
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
-import '../models/workspace_model.dart';
 import '../providers/expense_provider.dart';
 import 'confidence_evaluator.dart';
 import 'local_nlp_service.dart';
@@ -133,12 +132,6 @@ class NotificationEntryService {
         );
       }
 
-      final workspaceBox = Hive.box<Workspace>('workspaces');
-      final selectedWorkspace = preferences.get('selected_workspace_id_v1');
-      final workspaceId = selectedWorkspace is String &&
-              workspaceBox.containsKey(selectedWorkspace)
-          ? selectedWorkspace
-          : 'personal';
       final entry = Expense(
         id: const Uuid().v4(),
         title: coreTransactionTitle(parsed.title),
@@ -148,7 +141,6 @@ class NotificationEntryService {
         colorValue: 0xFF009688,
         type: type,
         walletId: walletId!,
-        workspaceId: workspaceId,
       );
       final execution = await TransactionExecutor(
         _HeadlessTransactionStore(),
@@ -178,15 +170,11 @@ class NotificationEntryService {
     await Hive.initFlutter();
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
     if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(WalletAdapter());
-    if (!Hive.isAdapterRegistered(9)) Hive.registerAdapter(WorkspaceAdapter());
     if (!Hive.isBoxOpen('preferences')) await Hive.openBox('preferences');
     if (!Hive.isBoxOpen('expenses')) {
       await Hive.openBox<Expense>('expenses');
     }
     if (!Hive.isBoxOpen('wallets')) await Hive.openBox<Wallet>('wallets');
-    if (!Hive.isBoxOpen('workspaces')) {
-      await Hive.openBox<Workspace>('workspaces');
-    }
   }
 
   Future<bool> _isDuplicate(Box preferences, int id, String input) async {

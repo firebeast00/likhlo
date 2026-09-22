@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
-import '../providers/workspace_provider.dart';
+import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
 import '../services/voice_privacy_service.dart';
 import 'backup_screen.dart';
@@ -31,12 +31,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _setPersistentQuickLog(bool enabled) async {
-    await _prefBox.put('persistent_bar_enabled', enabled);
-    if (!enabled) {
-      await NotificationService().cancelNotification(
-        NotificationService.persistentBarId,
-      );
+    final preferenceWrite =
+        _prefBox.put('persistent_bar_enabled', enabled);
+    if (mounted) setState(() {});
+    await preferenceWrite;
+    await NotificationService().setPersistentStatusBarEnabled(enabled);
+  }
+
+  Future<void> _setAppLock(bool enabled) async {
+    final result = await BiometricService().authenticate(
+      reason: enabled
+          ? 'Confirm your identity to enable Likhlo App Lock.'
+          : 'Confirm your identity to disable Likhlo App Lock.',
+      biometricOnly: false,
+    );
+    if (!mounted) return;
+    if (!result.authenticated) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(result.message)));
+      setState(() {});
+      return;
     }
+    await _prefBox.put(BiometricService.preferenceKey, enabled);
     if (mounted) setState(() {});
   }
 
@@ -226,6 +243,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _prefBox.get('persistent_bar_enabled', defaultValue: true);
     final bool remindersEnabled =
         _prefBox.get('daily_reminder_enabled', defaultValue: true);
+    final bool appLockEnabled = _prefBox.get(
+      BiometricService.preferenceKey,
+      defaultValue: false,
+    );
     final voicePrivacy = VoicePrivacySettings.read(_prefBox);
 
     return Scaffold(
@@ -428,8 +449,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             isDark: isDark,
             children: [
               _buildSwitchTile(
-                title: "Persistent Quick-Log",
-                subtitle: "Keep a live budget widget in status bar",
+                title: "Persistent Quick Entry",
+                subtitle: "Voice and direct text entry from the status bar",
                 icon: Icons.space_dashboard_rounded,
                 iconColor: Colors.teal,
                 value: persistentEnabled,
@@ -462,6 +483,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSettingsGroup(
             isDark: isDark,
             children: [
+              _buildSwitchTile(
+                title: "Likhlo App Lock",
+                subtitle:
+                    "Require fingerprint, Face ID, or device passcode after leaving the app",
+                icon: Icons.lock_outline_rounded,
+                iconColor: Colors.indigo,
+                value: appLockEnabled,
+                onChanged: _setAppLock,
+              ),
+              _buildDivider(),
               _buildSwitchTile(
                 title: "Cloud Voice Pilot",
                 subtitle:
@@ -630,18 +661,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // --- PROFESSIONAL PDF GENERATOR ---
   Future<void> _generatePdf(BuildContext context, WidgetRef ref) async {
     try {
-      final workspaceState = ref.read(workspaceProvider);
-      final workspaceId = workspaceState.selectedId;
-      final workspaceName = workspaceState.workspaces
-          .firstWhere(
-            (workspace) => workspace.id == workspaceId,
-            orElse: () => workspaceState.workspaces.first,
-          )
-          .name;
       final records = ref
           .read(expenseProvider)
           .allExpenses
-          .where((entry) => entry.workspaceId == workspaceId)
           .toList(growable: false);
       final expenses = visibleTransactions(records);
       final settings = ref.read(settingsProvider);
@@ -681,7 +703,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   fontWeight: pw.FontWeight.bold,
                                   color: pdfPrimaryColor)),
                           pw.SizedBox(height: 4),
-                          pw.Text("$workspaceName Financial Statement",
+                          pw.Text("Main Financial Statement",
                               style: const pw.TextStyle(
                                   fontSize: 14, color: PdfColors.grey700)),
                         ]),
@@ -711,7 +733,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text("Total Spending ($workspaceName):",
+                        pw.Text("Total Spending:",
                             style: pw.TextStyle(
                                 fontSize: 16, fontWeight: pw.FontWeight.bold)),
                         pw.Text("Rs. ${totalSpent.toStringAsFixed(2)}",
