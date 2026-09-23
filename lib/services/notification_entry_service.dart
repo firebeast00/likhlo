@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -158,7 +159,9 @@ class NotificationEntryService {
         NotificationEntryDisposition.saved,
         '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} saved.',
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Background notification entry failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       return const NotificationEntryResult(
         NotificationEntryDisposition.failed,
         'The entry could not be saved. Open Likhlo to try again.',
@@ -167,7 +170,11 @@ class NotificationEntryService {
   }
 
   Future<void> _openStorage() async {
-    await Hive.initFlutter();
+    if (!Hive.isBoxOpen('preferences') &&
+        !Hive.isBoxOpen('expenses') &&
+        !Hive.isBoxOpen('wallets')) {
+      await Hive.initFlutter();
+    }
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
     if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(WalletAdapter());
     if (!Hive.isBoxOpen('preferences')) await Hive.openBox('preferences');

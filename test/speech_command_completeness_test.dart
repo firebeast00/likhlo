@@ -48,6 +48,10 @@ void main() {
       check('transfer 500 from cash to jazzcash').isComplete,
       isTrue,
     );
+    expect(
+      check('transfer 5000 from jazzcash to cash').isComplete,
+      isTrue,
+    );
   });
 
   test('edit waits for selector and replacement value', () {

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/settings_provider.dart';
@@ -24,9 +26,25 @@ class AppDrawer extends ConsumerWidget {
         : "Student";
 
     return Drawer(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      child: Column(
-        children: [
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withValues(
+                    alpha: isDark ? 0.82 : 0.76,
+                  ),
+              border: Border(
+                right: BorderSide(
+                  color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.5),
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
           // 🌟 Elegant Profile Header with Gradient
           Container(
             width: double.infinity,
@@ -34,9 +52,17 @@ class AppDrawer extends ConsumerWidget {
                 const EdgeInsets.only(top: 60, bottom: 24, left: 24, right: 24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
+                colors: [
+                  primaryColor.withValues(alpha: isDark ? 0.72 : 0.8),
+                  primaryColor.withValues(alpha: isDark ? 0.32 : 0.42),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
+              ),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.16),
+                ),
               ),
             ),
             child: Row(
@@ -91,6 +117,8 @@ class AppDrawer extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               children: [
+                _buildDrawerItem(context, 'Stats', Icons.insights_rounded,
+                    primaryColor, isDark),
                 _buildDrawerItem(context, 'Settings', Icons.settings_rounded,
                     primaryColor, isDark),
                 _buildDrawerItem(context, 'Trash', Icons.delete_outline_rounded,
@@ -128,7 +156,10 @@ class AppDrawer extends ConsumerWidget {
               },
             ),
           )
-        ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

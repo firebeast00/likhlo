@@ -628,6 +628,32 @@ void main() {
       expect(resolution.destinationAccountId, 'jazz');
     });
 
+    test('resolves JazzCash to Cash without duplicating direction', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'cash',
+          name: 'Cash in Hand',
+          type: 'cash',
+          availableBalance: 1000,
+        ),
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 10000,
+        ),
+      ];
+
+      final resolution = resolveSmartEntryTransferAccounts(
+        'transfer 5000 from jazzcash to cash',
+        accounts,
+      );
+
+      expect(resolution, isNotNull);
+      expect(resolution!.sourceAccountId, 'jazz');
+      expect(resolution.destinationAccountId, 'cash');
+    });
+
     test('resolves Roman Urdu transfer direction', () {
       const accounts = [
         SmartEntryAccount(

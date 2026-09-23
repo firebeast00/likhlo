@@ -11,7 +11,7 @@ enum SpeechSessionAction {
   none,
   processFinal,
   retry,
-  preserveDraft,
+  discardDraft,
 }
 
 class SpeechSessionDecision {
@@ -31,13 +31,12 @@ class SpeechSessionDecision {
 /// An explicit final result is preferred. Some device recognizers emit only
 /// partial callbacks and then end normally, so a normal stop promotes the best
 /// available transcript through the same semantic validation pipeline. Error
-/// callbacks still preserve partial text instead of executing it.
+/// callbacks discard partial text instead of executing or reusing it.
 class SpeechSessionController {
   final int maxRetries;
 
   SpeechSessionState _state = SpeechSessionState.idle;
   String _latestDraft = '';
-  String _continuationBase = '';
   String _finalTranscript = '';
   int _retryCount = 0;
   bool _decisionIssued = false;
@@ -48,11 +47,9 @@ class SpeechSessionController {
   String get latestDraft => _latestDraft;
   int get retryCount => _retryCount;
 
-  void start({String initialTranscript = ''}) {
-    final seededTranscript = _normalizeSpeech(initialTranscript);
+  void start() {
     _state = SpeechSessionState.listening;
-    _latestDraft = seededTranscript;
-    _continuationBase = seededTranscript;
+    _latestDraft = '';
     _finalTranscript = '';
     _retryCount = 0;
     _decisionIssued = false;
@@ -71,14 +68,16 @@ class SpeechSessionController {
 
     final normalized = _normalizeSpeech(transcript);
     if (normalized.isNotEmpty) {
-      _latestDraft = mergeSpeechTranscripts(_continuationBase, normalized);
+      // Device recognizers normally send cumulative partials. Replacing the
+      // draft avoids duplicated amounts/titles when a partial is corrected.
+      _latestDraft = normalized;
     }
     if (!isFinal) return SpeechSessionDecision.none;
 
     if (normalized.isEmpty) {
       _state = SpeechSessionState.failed;
       _decisionIssued = true;
-      return _draftDecision();
+      return _discardDecision();
     }
 
     if (!isComplete) return _retryOrFail(retryWhenEmpty: false);
@@ -109,7 +108,7 @@ class SpeechSessionController {
 
     _state = SpeechSessionState.failed;
     _decisionIssued = true;
-    return _draftDecision();
+    return _discardDecision();
   }
 
   SpeechSessionDecision onRecognizerError({required bool retryable}) {
@@ -124,7 +123,7 @@ class SpeechSessionController {
 
     _state = SpeechSessionState.failed;
     _decisionIssued = true;
-    return _draftDecision();
+    return _discardDecision();
   }
 
   SpeechSessionDecision onStableTranscript({required bool isComplete}) {
@@ -156,7 +155,7 @@ class SpeechSessionController {
 
     _state = SpeechSessionState.failed;
     _decisionIssued = true;
-    return _draftDecision();
+    return _discardDecision();
   }
 
   void markProcessing() {
@@ -179,7 +178,6 @@ class SpeechSessionController {
   void reset() {
     _state = SpeechSessionState.idle;
     _latestDraft = '';
-    _continuationBase = '';
     _finalTranscript = '';
     _retryCount = 0;
     _decisionIssued = false;
@@ -199,58 +197,23 @@ class SpeechSessionController {
     if (canRetry) {
       _retryCount++;
       _state = SpeechSessionState.listening;
-      _continuationBase = _latestDraft;
+      _latestDraft = '';
       _finalTranscript = '';
-      return SpeechSessionDecision(
-        SpeechSessionAction.retry,
-        transcript: _latestDraft,
-      );
+      return const SpeechSessionDecision(SpeechSessionAction.retry);
     }
 
     _state = SpeechSessionState.failed;
     _decisionIssued = true;
-    return _draftDecision();
+    return _discardDecision();
   }
 
-  SpeechSessionDecision _draftDecision() {
+  SpeechSessionDecision _discardDecision() {
     if (_latestDraft.isEmpty) return SpeechSessionDecision.none;
     return SpeechSessionDecision(
-      SpeechSessionAction.preserveDraft,
+      SpeechSessionAction.discardDraft,
       transcript: _latestDraft,
     );
   }
-}
-
-String mergeSpeechTranscripts(String existing, String continuation) {
-  final left = _normalizeSpeech(existing);
-  final right = _normalizeSpeech(continuation);
-  if (left.isEmpty) return right;
-  if (right.isEmpty) return left;
-  if (left.toLowerCase() == right.toLowerCase()) return left;
-
-  final leftWords = left.split(' ');
-  final rightWords = right.split(' ');
-  final maximumOverlap = leftWords.length < rightWords.length
-      ? leftWords.length
-      : rightWords.length;
-  var overlap = 0;
-  for (var size = maximumOverlap; size > 0; size--) {
-    var matches = true;
-    for (var index = 0; index < size; index++) {
-      final leftWord = leftWords[leftWords.length - size + index];
-      final rightWord = rightWords[index];
-      if (leftWord.toLowerCase() != rightWord.toLowerCase()) {
-        matches = false;
-        break;
-      }
-    }
-    if (matches) {
-      overlap = size;
-      break;
-    }
-  }
-
-  return [...leftWords, ...rightWords.skip(overlap)].join(' ');
 }
 
 String _normalizeSpeech(String value) {

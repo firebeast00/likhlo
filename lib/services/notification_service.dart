@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_10y.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -8,20 +10,100 @@ import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import 'notification_entry_service.dart';
 
+const _notificationEntryPortName = 'likhlo_notification_entry_port_v1';
+
+class _NotificationEntryOutcome {
+  final NotificationEntryResult result;
+  final double? remainingToday;
+  final double? spentToday;
+
+  const _NotificationEntryOutcome(
+    this.result, {
+    this.remainingToday,
+    this.spentToday,
+  });
+}
+
+Future<_NotificationEntryOutcome> _processNotificationEntry(
+  NotificationResponse response,
+) async {
+  final input = response.input ?? '';
+  final notificationId =
+      response.id ?? NotificationService.persistentBarId;
+  final mainPort = IsolateNameServer.lookupPortByName(
+    _notificationEntryPortName,
+  );
+  if (mainPort == null) {
+    final result = await NotificationEntryService().process(
+      input: input,
+      notificationId: notificationId,
+    );
+    final status = NotificationService().persistentStatusSnapshot();
+    return _NotificationEntryOutcome(
+      result,
+      remainingToday: status?['remainingToday'],
+      spentToday: status?['spentToday'],
+    );
+  }
+
+  final reply = ReceivePort();
+  try {
+    mainPort.send({
+      'input': input,
+      'notificationId': notificationId,
+      'replyTo': reply.sendPort,
+    });
+    final message = await reply.first.timeout(const Duration(seconds: 20));
+    if (message is Map) {
+      final dispositionName = message['disposition']?.toString();
+      final disposition = NotificationEntryDisposition.values.firstWhere(
+        (value) => value.name == dispositionName,
+        orElse: () => NotificationEntryDisposition.failed,
+      );
+      return _NotificationEntryOutcome(
+        NotificationEntryResult(
+          disposition,
+          message['message']?.toString() ?? 'The entry could not be saved.',
+        ),
+        remainingToday: message['remainingToday'] is num
+            ? (message['remainingToday'] as num).toDouble()
+            : null,
+        spentToday: message['spentToday'] is num
+            ? (message['spentToday'] as num).toDouble()
+            : null,
+      );
+    }
+  } catch (error) {
+    debugPrint('Notification entry bridge failed: $error');
+  } finally {
+    reply.close();
+  }
+  return const _NotificationEntryOutcome(
+    NotificationEntryResult(
+      NotificationEntryDisposition.failed,
+      'The entry could not be saved. Please try again.',
+    ),
+  );
+}
+
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
   if (response.actionId != NotificationService.inlineEntryActionId) return;
-  final result = await NotificationEntryService().process(
-    input: response.input ?? '',
-    notificationId: response.id ?? NotificationService.persistentBarId,
-  );
-  try {
-    await NotificationService().showNotificationEntryResult(result);
-  } finally {
-    // Re-posting the pinned card clears Android's remote-input spinner and
-    // immediately displays the updated balance after a successful save.
-    await NotificationService().refreshPersistentStatusBarWidget();
+  WidgetsFlutterBinding.ensureInitialized();
+  final notifications = NotificationService();
+  await notifications.initializeForBackgroundAction();
+  final outcome = await _processNotificationEntry(response);
+  // Re-post the pinned card first so Android clears the remote-input spinner
+  // even when the visible app isolate is not running.
+  if (outcome.remainingToday != null && outcome.spentToday != null) {
+    await notifications.updatePersistentStatusBarWidget(
+      remainingToday: outcome.remainingToday!,
+      spentToday: outcome.spentToday!,
+    );
+  } else {
+    await notifications.refreshPersistentStatusBarWidget();
   }
+  await notifications.showNotificationEntryResult(outcome.result);
 }
 
 class NotificationService {
@@ -32,6 +114,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  ReceivePort? _entryBridgePort;
 
   // Notification ID Partitioning
   static const int persistentBarId = 700;
@@ -53,7 +136,61 @@ class NotificationService {
     return action;
   }
 
+  void startBackgroundEntryBridge() {
+    if (_entryBridgePort != null) return;
+    IsolateNameServer.removePortNameMapping(_notificationEntryPortName);
+    final port = ReceivePort();
+    if (!IsolateNameServer.registerPortWithName(
+      port.sendPort,
+      _notificationEntryPortName,
+    )) {
+      port.close();
+      return;
+    }
+    _entryBridgePort = port;
+    port.listen((message) async {
+      if (message is! Map) return;
+      final replyTo = message['replyTo'];
+      if (replyTo is! SendPort) return;
+      final result = await NotificationEntryService().process(
+        input: message['input']?.toString() ?? '',
+        notificationId: message['notificationId'] is int
+            ? message['notificationId'] as int
+            : persistentBarId,
+      );
+      final status = persistentStatusSnapshot();
+      replyTo.send({
+        'disposition': result.disposition.name,
+        'message': result.message,
+        if (status != null) ...status,
+      });
+    });
+  }
+
+  Future<void> initializeForBackgroundAction() async {
+    if (_initialized) return;
+    const settings = InitializationSettings(
+      android: AndroidInitializationSettings('@drawable/ic_notification'),
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
+      macOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
+    );
+    await _notifications.initialize(
+      settings,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+    );
+    _initialized = true;
+  }
+
   Future<void> init({void Function(String action)? onAction}) async {
+    startBackgroundEntryBridge();
     if (onAction != null) onActionTriggered = onAction;
     if (_initialized) return;
     tz.initializeTimeZones();
@@ -252,7 +389,16 @@ class NotificationService {
   }
 
   Future<void> refreshPersistentStatusBarWidget() async {
-    if (!Hive.isBoxOpen('expenses') || !Hive.isBoxOpen('wallets')) return;
+    final status = persistentStatusSnapshot();
+    if (status == null) return;
+    await updatePersistentStatusBarWidget(
+      remainingToday: status['remainingToday']!,
+      spentToday: status['spentToday']!,
+    );
+  }
+
+  Map<String, double>? persistentStatusSnapshot() {
+    if (!Hive.isBoxOpen('expenses') || !Hive.isBoxOpen('wallets')) return null;
     final entries = Hive.box<Expense>('expenses')
         .values
         .where((entry) => entry.deletedAt == null)
@@ -280,10 +426,10 @@ class NotificationService {
       0,
       (sum, wallet) => sum + wallet.balance + (movements[wallet.id] ?? 0),
     );
-    await updatePersistentStatusBarWidget(
-      remainingToday: totalAvailable,
-      spentToday: spentToday,
-    );
+    return {
+      'remainingToday': totalAvailable,
+      'spentToday': spentToday,
+    };
   }
 
   // ==================== ⏰ 2. SMART ENTRY REMINDERS ====================
@@ -399,18 +545,7 @@ class NotificationService {
   Future<void> showNotificationEntryResult(
     NotificationEntryResult result,
   ) async {
-    if (!_initialized) {
-      const settings = InitializationSettings(
-        android: AndroidInitializationSettings('@drawable/ic_notification'),
-        iOS: DarwinInitializationSettings(),
-        macOS: DarwinInitializationSettings(),
-      );
-      await _notifications.initialize(
-        settings,
-        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
-      );
-      _initialized = true;
-    }
+    await initializeForBackgroundAction();
     final needsReview =
         result.disposition == NotificationEntryDisposition.review ||
             result.disposition == NotificationEntryDisposition.failed;

@@ -32,6 +32,32 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
+Future<bool> _enhanceReceiptImage(Map<String, String> paths) async {
+  try {
+    final bytes = await File(paths['input']!).readAsBytes();
+    img.Image? decoded = img.decodeImage(bytes);
+    if (decoded == null) return false;
+
+    final longEdge = math.max(decoded.width, decoded.height);
+    if (longEdge > 1800) {
+      decoded = decoded.width >= decoded.height
+          ? img.copyResize(decoded, width: 1800)
+          : img.copyResize(decoded, height: 1800);
+    }
+
+    var processed = img.grayscale(decoded);
+    processed = img.adjustColor(processed, contrast: 1.4, brightness: 1.05);
+    processed = img.normalize(processed, min: 0, max: 255);
+    await File(paths['output']!).writeAsBytes(
+      img.encodeJpg(processed, quality: 88),
+      flush: true,
+    );
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// A single line item detected on the receipt.
 class ReceiptItem {
   final String name;
@@ -95,6 +121,7 @@ class OcrScannerService {
   OcrScannerService._internal();
 
   final ImagePicker _picker = ImagePicker();
+  String? lastError;
 
   static const _totalKeywords = [
     'total',
@@ -148,42 +175,91 @@ class OcrScannerService {
     ImageSource source = ImageSource.camera,
     bool enhanceForHandwriting = true,
   }) async {
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-
     try {
+      lastError = null;
       final XFile? image = await _picker.pickImage(
         source: source,
-        imageQuality: 100,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 88,
+        requestFullMetadata: false,
       );
       if (image == null) return null;
+      return _recognizeImage(
+        image,
+        enhanceForHandwriting: enhanceForHandwriting,
+      );
+    } catch (e) {
+      lastError = e.toString();
+      debugPrint('OCR Error: $e');
+      return null;
+    }
+  }
 
-      String pathToProcess = image.path;
+  /// Recovers a camera result when Android destroyed the activity while the
+  /// camera was open. This is common on memory-constrained devices.
+  Future<ScannedReceipt?> recoverLostReceiptDetailed({
+    bool enhanceForHandwriting = true,
+  }) async {
+    try {
+      lastError = null;
+      final response = await _picker.retrieveLostData();
+      if (response.isEmpty) return null;
+      if (response.exception != null) {
+        lastError = response.exception.toString();
+        return null;
+      }
+      final files = response.files;
+      final image = files != null && files.isNotEmpty
+          ? files.first
+          : response.file;
+      if (image == null) return null;
+      return _recognizeImage(
+        image,
+        enhanceForHandwriting: enhanceForHandwriting,
+      );
+    } catch (e) {
+      lastError = e.toString();
+      debugPrint('Lost receipt recovery error: $e');
+      return null;
+    }
+  }
+
+  Future<ScannedReceipt?> _recognizeImage(
+    XFile image, {
+    required bool enhanceForHandwriting,
+  }) async {
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    String? enhancedPath;
+    try {
+      var pathToProcess = image.path;
       if (enhanceForHandwriting) {
-        final enhancedPath = await _preprocessForHandwriting(image.path);
+        enhancedPath = await _preprocessForHandwriting(image.path);
         if (enhancedPath != null) pathToProcess = enhancedPath;
       }
 
-      RecognizedText recognizedText = await textRecognizer.processImage(
+      var recognizedText = await textRecognizer.processImage(
         InputImage.fromFilePath(pathToProcess),
       );
-
-      // Safety net: if the enhanced version somehow produced almost no
-      // text (over-aggressive contrast can occasionally wash out faint
-      // pencil strokes), fall back to the original photo.
-      if (enhanceForHandwriting &&
-          pathToProcess != image.path &&
-          recognizedText.text.trim().length < 6) {
+      if (enhancedPath != null && recognizedText.text.trim().length < 6) {
         recognizedText = await textRecognizer.processImage(
           InputImage.fromFilePath(image.path),
         );
       }
-
       return _parseReceiptData(recognizedText);
     } catch (e) {
-      debugPrint('OCR Error: $e');
+      lastError = e.toString();
+      debugPrint('OCR recognition error: $e');
       return null;
     } finally {
-      textRecognizer.close();
+      await textRecognizer.close();
+      if (enhancedPath != null) {
+        try {
+          await File(enhancedPath).delete();
+        } catch (_) {
+          // The OS may already have reclaimed the temporary file.
+        }
+      }
     }
   }
 
@@ -198,25 +274,14 @@ class OcrScannerService {
   /// clean.
   Future<String?> _preprocessForHandwriting(String originalPath) async {
     try {
-      final bytes = await File(originalPath).readAsBytes();
-      img.Image? decoded = img.decodeImage(bytes);
-      if (decoded == null) return null;
-
-      // Downscale very large camera photos — OCR accuracy doesn't benefit
-      // past ~1600px on the long edge, and it's a lot faster.
-      if (decoded.width > 1600) {
-        decoded = img.copyResize(decoded, width: 1600);
-      }
-
-      img.Image processed = img.grayscale(decoded);
-      processed = img.adjustColor(processed, contrast: 1.4, brightness: 1.05);
-      processed = img.normalize(processed, min: 0, max: 255);
-
       final dir = await getTemporaryDirectory();
       final outPath =
           '${dir.path}/ocr_enhanced_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(outPath).writeAsBytes(img.encodeJpg(processed, quality: 92));
-      return outPath;
+      final created = await compute(
+        _enhanceReceiptImage,
+        {'input': originalPath, 'output': outPath},
+      );
+      return created ? outPath : null;
     } catch (e) {
       // Preprocessing is a best-effort enhancement — never let it block
       // the scan if the image package throws on a weird input.

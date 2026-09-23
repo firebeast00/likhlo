@@ -53,6 +53,10 @@ void main() async {
     debugPrint("Hive Initialization Error: $e");
   }
 
+  if (storageError == null) {
+    NotificationService().startBackgroundEntryBridge();
+  }
+
   runApp(
     ProviderScope(
       child: LikhloApp(startupError: storageError?.toString()),

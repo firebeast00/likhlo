@@ -77,13 +77,13 @@ class _PrimaryLedgerTabsState extends State<PrimaryLedgerTabs> {
   }
 
   void _onPageChanged(int index) {
-    final tab = index == 0 ? PrimaryLedgerTab.udhar : PrimaryLedgerTab.main;
+    final tab = index == 0 ? PrimaryLedgerTab.main : PrimaryLedgerTab.udhar;
     widget.controller.select(tab);
     widget.onChanged?.call(tab);
   }
 
   int _pageFor(PrimaryLedgerTab tab) =>
-      tab == PrimaryLedgerTab.main ? 1 : 0;
+      tab == PrimaryLedgerTab.main ? 0 : 1;
 
   @override
   Widget build(BuildContext context) {
@@ -125,8 +125,8 @@ class _PrimaryLedgerTabsState extends State<PrimaryLedgerTabs> {
             itemCount: 2,
             onPageChanged: _onPageChanged,
             itemBuilder: (context, index) => index == 0
-                ? const _LazyUdharTab()
-                : widget.mainTab,
+                ? widget.mainTab
+                : const _LazyUdharTab(),
           ),
         ),
       ],

@@ -74,7 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   static const _speechStartupGrace = Duration(milliseconds: 1200);
   static const _prematureSpeechStatusGuard = Duration(milliseconds: 600);
   final SpeechSessionController _speechSession =
-  SpeechSessionController(maxRetries: 2);
+  SpeechSessionController(maxRetries: 1);
   final SmartInputEngine _smartInputEngine = SmartInputEngine();
   final SpeechCommandCompletenessEvaluator _speechCompletenessEvaluator =
   const SpeechCommandCompletenessEvaluator();
@@ -99,6 +99,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   DateTime? _speechListenStartedAt;
   bool _recognizerReportedListening = false;
   bool _finalizingRecognizerStop = false;
+  bool _isProcessingVoiceCommand = false;
   OverlayEntry? _activeMessageEntry;
 
   @override
@@ -145,6 +146,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final pendingAction = NotificationService().takePendingAction();
       if (pendingAction != null) _handleNotificationAction(pendingAction);
+
+      unawaited(_recoverLostReceiptScan());
 
       _queuePersistentNotificationUpdate(
         delay: const Duration(seconds: 2),
@@ -210,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
             const SizedBox(height: 6),
             const Text(
-              'Speak one complete expense or income. Your transcript stays here if recognition or saving fails.',
+              'Speak one complete expense, income, or transfer. A failed attempt is discarded so the next command starts clean.',
             ),
             const SizedBox(height: 16),
             ValueListenableBuilder<TextEditingValue>(
@@ -2589,6 +2592,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   Future<void> _listenForExpense() async {
     _dismissKeyboard();
+    if (_isProcessingVoiceCommand) {
+      _showTransactionInfo(
+        'Your previous voice command is still being processed.',
+        title: 'Please wait',
+      );
+      return;
+    }
     if (_isListening) {
       await _finishSpeechSession(manual: true);
       unawaited(HapticFeedback.selectionClick());
@@ -2600,7 +2610,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _handlingSpeechError = false;
     _restartingSpeech = false;
     _finalizingRecognizerStop = false;
-    final preservedDraft = _smartInputCtrl.text.trim();
     if (!_speechInitialized) {
       final available = await _speech.initialize(
         onStatus: _handleSpeechStatus,
@@ -2624,13 +2633,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _speechLocaleCandidateIndex = 0;
     if (!mounted) return;
 
+    _smartInputCtrl.clear();
     _speechSession.start();
-    if (preservedDraft.isNotEmpty) {
-      _speechSession.recordTranscript(
-        preservedDraft,
-        isFinal: false,
-      );
-    }
     _speechDeadlineTimer = Timer(
       _speechSessionLimit,
           () => unawaited(_finishSpeechSession()),
@@ -2709,14 +2713,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           }
           _markRecognizerActive();
           final words = result.text.trim();
-          final candidate = _mergeSpeechTranscripts(
-            _speechSession.latestDraft,
-            words,
-          );
-          final completeness = _speechCompleteness(candidate);
+          final completeness = _speechCompleteness(words);
           final decision = _speechSession.recordTranscript(
-            candidate,
-            isFinal: result.isFinal && completeness.isComplete,
+            words,
+            isFinal: result.isFinal,
+            isComplete: completeness.isComplete,
           );
           final combinedWords = _speechSession.latestDraft;
           if (combinedWords.isNotEmpty) {
@@ -2746,6 +2747,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _handlingSpeechError = true;
       _speechSession.onRecognizerError(retryable: false);
       _cancelSpeechTimers();
+      _smartInputCtrl.clear();
       setState(() => _isListening = false);
       _showTransactionError(
         'Voice recognition could not start. Check microphone permission and the phone\'s speech-recognition service.',
@@ -2956,6 +2958,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
 
     if (decision.action == SpeechSessionAction.retry) {
+      _smartInputCtrl.clear();
       await _restartSpeechListening(advanceLocale: canTryAnotherLocale);
       return;
     }
@@ -2968,6 +2971,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return;
     }
 
+    _smartInputCtrl.clear();
+
     if (normalized.contains('error_client')) {
       _speechInitialized = false;
     }
@@ -2979,9 +2984,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (networkFailure) {
       _showTransactionError(
-        _speechDraftMessage(
-          'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
-        ),
+        'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
         title: 'Voice service is offline',
       );
       return;
@@ -2989,63 +2992,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     if (languageFailure) {
       _showTransactionError(
-        _speechDraftMessage(
-          'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
-        ),
+        'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
         title: 'Speech language unavailable',
       );
       return;
     }
 
     _showTransactionError(
-      _speechDraftMessage(
-        'Voice Log stopped before it received a final result. Please try again.',
-      ),
+      'Voice Log stopped before it received a final result. Please say the full command again.',
       title: 'Voice Log stopped',
     );
-  }
-
-  String _speechDraftMessage(String message) {
-    if (_smartInputCtrl.text.trim().isEmpty) return message;
-    return '$message Your unfinished words were kept. Tap the microphone again and the next words will be merged with them.';
   }
 
   Future<void> _applySpeechDecision(SpeechSessionDecision decision) async {
     if (!mounted) return;
     switch (decision.action) {
       case SpeechSessionAction.processFinal:
+        if (_isProcessingVoiceCommand) return;
         _cancelSpeechTimers();
         setState(() => _isListening = false);
         _speechSession.markProcessing();
+        _isProcessingVoiceCommand = true;
         try {
-          final succeeded = await _processNLP(
+          await _processNLP(
             decision.transcript,
             source: SmartInputSource.voice,
           );
           _speechSession.markCompleted();
-          if (succeeded) {
-            _smartInputCtrl.clear();
-            _speechSession.reset();
-          } else if (_smartInputCtrl.text.trim().isEmpty &&
-              decision.transcript.trim().isNotEmpty) {
-            final preservedText = decision.transcript.trim();
-            _smartInputCtrl.value = TextEditingValue(
-              text: preservedText,
-              selection: TextSelection.collapsed(
-                offset: preservedText.length,
-              ),
-            );
-          }
+          _smartInputCtrl.clear();
+          _speechSession.reset();
         } catch (error) {
           _speechSession.markFailed();
+          _smartInputCtrl.clear();
           rethrow;
+        } finally {
+          _isProcessingVoiceCommand = false;
         }
         return;
-      case SpeechSessionAction.preserveDraft:
+      case SpeechSessionAction.discardDraft:
         _cancelSpeechTimers();
         setState(() => _isListening = false);
+        _smartInputCtrl.clear();
+        _speechSession.reset();
         _showTransactionError(
-          'The voice command was incomplete. Your words were kept—tap the microphone again and continue speaking.',
+          'The voice command was incomplete. Please tap the microphone and say the full command again.',
           title: 'Voice command incomplete',
         );
         return;
@@ -3053,6 +3043,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         if (_speechSession.state == SpeechSessionState.failed) {
           _cancelSpeechTimers();
           if (_isListening) setState(() => _isListening = false);
+          _smartInputCtrl.clear();
+          _speechSession.reset();
           _showTransactionError(
             'Voice recognition stopped before hearing any words. Tap the microphone and try again.',
             title: 'Voice stopped too soon',
@@ -3060,6 +3052,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         }
         return;
       case SpeechSessionAction.retry:
+        _smartInputCtrl.clear();
         await _restartSpeechListening();
         return;
     }
@@ -3070,30 +3063,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _dismissKeyboard();
     setState(() => _isScanningReceipt = true);
     try {
-      final receipt = await OcrScannerService().scanReceiptDetailed();
-      if (!mounted || receipt == null) return;
-
-      if (receipt.total <= 0 && receipt.items.isEmpty) {
-        _showTransactionError(
-          'No reliable receipt items or total were detected. Retake the photo with the full receipt visible and good lighting.',
-          title: 'Receipt details not found',
-        );
+      final scanner = OcrScannerService();
+      final receipt = await scanner.scanReceiptDetailed();
+      if (!mounted) return;
+      if (receipt == null) {
+        if (scanner.lastError != null) {
+          _showTransactionError(
+            'The receipt could not be read. Retake it with good lighting and the full receipt visible.',
+            title: 'Receipt scan failed',
+          );
+        }
         return;
       }
-
-      final confirmed = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => ReceiptReviewScreen(receipt: receipt),
-        ),
-      );
-      if (confirmed == true && mounted) {
-        _showExpenseMessage(
-          'The reviewed receipt was added to your records.',
-          title: 'Receipt saved',
-        );
-      }
+      await _reviewScannedReceipt(receipt);
     } finally {
       if (mounted) setState(() => _isScanningReceipt = false);
+    }
+  }
+
+  Future<void> _recoverLostReceiptScan() async {
+    if (_isScanningReceipt || !mounted) return;
+    setState(() => _isScanningReceipt = true);
+    try {
+      final scanner = OcrScannerService();
+      final receipt = await scanner.recoverLostReceiptDetailed();
+      if (!mounted || receipt == null) return;
+      await _reviewScannedReceipt(receipt);
+    } finally {
+      if (mounted) setState(() => _isScanningReceipt = false);
+    }
+  }
+
+  Future<void> _reviewScannedReceipt(ScannedReceipt receipt) async {
+    if (receipt.total <= 0 && receipt.items.isEmpty) {
+      _showTransactionError(
+        'No reliable receipt items or total were detected. Retake the photo with the full receipt visible and good lighting.',
+        title: 'Receipt details not found',
+      );
+      return;
+    }
+
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ReceiptReviewScreen(receipt: receipt),
+      ),
+    );
+    if (confirmed == true && mounted) {
+      _showExpenseMessage(
+        'The reviewed receipt was added to your records.',
+        title: 'Receipt saved',
+      );
     }
   }
 
@@ -4429,37 +4448,4 @@ class _LearnedSmartEntryPreference {
     'uses': uses,
     'updatedAt': updatedAt,
   };
-}
-
-
-String _mergeSpeechTranscripts(String previous, String next) {
-  final left = previous.trim();
-  final right = next.trim();
-  if (left.isEmpty) return right;
-  if (right.isEmpty) return left;
-
-  final leftWords = left.split(RegExp(r'\s+'));
-  final rightWords = right.split(RegExp(r'\s+'));
-  final maximumOverlap = leftWords.length < rightWords.length
-      ? leftWords.length
-      : rightWords.length;
-  var overlap = 0;
-
-  for (var size = maximumOverlap; size > 0; size--) {
-    var matches = true;
-    for (var index = 0; index < size; index++) {
-      final leftWord = leftWords[leftWords.length - size + index];
-      final rightWord = rightWords[index];
-      if (leftWord.toLowerCase() != rightWord.toLowerCase()) {
-        matches = false;
-        break;
-      }
-    }
-    if (matches) {
-      overlap = size;
-      break;
-    }
-  }
-
-  return [...leftWords, ...rightWords.skip(overlap)].join(' ');
 }
