@@ -483,6 +483,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSettingsGroup(
             isDark: isDark,
             children: [
+              ListTile(
+                leading: const Icon(Icons.language_rounded, color: Colors.teal),
+                title: const Text('Smart Entry language'),
+                subtitle: const Text('Typing aur voice ki zaban. Both languages remain supported.'),
+                trailing: DropdownButton<String>(
+                  value: ref.watch(settingsProvider).smartEntryLanguage,
+                  underline: const SizedBox.shrink(),
+                  items: const [
+                    DropdownMenuItem(value: 'romanUrdu', child: Text('Roman Urdu')),
+                    DropdownMenuItem(value: 'english', child: Text('English')),
+                  ],
+                  onChanged: (value) async {
+                    if (value == null) return;
+                    await ref.read(settingsProvider.notifier).updateSmartEntryLanguage(value);
+                  },
+                ),
+              ),
+              _buildDivider(),
               _buildSwitchTile(
                 title: "Likhlo App Lock",
                 subtitle:

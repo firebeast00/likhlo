@@ -40,6 +40,7 @@ class SmartInputEngine {
     String input,
     List<String> activeCategories, {
     SmartInputSource source = SmartInputSource.typed,
+    Iterable<SmartEntryAccount> accounts = const [],
   }) {
     final normalization = normalizer.normalize(
       input,
@@ -48,6 +49,7 @@ class SmartInputEngine {
     final parsed = nlp.parseCommand(
       normalization.normalized,
       activeCategories,
+      accounts: accounts,
     );
     final command = _toTypedCommand(parsed, source);
     return SmartInputPlan(
@@ -102,7 +104,7 @@ class SmartInputEngine {
   ) {
     final input = parsed.rawInput.toLowerCase();
     final numberPattern = RegExp(
-      r'\b\d+(?:\.\d+)?(?:\s*(?:k|thousand|hazar|hazaar|lakh|lac))?\b',
+      r'\b\d+(?:\.\d+)?(?:\s*(?:k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr))?\b',
     );
     final numbers = numberPattern.allMatches(input).toList();
     double? selectorAmount;
@@ -144,7 +146,7 @@ class SmartInputEngine {
     }
 
     final amountMatch = RegExp(
-      r'^(?:change|edit|update)?\s*(.+?)\s+(?:ka|ki|ke)?\s*amount\s+(?:to\s+)?(\d+(?:\.\d+)?(?:\s*(?:k|thousand|hazar|hazaar|lakh|lac))?)\s*(?:karo|kar\s+do|change|update)?$',
+      r'^(?:change|edit|update)?\s*(.+?)\s+(?:ka|ki|ke)?\s*amount\s+(?:to\s+)?(\d+(?:\.\d+)?(?:\s*(?:k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr))?)\s*(?:karo|kar\s+do|change|update)?$',
     ).firstMatch(input);
     if (amountMatch != null) {
       targetTitle = _cleanMutationText(
@@ -184,7 +186,7 @@ class SmartInputEngine {
 
   double? _numericAmount(String value) {
     final match = RegExp(
-      r'(\d+(?:\.\d+)?)\s*(k|thousand|hazar|hazaar|lakh|lac)?',
+      r'(\d+(?:\.\d+)?)\s*(k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr)?\b',
     ).firstMatch(value);
     if (match == null) return null;
     final base = double.tryParse(match.group(1)!);
@@ -196,7 +198,9 @@ class SmartInputEngine {
         scale == 'hazaar') {
       return base * 1000;
     }
-    if (scale == 'lakh' || scale == 'lac') return base * 100000;
+    if (scale == 'lakh' || scale == 'lac' || scale == 'lak') return base * 100000;
+    if (scale == 'million') return base * 1000000;
+    if (scale == 'crore' || scale == 'krore' || scale == 'cr') return base * 10000000;
     return base;
   }
 

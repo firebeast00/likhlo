@@ -83,6 +83,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _restartingSpeech = false;
   bool _speechInitialized = false;
   bool _speechLocalesLoaded = false;
+  String? _speechLocaleLanguage;
   List<String?> _speechLocaleCandidates = const [null];
   int _speechLocaleCandidateIndex = 0;
   bool _isScanningReceipt = false;
@@ -1772,7 +1773,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               decoration: InputDecoration(
                 hintText: _isListening
                     ? 'Listening…'
-                    : 'e.g. 500 biryani from JazzCash',
+                    : ref.watch(settingsProvider).smartEntryLanguage == 'romanUrdu'
+                        ? 'Misal: 500 biryani par kharch kiya'
+                        : 'e.g. 500 biryani from JazzCash',
                 hintStyle: TextStyle(
                   color: Colors.grey.shade500,
                   fontSize: 12,
@@ -2626,9 +2629,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _speechInitialized = true;
     }
 
-    if (!_speechLocalesLoaded) {
+    final language = ref.read(settingsProvider).smartEntryLanguage;
+    if (!_speechLocalesLoaded || _speechLocaleLanguage != language) {
       _speechLocaleCandidates = await _buildSpeechLocaleCandidates();
       _speechLocalesLoaded = true;
+      _speechLocaleLanguage = language;
     }
     _speechLocaleCandidateIndex = 0;
     if (!mounted) return;
@@ -2660,7 +2665,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         if (added.add(normalized)) candidates.add(localeId);
       }
 
-      const preferred = ['en_pk', 'en_in', 'en_gb', 'en_us'];
+      final preferred = ref.read(settingsProvider).smartEntryLanguage == 'romanUrdu'
+          ? ['ur_pk', 'ur', 'ur_in', 'en_pk', 'en_in']
+          : ['en_pk', 'en_in', 'en_gb', 'en_us'];
       for (final preferredId in preferred) {
         for (final locale in locales) {
           if (normalize(locale.localeId) == preferredId) {
@@ -2756,6 +2763,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
   }
 
+  Iterable<SmartEntryAccount> _parsingAccounts() =>
+      ref.read(walletProvider).map((wallet) => SmartEntryAccount(
+        id: wallet.id,
+        name: wallet.name,
+        type: wallet.walletType,
+        availableBalance: 0,
+        isBackup: wallet.isBackup,
+      ));
+
   SpeechCommandCompleteness _speechCompleteness(String transcript) {
     final normalized = transcript.trim();
     if (normalized.isEmpty) {
@@ -2766,6 +2782,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         normalized,
         ref.read(categoryProvider),
         source: SmartInputSource.voice,
+        accounts: _parsingAccounts(),
       );
       final accounts = ref
           .read(walletProvider)
@@ -4087,6 +4104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       normalized,
       categories,
       source: source,
+      accounts: _parsingAccounts(),
     );
     _debugSmartInputPlan(plan);
     final command = plan.parsed;

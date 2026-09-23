@@ -64,6 +64,12 @@ class PakistaniLanguageNormalizer {
     'رقم': 'amount',
     'بدلو': 'badlo',
     'کرو': 'karo',
+    'کر دو': 'karo',
+    'کر': 'kar',
+    'پر': 'par',
+    'کے': 'ke',
+    'کی': 'ki',
+    'کا': 'ka',
     'آج': 'aaj',
     'کل': 'kal',
     'پرسوں': 'parso',
@@ -89,6 +95,46 @@ class PakistaniLanguageNormalizer {
     'ہزار': 'hazar',
     'لاکھ': 'lakh',
     'کروڑ': 'crore',
+    'ڈیڑھ': 'derh',
+    'ڈھائی': 'dhai',
+    'سوا': 'sawa',
+    'پونے': 'paune',
+    'روپے': 'rupees',
+    'روپیہ': 'rupees',
+    'کیا': 'kiya',
+    'نہیں': 'nahi',
+    'مت': 'mat',
+    'یا': 'ya',
+    'ڈیلی': 'daily',
+    'خریدا': 'kharida',
+    'ملے': 'mila',
+    'دکھاؤ': 'show',
+    'کتنا': 'kitna',
+    'بیلنس': 'balance',
+    'بریانی': 'biryani',
+    'پٹرول': 'petrol',
+    'پیٹرول': 'petrol',
+    'دودھ': 'doodh',
+    'روٹی': 'roti',
+    'چائے': 'chai',
+    'کرایہ': 'kiraya',
+    'گیارہ': '11',
+    'بارہ': '12',
+    'تیرہ': '13',
+    'چودہ': '14',
+    'پندرہ': '15',
+    'سولہ': '16',
+    'سترہ': '17',
+    'اٹھارہ': '18',
+    'انیس': '19',
+    'پچیس': '25',
+    'پینتیس': '35',
+    'پینتالیس': '45',
+    'پچپن': '55',
+    'پینسٹھ': '65',
+    'پچھتر': '75',
+    'پچاسی': '85',
+    'پچانوے': '95',
   };
 
   static final List<MapEntry<String, String>> _sortedUrduPhrases = _urduPhrases
@@ -111,12 +157,25 @@ class PakistaniLanguageNormalizer {
     }
 
     for (final entry in _sortedUrduPhrases) {
-      if (value.contains(entry.key)) {
-        value = value.replaceAll(entry.key, ' ${entry.value} ');
+      final phrase = RegExp('(^|[^a-z0-9\\u0600-\\u06ff])${RegExp.escape(entry.key)}(?=\$|[^a-z0-9\\u0600-\\u06ff])');
+      if (phrase.hasMatch(value)) {
+        value = value.replaceAllMapped(phrase, (match) => '${match.group(1)}${entry.value}');
         if (!applied.contains('urdu_script')) applied.add('urdu_script');
       }
     }
 
+    const romanAliases = {
+      'sy': 'se', 'khurch': 'kharch', 'kharcha': 'kharch',
+      'kharach': 'kharch', 'kharchay': 'kharch',
+      'jamma': 'jama', 'bhejdo': 'bhejo', 'kardo': 'karo',
+      'daaldo': 'dalo', 'daal': 'dalo',
+      'lakhs': 'lakh', 'lacs': 'lac', 'crores': 'crore',
+      'dairh': 'derh', 'deirh': 'derh',
+    };
+    for (final entry in romanAliases.entries) {
+      value = _replace(value, RegExp('\\b${entry.key}\\b'),
+          entry.value, applied, 'roman_urdu_alias');
+    }
     value = _replace(
       value,
       RegExp(r'\b(jazz\s*(?:cash|cast)|jaz\s*cash)\b'),
@@ -190,7 +249,7 @@ class PakistaniLanguageNormalizer {
     );
 
     value = value
-        .replaceAll(RegExp(r'[^a-z0-9\u0600-\u06ff.]+'), ' ')
+        .replaceAll(RegExp(r"[^a-z0-9\u0600-\u06ff.,'\-]+"), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 

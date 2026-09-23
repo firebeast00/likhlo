@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 class SettingsState {
   final String themeMode;
+  final String smartEntryLanguage;
   final double brightnessLevel;
   final String userName;
   final String userProfession;
@@ -10,6 +11,7 @@ class SettingsState {
 
   SettingsState({
     this.themeMode = 'light',
+    this.smartEntryLanguage = 'romanUrdu',
     this.brightnessLevel = 0.0,
     this.userName = '',
     this.userProfession = '',
@@ -18,6 +20,7 @@ class SettingsState {
 
   SettingsState copyWith({
     String? themeMode,
+    String? smartEntryLanguage,
     double? brightnessLevel,
     String? userName,
     String? userProfession,
@@ -25,6 +28,7 @@ class SettingsState {
   }) {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
+      smartEntryLanguage: smartEntryLanguage ?? this.smartEntryLanguage,
       brightnessLevel: brightnessLevel ?? this.brightnessLevel,
       userName: userName ?? this.userName,
       userProfession: userProfession ?? this.userProfession,
@@ -43,6 +47,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void _loadSettings() {
     state = SettingsState(
       themeMode: _box.get('themeMode', defaultValue: 'light'),
+      smartEntryLanguage: _box.get('smartEntryLanguage') == 'english'
+          ? 'english' : 'romanUrdu',
       brightnessLevel:
           (_box.get('brightnessLevel', defaultValue: 0.0) as num).toDouble(),
       userName: _box.get('userName', defaultValue: ''),
@@ -55,6 +61,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void updateThemeMode(String mode) {
     _box.put('themeMode', mode);
     state = state.copyWith(themeMode: mode);
+  }
+
+  Future<void> updateSmartEntryLanguage(String language) async {
+    if (language != 'romanUrdu' && language != 'english') return;
+    await _box.put('smartEntryLanguage', language);
+    state = state.copyWith(smartEntryLanguage: language);
   }
 
   void updateBrightness(double level) {

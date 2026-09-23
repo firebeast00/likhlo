@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'primary_intent_router.dart';
+import 'pakistani_language_normalizer.dart';
 import 'transaction_title_policy.dart';
 
 enum SmartEntryIntent {
@@ -682,6 +683,8 @@ class LocalNlpService {
     'gaya',
     'kar',
     'karo',
+    'kiya',
+    'jama',
     'kardiye',
     'karwa',
     'liya',
@@ -891,6 +894,36 @@ class LocalNlpService {
   };
 
   static const Map<String, int> _tens = {
+    'ikkees': 21, 'ikkis': 21,
+    'baees': 22, 'bais': 22,
+    'taees': 23, 'teis': 23,
+    'chobees': 24, 'chaubees': 24,
+    'pachees': 25, 'pachis': 25,
+    'chhabbees': 26, 'chabbis': 26,
+    'sattaees': 27, 'sattais': 27,
+    'atthaees': 28, 'atthais': 28,
+    'untees': 29,
+    'iktees': 31, 'battees': 32, 'tentees': 33,
+    'chauntees': 34, 'paintees': 35, 'chhattees': 36,
+    'saintees': 37, 'arthees': 38, 'untalees': 39,
+    'iktalees': 41, 'bayalees': 42, 'taintalees': 43,
+    'chawalees': 44, 'paintalees': 45, 'chiyalees': 46,
+    'saintalees': 47, 'artalees': 48, 'unchas': 49,
+    'ikyawan': 51, 'bawan': 52, 'tirpan': 53,
+    'chauwan': 54, 'pachpan': 55, 'chhappan': 56,
+    'sattawan': 57, 'atthawan': 58, 'unsath': 59,
+    'iksath': 61, 'basath': 62, 'tirsath': 63,
+    'chausath': 64, 'painsath': 65, 'chiyasath': 66,
+    'sarsath': 67, 'arsath': 68, 'unhattar': 69,
+    'ikhattar': 71, 'bahattar': 72, 'tihattar': 73,
+    'chauhattar': 74, 'pachattar': 75, 'chihattar': 76,
+    'sathattar': 77, 'athattar': 78, 'unasi': 79,
+    'ikyasi': 81, 'bayasi': 82, 'tirasi': 83,
+    'chaurasi': 84, 'pachasi': 85, 'chiyasi': 86,
+    'satasi': 87, 'athasi': 88, 'navasi': 89,
+    'ikyanwe': 91, 'bayanwe': 92, 'tiranwe': 93,
+    'chauranwe': 94, 'pachanwe': 95, 'chiyanwe': 96,
+    'sattanwe': 97, 'atthanwe': 98, 'ninyanwe': 99,
     'bees': 20,
     'twenty': 20,
     'tees': 30,
@@ -921,8 +954,11 @@ class LocalNlpService {
     'thousand': 1000,
     'lakh': 100000,
     'lac': 100000,
+    'lak': 100000,
     'million': 1000000,
     'crore': 10000000,
+    'krore': 10000000,
+    'cr': 10000000,
   };
 
   static const Map<String, double> _fusedOverrides = {
@@ -1031,11 +1067,17 @@ class LocalNlpService {
     while (i < tokens.length) {
       final raw = tokens[i];
       final norm = _normalize(raw);
+      if (norm == 'do' && i > 0 &&
+          const ['kar', 'daal', 'dalo', 'jama', 'bhej'].contains(tokens[i - 1])) {
+        i++;
+        continue;
+      }
 
-      if ((norm == 'dhai' || norm == 'adhai') && i + 1 < tokens.length) {
+      if (const ['dhai', 'adhai', 'derh', 'dedh'].contains(norm) &&
+          i + 1 < tokens.length) {
         final mult = _normalizedMultipliers[_normalize(tokens[i + 1])];
         if (mult != null) {
-          amount += 2.5 * mult;
+          amount += (norm == 'derh' || norm == 'dedh' ? 1.5 : 2.5) * mult;
           consumed.addAll([raw, tokens[i + 1]]);
           i += 2;
           continue;
@@ -1074,15 +1116,6 @@ class LocalNlpService {
         }
       }
 
-      final overrideVal =
-          _fuzzyLookup(norm, _normalizedFusedOverrides, forceBudget: 1);
-      if (overrideVal != null) {
-        amount += overrideVal;
-        consumed.add(raw);
-        i++;
-        continue;
-      }
-
       final multVal = _normalizedMultipliers[norm];
       if (multVal != null) {
         amount += (pendingUnit ?? 1) * multVal;
@@ -1090,6 +1123,18 @@ class LocalNlpService {
         consumed.add(raw);
         pendingUnit = null;
         pendingUnitToken = null;
+        i++;
+        continue;
+      }
+
+      // Short relational words (se, to, do) must not fuzzy-match "so/sou".
+      final overrideVal = _normalizedFusedOverrides[norm] ??
+          (norm.length >= 5
+              ? _fuzzyLookup(norm, _normalizedFusedOverrides, forceBudget: 1)
+              : null);
+      if (overrideVal != null) {
+        amount += overrideVal;
+        consumed.add(raw);
         i++;
         continue;
       }
@@ -1263,15 +1308,32 @@ class LocalNlpService {
 
   ParsedSmartEntryCommand parseCommand(
     String input,
-    List<String> activeCategories,
-  ) {
-    final rawInput = input.trim();
+    List<String> activeCategories, {
+    Iterable<SmartEntryAccount> accounts = const [],
+  }) {
+    final rawInput = PakistaniLanguageNormalizer().normalize(input).normalized;
     String lowerInput = rawInput.toLowerCase().replaceAll(
           RegExp(r'\s+'),
           ' ',
         );
     final intentRoute = const PrimaryIntentRouter().classify(lowerInput);
-    final intent = _intentFromRoute(intentRoute.intent);
+    var intent = _intentFromRoute(intentRoute.intent);
+    if (intent.isTransactionAddition || intent == SmartEntryIntent.unknown) {
+      final transfer = resolveSmartEntryTransferAccounts(
+        lowerInput, accounts, requireDirection: true,
+      );
+      if (transfer != null) {
+        intent = SmartEntryIntent.transfer;
+      } else if (RegExp(r'\b(from|se|sy|say)\b').hasMatch(lowerInput) &&
+          RegExp(r'\b(to|me|mein|ko)\b').hasMatch(lowerInput) &&
+          RegExp(r'\b(jama|add|dalo|daalo|deposit)\b').hasMatch(lowerInput)) {
+        intent = SmartEntryIntent.unknown;
+      }
+    }
+    // Negation and alternative commands must never silently write a ledger entry.
+    if (RegExp(r'\b(nahi|nahin|mat|dont|don\x27t|ya|or)\b').hasMatch(lowerInput)) {
+      intent = SmartEntryIntent.unknown;
+    }
     final isIncome = intent == SmartEntryIntent.addIncome;
     final queryMetric =
         intent == SmartEntryIntent.query ? _queryMetric(lowerInput) : null;
@@ -1305,7 +1367,7 @@ class LocalNlpService {
     }
 
     final amountRegExp = RegExp(
-      r'\b(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k|thousand|hazar|hazaar|lakh|lac|million|crore)?\b',
+      r'\b(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(sau|hundred|k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr)?\b',
     );
     final containsNegativeAmount = RegExp(
       r'(^|\s)(-|minus)\s*\d',
@@ -1323,16 +1385,18 @@ class LocalNlpService {
           0.0;
       final scale = digitMatch.group(2);
       var multiplier = 1.0;
-      if (scale == 'k' ||
+      if (scale == 'sau' || scale == 'hundred') {
+        multiplier = 100;
+      } else if (scale == 'k' ||
           scale == 'thousand' ||
           scale == 'hazar' ||
           scale == 'hazaar') {
         multiplier = 1000;
-      } else if (scale == 'lakh' || scale == 'lac') {
+      } else if (scale == 'lakh' || scale == 'lac' || scale == 'lak') {
         multiplier = 100000;
       } else if (scale == 'million') {
         multiplier = 1000000;
-      } else if (scale == 'crore') {
+      } else if (scale == 'crore' || scale == 'krore' || scale == 'cr') {
         multiplier = 10000000;
       }
       amount = base * multiplier;
@@ -1428,7 +1492,7 @@ class LocalNlpService {
     }
 
     cleanTitle = cleanTitle
-        .replaceAll(RegExp(r'[^\w\s]'), ' ')
+        .replaceAll(RegExp(r'[^\w\s\u0600-\u06ff]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     cleanTitle =
@@ -1457,7 +1521,8 @@ class LocalNlpService {
       cleanTitle = coreTransactionTitle(cleanTitle);
     }
 
-    final intentConfidence = intentRoute.confidence;
+    final intentConfidence = intent == SmartEntryIntent.unknown
+        ? 0.0 : intent == SmartEntryIntent.transfer ? 0.99 : intentRoute.confidence;
     final categoryConfidence = isIncome
         ? 0.98
         : categoryFound
@@ -1482,7 +1547,7 @@ class LocalNlpService {
         .toDouble();
 
     final clarificationReasons = <String>[];
-    if (intent.isTransactionAddition && amount <= 0) {
+    if (containsNegativeAmount || (intent.isTransactionAddition && amount <= 0)) {
       clarificationReasons.add(
         containsNegativeAmount
             ? 'Amount must be greater than zero.'
@@ -1542,7 +1607,8 @@ class SmartEntryAccount {
 }
 
 String _normalizeAccountText(String value) {
-  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+  return PakistaniLanguageNormalizer().normalize(value).normalized
+      .replaceAll(RegExp(r'[^a-z0-9\u0600-\u06ff]+'), ' ').trim();
 }
 
 Set<String> _smartEntryAccountAliases(SmartEntryAccount account) {
@@ -1550,6 +1616,9 @@ Set<String> _smartEntryAccountAliases(SmartEntryAccount account) {
   final normalizedType = _normalizeAccountText(account.type);
   return <String>{
     normalizedName,
+    // Keep colliding aliases as multiple matches so callers request review.
+    if (normalizedName.contains(' ') && normalizedName.split(' ').first.length >= 4)
+      normalizedName.split(' ').first,
     if (normalizedType == 'cash') 'cash',
     if (normalizedType == 'jazzcash') ...['jazzcash', 'jazz cash'],
   }..removeWhere((alias) => alias.isEmpty);
@@ -1607,8 +1676,9 @@ class _SmartEntryAccountMention {
 
 SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
   String input,
-  Iterable<SmartEntryAccount> accounts,
-) {
+  Iterable<SmartEntryAccount> accounts, {
+  bool requireDirection = false,
+}) {
   final normalizedInput = _normalizeAccountText(input);
   final mentions = <_SmartEntryAccountMention>[];
 
@@ -1641,6 +1711,12 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
     if (best != null) mentions.add(best);
   }
 
+  // A complete wallet name wins over another wallet's short prefix.
+  final contained = mentions.where((mention) => mentions.any((other) =>
+      other.account.id != mention.account.id &&
+      other.start <= mention.start && other.end >= mention.end &&
+      other.end - other.start > mention.end - mention.start)).toSet();
+  mentions.removeWhere(contained.contains);
   mentions.sort((first, second) => first.start.compareTo(second.start));
   final uniqueMentions = <_SmartEntryAccountMention>[];
   final seenIds = <String>{};
@@ -1674,7 +1750,7 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
   _SmartEntryAccountMention? destination;
   for (final mention in uniqueMentions) {
     if (hasBefore(mention, 'from') ||
-        hasAfter(mention, const ['se', 'say', 'to'])) {
+        hasAfter(mention, const ['se', 'sy', 'say', 'to'])) {
       source ??= mention;
     }
     if (hasBefore(mention, 'to') ||
@@ -1691,6 +1767,7 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
     resolvedSource = source;
     resolvedDestination = destination;
   } else {
+    if (requireDirection) return null;
     resolvedSource = uniqueMentions.first;
     resolvedDestination = uniqueMentions.last;
   }
@@ -1699,7 +1776,7 @@ SmartEntryTransferAccounts? resolveSmartEntryTransferAccounts(
   }
 
   final directional = hasBefore(resolvedSource, 'from') ||
-      hasAfter(resolvedSource, const ['se', 'say', 'to']) ||
+      hasAfter(resolvedSource, const ['se', 'sy', 'say', 'to']) ||
       hasBefore(resolvedDestination, 'to') ||
       hasAfter(resolvedDestination, const ['me', 'mein', 'ko']);
 

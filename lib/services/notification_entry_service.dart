@@ -65,6 +65,13 @@ class NotificationEntryService {
         normalizedInput,
         categories,
         source: SmartInputSource.notification,
+        accounts: Hive.box<Wallet>('wallets').values.map((wallet) => SmartEntryAccount(
+          id: wallet.id,
+          name: wallet.name,
+          type: wallet.walletType,
+          availableBalance: 0,
+          isBackup: wallet.isBackup,
+        )),
       );
       if (plan.command is! AddSmartTransactionCommand) {
         await _queueReview(preferences, normalizedInput);
