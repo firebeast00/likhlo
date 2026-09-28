@@ -138,13 +138,13 @@ void main() {
     );
   });
 
-  test('time-like ASR amount requires confirmation before saving', () {
+  test('Main voice entry keeps its original review rules', () {
     final plan = engine.parse(
       '3:30 lakh ka tel',
       categories,
       source: SmartInputSource.voice,
     );
     expect(plan.parsed.amount, 350000);
-    expect(plan.requiresAsrReview, true);
+    expect(plan.requiresAsrReview, false);
   });
 }

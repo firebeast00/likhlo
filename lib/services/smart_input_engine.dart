@@ -18,11 +18,10 @@ class SmartInputPlan {
 
   bool get requiresAsrReview =>
       command.source == SmartInputSource.voice &&
-      (RegExp(r'\d\s*:\s*\d').hasMatch(originalText) ||
-          normalization.appliedRules.any(
-            (rule) =>
-                const {'spent_asr_context', 'pen_asr_context'}.contains(rule),
-          ));
+      normalization.appliedRules.any(
+        (rule) =>
+            const {'spent_asr_context', 'pen_asr_context'}.contains(rule),
+      );
 }
 
 class SmartInputEngine {
