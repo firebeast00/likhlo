@@ -33,6 +33,7 @@ class DebtScreen extends ConsumerStatefulWidget {
 }
 
 class _DebtScreenState extends ConsumerState<DebtScreen> {
+  static const _walletPreferenceKey = 'udhar_smart_entry_wallet_id';
   final Box<DebtEntry> debtBox = Hive.box<DebtEntry>('debts');
 
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -45,6 +46,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   final TextEditingController _smartInputCtrl = TextEditingController();
   final TextEditingController _searchCtrl = TextEditingController();
   String _directionFilter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedWalletId = Hive.box('preferences').get(_walletPreferenceKey) as String?;
+  }
 
   String? get _activeWalletId {
     final wallets = ref.read(walletProvider);
@@ -99,9 +106,11 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 trailing: wallet.id == _activeWalletId
                     ? const Icon(Icons.check_circle_rounded)
                     : null,
-                onTap: () {
+                onTap: () async {
+                  await Hive.box('preferences').put(_walletPreferenceKey, wallet.id);
+                  if (!mounted) return;
                   setState(() => _selectedWalletId = wallet.id);
-                  Navigator.pop(sheetContext);
+                  if (sheetContext.mounted) Navigator.pop(sheetContext);
                 },
               ),
           ],
