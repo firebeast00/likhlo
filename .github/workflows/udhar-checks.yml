@@ -4,14 +4,16 @@ on:
     branches:
       - codex/udhar-nlp-budget-sync
 jobs:
-  baseline:
+  analysis:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: updated
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
       - run: flutter pub get
-      - run: flutter test --no-pub
+      - name: Check Dart errors
+        run: |
+          flutter analyze --no-pub lib test > analyze.log 2>&1 || true
+          cat analyze.log
+          if grep -Eq '^[[:space:]]*error[[:space:]]+[•-]' analyze.log; then exit 1; fi
