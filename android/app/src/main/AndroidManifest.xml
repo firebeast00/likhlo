@@ -67,6 +67,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Forces Google Play to download the OCR model at the exact time the user installs the app from the Play Store, not when they open the scanner -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
     </application>
 
     <queries>

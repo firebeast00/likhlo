@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:ui' show IsolateNameServer;
-
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';

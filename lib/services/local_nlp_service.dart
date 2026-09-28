@@ -1318,7 +1318,18 @@ class LocalNlpService {
         );
     final intentRoute = const PrimaryIntentRouter().classify(lowerInput);
     var intent = _intentFromRoute(intentRoute.intent);
+    if (intent == SmartEntryIntent.transfer) {
+      final transferAccounts = resolveSmartEntryTransferAccounts(
+        lowerInput,
+        accounts,
+        requireDirection: false,
+      );
+      if (transferAccounts == null) {
+        intent = SmartEntryIntent.addExpense; // Downgrade to Expense!
+      }
+    }
     if (intent.isTransactionAddition || intent == SmartEntryIntent.unknown) {
+
       final transfer = resolveSmartEntryTransferAccounts(
         lowerInput, accounts, requireDirection: true,
       );
@@ -1611,17 +1622,38 @@ String _normalizeAccountText(String value) {
       .replaceAll(RegExp(r'[^a-z0-9\u0600-\u06ff]+'), ' ').trim();
 }
 
+// lib/services/local_nlp_service.dart
+
 Set<String> _smartEntryAccountAliases(SmartEntryAccount account) {
   final normalizedName = _normalizeAccountText(account.name);
   final normalizedType = _normalizeAccountText(account.type);
-  return <String>{
+
+  final aliases = <String>{
     normalizedName,
     // Keep colliding aliases as multiple matches so callers request review.
     if (normalizedName.contains(' ') && normalizedName.split(' ').first.length >= 4)
       normalizedName.split(' ').first,
     if (normalizedType == 'cash') 'cash',
-    if (normalizedType == 'jazzcash') ...['jazzcash', 'jazz cash'],
+    if (normalizedType == 'jazzcash') ...['jazzcash', 'jazz cash', 'jskesh'],
+    if (normalizedType == 'easypaisa') ...['easypaisa', 'easy paisa', 'paise'],
+    if (normalizedType == 'cash') ...['cash', 'case'],
+    if (normalizedType == 'jazzcash') ...['jazzcash', 'jazz cash','jez', 'jaz', 'jack cake', 'jail cale', 'jazz case', 'jaz cash', 'jskesh'],
+    if (normalizedType == 'easypaisa') ...['easypaisa', 'easy paisa', 'paise', 'paisa'],
   }..removeWhere((alias) => alias.isEmpty);
+
+  // Add individual words from multi-word accounts
+  for (final word in normalizedName.split(' ')) {
+    if (word.length >= 3) {
+      aliases.add(word);
+      // Catch common Urdu transliteration swaps (z <-> j, s <-> c)
+      if (word.contains('roj') || word.contains('roz')) {
+        aliases.addAll(['roj', 'roz', 'rose']);
+      }
+    }
+  }
+
+  aliases.removeWhere((alias) => alias.isEmpty);
+  return aliases;
 }
 
 bool _isCashInsideJazzCash(String input, int start, String alias) {

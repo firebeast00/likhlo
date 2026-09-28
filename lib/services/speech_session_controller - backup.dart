@@ -11,7 +11,7 @@ enum SpeechSessionAction {
   none,
   processFinal,
   retry,
-  preserveDraft,
+  discardDraft,
 }
 
 class SpeechSessionDecision {
@@ -31,7 +31,7 @@ class SpeechSessionDecision {
 /// An explicit final result is preferred. Some device recognizers emit only
 /// partial callbacks and then end normally, so a normal stop promotes the best
 /// available transcript through the same semantic validation pipeline. Error
-/// callbacks still preserve partial text instead of executing it.
+/// callbacks discard partial text instead of executing or reusing it.
 class SpeechSessionController {
   final int maxRetries;
 
@@ -58,6 +58,7 @@ class SpeechSessionController {
   SpeechSessionDecision recordTranscript(
     String transcript, {
     required bool isFinal,
+    bool isComplete = true,
   }) {
     if (_decisionIssued ||
         (_state != SpeechSessionState.listening &&
@@ -65,28 +66,42 @@ class SpeechSessionController {
       return SpeechSessionDecision.none;
     }
 
-    final normalized = transcript.trim();
-    if (normalized.isNotEmpty) _latestDraft = normalized;
+    final normalized = _normalizeSpeech(transcript);
+    if (normalized.isNotEmpty) {
+      // Device recognizers normally send cumulative partials. Replacing the
+      // draft avoids duplicated amounts/titles when a partial is corrected.
+      _latestDraft = normalized;
+    }
     if (!isFinal) return SpeechSessionDecision.none;
 
     if (normalized.isEmpty) {
       _state = SpeechSessionState.failed;
       _decisionIssued = true;
-      return _draftDecision();
+      return _discardDecision();
     }
 
-    _finalTranscript = normalized;
+    if (!isComplete) return _retryOrFail(retryWhenEmpty: false);
+
+    _finalTranscript = _latestDraft;
     _state = SpeechSessionState.finalizing;
     return _emitFinal();
   }
 
-  SpeechSessionDecision onRecognizerStopped() {
+  // lib/services/speech_session_controller.dart
+
+  SpeechSessionDecision onRecognizerStopped({
+    bool isComplete = true,
+    bool retryWhenEmpty = false,
+  }) {
     if (_decisionIssued) return SpeechSessionDecision.none;
     if (_state != SpeechSessionState.listening &&
         _state != SpeechSessionState.finalizing) {
       return SpeechSessionDecision.none;
     }
     if (_finalTranscript.isNotEmpty) return _emitFinal();
+
+    // 🚀 FIX: If we have text, NEVER wipe it and restart into silence.
+    // Promote the draft to final so the user can review/edit it in the UI.
     if (_latestDraft.isNotEmpty) {
       _finalTranscript = _latestDraft;
       _state = SpeechSessionState.finalizing;
@@ -95,7 +110,7 @@ class SpeechSessionController {
 
     _state = SpeechSessionState.failed;
     _decisionIssued = true;
-    return _draftDecision();
+    return _discardDecision();
   }
 
   SpeechSessionDecision onRecognizerError({required bool retryable}) {
@@ -106,19 +121,43 @@ class SpeechSessionController {
     }
     if (_finalTranscript.isNotEmpty) return _emitFinal();
 
-    if (retryable && _retryCount < maxRetries) {
-      _retryCount++;
-      _state = SpeechSessionState.listening;
-      _finalTranscript = '';
-      return SpeechSessionDecision(
-        SpeechSessionAction.retry,
-        transcript: _latestDraft,
-      );
+    if (retryable) return _retryOrFail(retryWhenEmpty: true);
+
+    _state = SpeechSessionState.failed;
+    _decisionIssued = true;
+    return _discardDecision();
+  }
+
+  SpeechSessionDecision onStableTranscript({required bool isComplete}) {
+    if (_decisionIssued ||
+        (_state != SpeechSessionState.listening &&
+            _state != SpeechSessionState.finalizing)) {
+      return SpeechSessionDecision.none;
+    }
+    if (!isComplete || _latestDraft.isEmpty) {
+      return SpeechSessionDecision.none;
+    }
+
+    _finalTranscript = _latestDraft;
+    _state = SpeechSessionState.finalizing;
+    return _emitFinal();
+  }
+
+  SpeechSessionDecision onSessionExpired({required bool isComplete}) {
+    if (_decisionIssued ||
+        (_state != SpeechSessionState.listening &&
+            _state != SpeechSessionState.finalizing)) {
+      return SpeechSessionDecision.none;
+    }
+    if (isComplete && _latestDraft.isNotEmpty) {
+      _finalTranscript = _latestDraft;
+      _state = SpeechSessionState.finalizing;
+      return _emitFinal();
     }
 
     _state = SpeechSessionState.failed;
     _decisionIssued = true;
-    return _draftDecision();
+    return _discardDecision();
   }
 
   void markProcessing() {
@@ -154,11 +193,31 @@ class SpeechSessionController {
     );
   }
 
-  SpeechSessionDecision _draftDecision() {
+  SpeechSessionDecision _retryOrFail({required bool retryWhenEmpty}) {
+    final canRetry = (_latestDraft.isNotEmpty || retryWhenEmpty) &&
+        _retryCount < maxRetries;
+    if (canRetry) {
+      _retryCount++;
+      _state = SpeechSessionState.listening;
+      _latestDraft = '';
+      _finalTranscript = '';
+      return const SpeechSessionDecision(SpeechSessionAction.retry);
+    }
+
+    _state = SpeechSessionState.failed;
+    _decisionIssued = true;
+    return _discardDecision();
+  }
+
+  SpeechSessionDecision _discardDecision() {
     if (_latestDraft.isEmpty) return SpeechSessionDecision.none;
     return SpeechSessionDecision(
-      SpeechSessionAction.preserveDraft,
+      SpeechSessionAction.discardDraft,
       transcript: _latestDraft,
     );
   }
+}
+
+String _normalizeSpeech(String value) {
+  return value.trim().replaceAll(RegExp(r'\s+'), ' ');
 }

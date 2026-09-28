@@ -30,19 +30,29 @@ class SpeechCommandCompletenessEvaluator {
     final parsed = plan.parsed;
     final command = plan.command;
 
+    // lib/services/speech_command_completeness.dart
+
     if (command is AddSmartTransactionCommand) {
       if (parsed.amount <= 0) {
         return const SpeechCommandCompleteness.incomplete('amount_missing');
       }
+
+      // 🚀 FIX: "test se 400" is likely the beginning of a transfer, not a finished expense.
+      final text = plan.normalizedText;
+      final hasSourceMarker = RegExp(r'\b(se|sy|say|from)\b').hasMatch(text);
+      final hasExplicitExpenseVerb = RegExp(r'\b(kharch|spent|paid|diye|kharida|loss)\b').hasMatch(text);
+
+      if (hasSourceMarker && !hasExplicitExpenseVerb) {
+        return const SpeechCommandCompleteness.incomplete('waiting_for_transfer_destination');
+      }
+
       if (parsed.intent == SmartEntryIntent.addIncome) {
         return const SpeechCommandCompleteness.complete('income_with_amount');
       }
       if (!hasSpecificSmartEntryTitle(parsed.title)) {
         return const SpeechCommandCompleteness.incomplete('item_missing');
       }
-      return const SpeechCommandCompleteness.complete(
-        'expense_with_amount_and_item',
-      );
+      return const SpeechCommandCompleteness.complete('expense_with_amount_and_item');
     }
 
     if (command is TransferCommand) {

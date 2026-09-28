@@ -106,7 +106,7 @@ class PrimaryIntentRouter {
     }
 
     final asksFinancialQuestion = has(
-            r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net)\b') ||
+        r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net)\b') ||
         has(
             r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining|net)\b') ||
         (has(r'\b(show|tell|calculate|summary|report|dikhao|batao)\b') &&
@@ -118,13 +118,14 @@ class PrimaryIntentRouter {
         rule: 'financial_question',
       );
     }
-    if (has(r'\b(show|list|find|search|dhoondo|dikhao)\b')) {
+    if (has(r'\b(show|list|find|search|dhoondo|dhundho|dikhao)\b')) {
       return const PrimaryIntentRoute(
         intent: RoutedSmartIntent.searchEntries,
         confidence: 0.96,
         rule: 'search_verb',
       );
     }
+
 
     final addsMoneyToWallet = has(
           r'\b(me|mein|ko)\s+(add|jama|deposit|dalo|daalo|daldo|daaldo)\b',

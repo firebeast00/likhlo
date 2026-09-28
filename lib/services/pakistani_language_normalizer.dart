@@ -197,6 +197,63 @@ class PakistaniLanguageNormalizer {
       applied,
       'amount_alias',
     );
+    // lib/services/pakistani_language_normalizer.dart
+
+// 1. Repair ASR Jazzcash & Easypaisa spellings
+    value = _replace(
+      value,
+      RegExp(r'\b(jskesh|jaz\s*cash|jazz\s*cast|jaz\s*kesh)\b'),
+      'jazzcash',
+      applied,
+      'jazzcash_alias',
+    );
+
+// 2. Repair "transferred" -> "transfer" so intent router recognizes it
+    value = _replace(
+      value,
+      RegExp(r'\b(transferred|transfered)\b'),
+      'transfer',
+      applied,
+      'transfer_alias',
+    );
+    value = _replace(
+      value,
+      // 🚀 FIXED: Added case, jskesh, and jez kashmir to the regex
+      RegExp(r'\b(jazz\s*(?:cash|cast|case)|jaz\s*(?:cash|case)|jskesh|jez\s*kashmir)\b'),
+      'jazzcash',
+      applied,
+      'jazzcash_alias',
+    );
+    value = _replace(
+      value,
+      RegExp(r'\bfemi\b'),
+      'fee me',
+      applied,
+      'asr_repair_femi',
+    );
+
+// 3. Fix clock-time format "3:30 lakh" -> "3.5 lakh" or "350000"
+    value = value.replaceAllMapped(
+      RegExp(r'\b(\d+):([0-5]\d)\s*(lakh|lac|hazar|k)?\b'),
+          (match) {
+        final whole = match.group(1)!;
+        final mins = match.group(2)!;
+        final scale = match.group(3) ?? '';
+        if (mins == '30') {
+          return '$whole.5 $scale'.trim();
+        }
+        return '$whole $mins $scale'.trim();
+      },
+    );
+
+// 4. Map "sade" / "sadhe" to 1.5 multiplier
+    value = _replace(
+      value,
+      RegExp(r'\b(sade|sadhe|saade)\s+lakh\b'),
+      '1.5 lakh',
+      applied,
+      'sadhe_scale',
+    );
 
     final hasAmountContext = RegExp(
       r'\b(?:\d+(?:[,.]\d+)?|aik|ek|do|teen|tin|chaar|char|paanch|panch|chhay|saat|aath|nau|das|bees|tees|chalees|pachas|saath|sattar|assi|nabbe|hundred|sau|hazar|hazaar|thousand|lakh|crore)\b',

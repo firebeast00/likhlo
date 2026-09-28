@@ -35,6 +35,9 @@ import '../services/transaction_title_policy.dart';
 import './income_accounts_screen.dart';
 import './trash_screen.dart';
 import './receipt_review_screen.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'interactive_ocr_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -3079,20 +3082,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_isScanningReceipt) return;
     _dismissKeyboard();
     setState(() => _isScanningReceipt = true);
+
     try {
-      final scanner = OcrScannerService();
-      final receipt = await scanner.scanReceiptDetailed();
-      if (!mounted) return;
-      if (receipt == null) {
-        if (scanner.lastError != null) {
-          _showTransactionError(
-            'The receipt could not be read. Retake it with good lighting and the full receipt visible.',
-            title: 'Receipt scan failed',
-          );
-        }
-        return;
+      // 🚀 FIXED: Show Bottom Sheet for Camera / Gallery
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Add Receipt', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded),
+                title: const Text('Take Photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source == null) return;
+
+      final picker = ImagePicker();
+      final image = await picker.pickImage(source: source, imageQuality: 90);
+      if (!mounted || image == null) return;
+
+      // 🚀 FIXED: Navigate to Interactive Screen
+      final scannedReceipt = await Navigator.push<ScannedReceipt>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InteractiveOcrScreen(imageFile: File(image.path)),
+        ),
+      );
+
+      if (!mounted || scannedReceipt == null) return;
+
+      // 🚀 FIXED: Open the Review Screen for bulk saving if data was found!
+      if (scannedReceipt.items.isNotEmpty || scannedReceipt.total > 0) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReceiptReviewScreen(receipt: scannedReceipt),
+          ),
+        );
       }
-      await _reviewScannedReceipt(receipt);
+
+    } catch (e) {
+      debugPrint("Scanner Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Camera or scanner error occurred.')),
+      );
     } finally {
       if (mounted) setState(() => _isScanningReceipt = false);
     }

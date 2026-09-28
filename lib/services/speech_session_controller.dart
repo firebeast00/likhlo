@@ -19,22 +19,15 @@ class SpeechSessionDecision {
   final String transcript;
 
   const SpeechSessionDecision(
-    this.action, {
-    this.transcript = '',
-  });
+      this.action, {
+        this.transcript = '',
+      });
 
   static const none = SpeechSessionDecision(SpeechSessionAction.none);
 }
 
-/// Keeps speech-recognition lifecycle events separate from financial actions.
-///
-/// An explicit final result is preferred. Some device recognizers emit only
-/// partial callbacks and then end normally, so a normal stop promotes the best
-/// available transcript through the same semantic validation pipeline. Error
-/// callbacks discard partial text instead of executing or reusing it.
 class SpeechSessionController {
   final int maxRetries;
-
   SpeechSessionState _state = SpeechSessionState.idle;
   String _latestDraft = '';
   String _finalTranscript = '';
@@ -56,10 +49,10 @@ class SpeechSessionController {
   }
 
   SpeechSessionDecision recordTranscript(
-    String transcript, {
-    required bool isFinal,
-    bool isComplete = true,
-  }) {
+      String transcript, {
+        required bool isFinal,
+        bool isComplete = true,
+      }) {
     if (_decisionIssued ||
         (_state != SpeechSessionState.listening &&
             _state != SpeechSessionState.finalizing)) {
@@ -68,10 +61,9 @@ class SpeechSessionController {
 
     final normalized = _normalizeSpeech(transcript);
     if (normalized.isNotEmpty) {
-      // Device recognizers normally send cumulative partials. Replacing the
-      // draft avoids duplicated amounts/titles when a partial is corrected.
       _latestDraft = normalized;
     }
+
     if (!isFinal) return SpeechSessionDecision.none;
 
     if (normalized.isEmpty) {
@@ -80,8 +72,8 @@ class SpeechSessionController {
       return _discardDecision();
     }
 
-    if (!isComplete) return _retryOrFail(retryWhenEmpty: false);
-
+    // 🚀 FIXED: Even if not "complete" (e.g. missing an account slot),
+    // if it's the final acoustic result, we process it!
     _finalTranscript = _latestDraft;
     _state = SpeechSessionState.finalizing;
     return _emitFinal();
@@ -96,14 +88,20 @@ class SpeechSessionController {
         _state != SpeechSessionState.finalizing) {
       return SpeechSessionDecision.none;
     }
+
     if (_finalTranscript.isNotEmpty) return _emitFinal();
-    if (!isComplete) {
-      return _retryOrFail(retryWhenEmpty: retryWhenEmpty);
-    }
+
+    // 🚀 FIXED: NEVER wipe a partial transcript if the user stopped speaking.
+    // Push the draft to the UI so the user can see what was heard and correct it,
+    // instead of deleting their sentence and retrying into silence.
     if (_latestDraft.isNotEmpty) {
       _finalTranscript = _latestDraft;
       _state = SpeechSessionState.finalizing;
       return _emitFinal();
+    }
+
+    if (!isComplete) {
+      return _retryOrFail(retryWhenEmpty: retryWhenEmpty);
     }
 
     _state = SpeechSessionState.failed;
@@ -117,7 +115,15 @@ class SpeechSessionController {
         _state != SpeechSessionState.finalizing) {
       return SpeechSessionDecision.none;
     }
+
     if (_finalTranscript.isNotEmpty) return _emitFinal();
+
+    // 🚀 FIXED: Preserve draft on error to prevent data loss
+    if (_latestDraft.isNotEmpty) {
+      _finalTranscript = _latestDraft;
+      _state = SpeechSessionState.finalizing;
+      return _emitFinal();
+    }
 
     if (retryable) return _retryOrFail(retryWhenEmpty: true);
 
@@ -132,6 +138,7 @@ class SpeechSessionController {
             _state != SpeechSessionState.finalizing)) {
       return SpeechSessionDecision.none;
     }
+
     if (!isComplete || _latestDraft.isEmpty) {
       return SpeechSessionDecision.none;
     }
@@ -147,6 +154,7 @@ class SpeechSessionController {
             _state != SpeechSessionState.finalizing)) {
       return SpeechSessionDecision.none;
     }
+
     if (isComplete && _latestDraft.isNotEmpty) {
       _finalTranscript = _latestDraft;
       _state = SpeechSessionState.finalizing;
@@ -194,6 +202,7 @@ class SpeechSessionController {
   SpeechSessionDecision _retryOrFail({required bool retryWhenEmpty}) {
     final canRetry = (_latestDraft.isNotEmpty || retryWhenEmpty) &&
         _retryCount < maxRetries;
+
     if (canRetry) {
       _retryCount++;
       _state = SpeechSessionState.listening;
@@ -209,6 +218,7 @@ class SpeechSessionController {
 
   SpeechSessionDecision _discardDecision() {
     if (_latestDraft.isEmpty) return SpeechSessionDecision.none;
+
     return SpeechSessionDecision(
       SpeechSessionAction.discardDraft,
       transcript: _latestDraft,
