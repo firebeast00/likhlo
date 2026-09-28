@@ -12,4 +12,4 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-      - run: flutter test test/udhar_input_service_test.dart test/udhar_ledger_integration_test.dart test/ledger_regression_test.dart
+      - run: flutter test --no-pub
