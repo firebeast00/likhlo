@@ -2760,8 +2760,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           );
           _scheduleStableSpeechFinalization(
             combinedWords,
-            completeness,
-            isFinal: result.isFinal,
           );
           await _applySpeechDecision(decision);
         },
@@ -2826,9 +2824,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   void _scheduleStableSpeechFinalization(
     String transcript,
-    SpeechCommandCompleteness completeness, {
-    required bool isFinal,
-  }) {
+  ) {
     _speechStabilityTimer?.cancel();
     if (transcript.isEmpty) return;
 
@@ -3242,8 +3238,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (transcript.isNotEmpty) {
         _scheduleStableSpeechFinalization(
           transcript,
-          completeness,
-          isFinal: false,
         );
         return;
       }

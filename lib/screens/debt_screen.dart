@@ -882,6 +882,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final wallets = ref.watch(walletProvider);
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     double iGave = debts
         .where((e) => e.type == 'lent')
@@ -894,7 +895,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final body = Column(
       children: [
         // 1. 🌟 SUMMARY HERO CARD
-        Container(
+        if (!keyboardOpen) Container(
           width: double.infinity,
           margin: const EdgeInsets.fromLTRB(20, 12, 20, 10),
           padding: const EdgeInsets.all(18),
@@ -1027,7 +1028,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        SizedBox(
+        if (!keyboardOpen) SizedBox(
           height: 42,
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
