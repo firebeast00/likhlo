@@ -4,10 +4,12 @@ on:
     branches:
       - codex/udhar-nlp-budget-sync
 jobs:
-  flutter:
+  baseline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: updated
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
