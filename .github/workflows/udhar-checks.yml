@@ -1,0 +1,15 @@
+name: Udhar checks
+on:
+  push:
+    branches:
+      - codex/udhar-nlp-budget-sync
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter test test/udhar_input_service_test.dart test/udhar_ledger_integration_test.dart test/ledger_regression_test.dart
