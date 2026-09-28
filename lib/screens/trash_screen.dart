@@ -7,6 +7,7 @@ import '../models/debt_model.dart';
 import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
 import '../services/transaction_executor.dart';
+import '../services/udhar_ledger_link_service.dart';
 
 class TrashScreen extends ConsumerStatefulWidget {
   const TrashScreen({super.key});
@@ -19,8 +20,13 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
   @override
   Widget build(BuildContext context) {
     final deleted = ref.watch(expenseProvider).deletedExpenses;
-    final visible = visibleTransactions(deleted);
     final deletedIds = deleted.map((entry) => entry.id).toSet();
+    final visible = visibleTransactions(deleted).where((entry) {
+      if (!entry.id.endsWith('_settlement')) return true;
+      final debtId = entry.id.substring(0, entry.id.length - '_settlement'.length);
+      return !deletedIds.contains(debtId) ||
+          const UdharLedgerLinkService().find(debtId) == null;
+    }).toList(growable: false);
     final orphanDebts = Hive.isBoxOpen('debts')
         ? Hive.box<DebtEntry>('debts')
             .values
