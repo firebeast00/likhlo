@@ -111,8 +111,10 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         setState(() => _isListening = true);
         _smartInputCtrl.clear();
         await _speech.listen(
-          options: stt.SpeechRecognitionListenOptions(
+          listenOptions: stt.SpeechListenOptions(
             localeId: localeId,
+            cancelOnError: true,
+            listenMode: stt.ListenMode.dictation,
             pauseFor: const Duration(seconds: 7),
             listenFor: const Duration(seconds: 45),
             partialResults: true,
@@ -123,7 +125,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             if (words.isNotEmpty) {
               final decision = _speechSession.recordTranscript(
                 words,
-                isFinal: val.isFinal,
+                isFinal: val.finalResult,
               );
               _smartInputCtrl.value = TextEditingValue(
                 text: words,
