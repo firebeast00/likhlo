@@ -29,7 +29,10 @@ class DeterministicFeedbackService {
       case FinancialFeedbackAction.income:
         return '${data.title}, $amount rupees income added.';
       case FinancialFeedbackAction.transfer:
-        return '$amount rupees transferred from ${data.source ?? 'source wallet'} to ${data.destination ?? 'destination wallet'}.';
+        if (data.source == null || data.destination == null) {
+          return '$amount rupees transferred.';
+        }
+        return '$amount rupees transferred from ${data.source} to ${data.destination}.';
       case FinancialFeedbackAction.edit:
         return '${data.title} updated to $amount rupees.';
       case FinancialFeedbackAction.delete:

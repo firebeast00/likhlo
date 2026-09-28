@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
+import '../providers/wallet_provider.dart';
 import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
 import '../services/voice_privacy_service.dart';
@@ -697,10 +698,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       final totalSpent = records
           .where((e) => e.type == 'expense' && e.category != 'Transfer')
-          .fold(0.0, (sum, item) => sum + item.amount);
+          .fold<double>(0, (sum, item) => sum + item.amount);
+      final remaining = ref.read(walletProvider).fold<double>(0,
+          (sum, wallet) => sum + ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id));
+      // The three figures reconcile even if opening balances were adjusted.
+      final totalAmount = remaining + totalSpent;
+      final byCategory = <String, double>{};
+      for (final entry in records.where((e) => e.type == 'expense' && e.category != 'Transfer')) {
+        byCategory.update(entry.category, (sum) => sum + entry.amount,
+            ifAbsent: () => entry.amount);
+      }
+      final categories = byCategory.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
       final dateStr = DateFormat.yMMMM().format(DateTime.now());
 
       const pdfPrimaryColor = PdfColor.fromInt(0xFF1E3A8A);
+      const categoryColors = <PdfColor>[
+        PdfColor.fromInt(0xFF2563EB), PdfColor.fromInt(0xFF7C3AED),
+        PdfColor.fromInt(0xFFEA580C), PdfColor.fromInt(0xFF0891B2),
+        PdfColor.fromInt(0xFFBE185D),
+      ];
+      String shortTitle(String value) {
+        final text = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (text.runes.length <= 22) return text;
+        return '${String.fromCharCodes(text.runes.take(21)).trimRight()}…';
+      }
+      pw.Widget amountCard(String title, double value, PdfColor color) => pw.Expanded(
+        child: pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          decoration: pw.BoxDecoration(
+            color: PdfColor.fromInt(0xFFF8FAFC),
+            border: pw.Border(left: pw.BorderSide(color: color, width: 3)),
+          ),
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(title, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+              pw.SizedBox(height: 5),
+              pw.Text('Rs. ${value.toStringAsFixed(2)}', style: pw.TextStyle(
+                fontSize: 12, fontWeight: pw.FontWeight.bold, color: color)),
+            ],
+          ),
+        ),
+      );
 
       pdf.addPage(
         pw.MultiPage(
@@ -740,30 +779,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   fontSize: 12, color: PdfColors.grey600)),
                         ])
                   ]),
-              pw.SizedBox(height: 30),
-              pw.Container(
-                  padding: const pw.EdgeInsets.all(16),
-                  decoration: pw.BoxDecoration(
-                      color: PdfColors.grey100,
-                      borderRadius:
-                          const pw.BorderRadius.all(pw.Radius.circular(12)),
-                      border: pw.Border.all(color: PdfColors.grey300)),
-                  child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Text("Total Spending:",
-                            style: pw.TextStyle(
-                                fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                        pw.Text("Rs. ${totalSpent.toStringAsFixed(2)}",
-                            style: pw.TextStyle(
-                                fontSize: 18,
-                                fontWeight: pw.FontWeight.bold,
-                                color: pdfPrimaryColor)),
-                      ])),
-              pw.SizedBox(height: 30),
+              pw.SizedBox(height: 20),
+              pw.Row(children: [
+                amountCard('Total amount', totalAmount, pdfPrimaryColor),
+                pw.SizedBox(width: 8),
+                amountCard('Expenses', totalSpent, const PdfColor.fromInt(0xFFDC2626)),
+                pw.SizedBox(width: 8),
+                amountCard('Remaining', remaining, const PdfColor.fromInt(0xFF15803D)),
+              ]),
+              if (categories.isNotEmpty) ...[
+                pw.SizedBox(height: 18),
+                pw.Text('Spending by category', style: pw.TextStyle(
+                    fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 7),
+                pw.Wrap(spacing: 12, runSpacing: 7, children: [
+                  for (var i = 0; i < categories.length && i < 5; i++)
+                    pw.Row(mainAxisSize: pw.MainAxisSize.min, children: [
+                      pw.Container(width: 7, height: 7, color: categoryColors[i]),
+                      pw.SizedBox(width: 4),
+                      pw.Text('${shortTitle(categories[i].key)}  Rs. ${categories[i].value.toStringAsFixed(0)}',
+                        style: pw.TextStyle(fontSize: 9, color: categoryColors[i])),
+                    ]),
+                ]),
+              ],
+              pw.SizedBox(height: 22),
               pw.Text("Transaction History",
                   style: pw.TextStyle(
                       fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 6),
+              pw.Row(children: [
+                for (final item in <(String, PdfColor)>[
+                  ('Expense', const PdfColor.fromInt(0xFFDC2626)),
+                  ('Income', const PdfColor.fromInt(0xFF15803D)),
+                  ('Transfer', const PdfColor.fromInt(0xFF2563EB)),
+                ]) ...[
+                  pw.Container(width: 7, height: 7, color: item.$2),
+                  pw.SizedBox(width: 4),
+                  pw.Text(item.$1, style: pw.TextStyle(fontSize: 9, color: item.$2)),
+                  pw.SizedBox(width: 14),
+                ],
+              ]),
               pw.SizedBox(height: 10),
               pw.TableHelper.fromTextArray(
                 context: context,
@@ -778,6 +833,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
                 cellPadding:
                     const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                columnWidths: const {
+                  0: pw.FixedColumnWidth(77),
+                  1: pw.FixedColumnWidth(135),
+                  2: pw.FixedColumnWidth(62),
+                  3: pw.FixedColumnWidth(102),
+                  4: pw.FixedColumnWidth(74),
+                },
                 headers: const [
                   'Date',
                   'Title',
@@ -788,9 +850,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 data: expenses
                     .map((e) => [
                           DateFormat('dd MMM yyyy').format(e.date),
-                          e.title,
-                          e.category == 'Transfer' ? 'Transfer' : e.type,
-                          e.category,
+                          shortTitle(e.title),
+                          e.category == 'Transfer' ? 'Transfer' : e.type == 'income' ? 'Income' : 'Expense',
+                          shortTitle(e.category),
                           e.amount.toStringAsFixed(2)
                         ])
                     .toList(),

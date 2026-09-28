@@ -845,6 +845,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         }
                         if (ctx.mounted) Navigator.pop(ctx, true);
                         if (reviewMessage == null && mounted) {
+                          final notificationTitle = transactionType == 'transfer'
+                              ? 'Transfer saved'
+                              : existing != null ? 'Entry updated' : 'Entry saved';
+                          final notificationDetail = transactionType == 'transfer'
+                              ? 'Rs. ${amt.toStringAsFixed(2)} transferred between wallets.'
+                              : '${preferenceEntry?.title ?? titleCtrl.text.trim()} · Rs. ${amt.toStringAsFixed(2)}';
+                          unawaited(NotificationService().showManualLedgerResult(
+                            notificationTitle, notificationDetail));
                           if (transactionType == 'transfer') {
                             _showTransferMessage(
                               'Money was moved between the selected wallets.',
@@ -1176,7 +1184,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         centerTitle: true,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded, size: 24),
+            tooltip: 'Open sidebar',
+            icon: const Icon(Icons.view_sidebar_outlined, size: 24),
             onPressed: () {
               _dismissKeyboard();
               Scaffold.of(context).openDrawer();
@@ -1553,6 +1562,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         return true;
       },
       onDismissed: (direction) {
+        unawaited(NotificationService().showManualLedgerResult(
+          isTransfer ? 'Transfer deleted' : 'Entry deleted',
+          '${e.title} · Rs. ${e.amount.toStringAsFixed(2)}',
+        ));
         _showDeletionMessage(
           "'${e.title}' can be restored from Trash.",
           title: isTransfer ? 'Transfer moved to Trash' : 'Moved to Trash',

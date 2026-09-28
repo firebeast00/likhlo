@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../services/backup_codec.dart';
 import '../services/backup_service.dart';
+import '../services/automatic_backup_service.dart';
 
 class BackupScreen extends ConsumerStatefulWidget {
   const BackupScreen({super.key});
@@ -44,7 +46,20 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     await _runBusy(() async {
       final payload = await _service.createPayload();
       final bytes = await _codec.encrypt(payload, password);
+      if (bytes.length > BackupService.maxBackupBytes) {
+        throw const BackupException('This backup exceeds the 25 MB limit.');
+      }
       final timestamp = DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now());
+      if (defaultTargetPlatform == TargetPlatform.android &&
+          await AutomaticBackupService.instance.supported) {
+        final saved = await AutomaticBackupService.instance.saveNew(
+          bytes, password, 'Likhlo_Backup_$timestamp.likhlo',
+        );
+        if (saved && mounted) {
+          _showMessage('Encrypted backup saved. It refreshes after 24 hours when Likhlo runs.');
+        }
+        return;
+      }
       final destination = await FilePicker.platform.saveFile(
         dialogTitle: 'Save encrypted Likhlo backup',
         fileName: 'Likhlo_Backup_$timestamp.likhlo',

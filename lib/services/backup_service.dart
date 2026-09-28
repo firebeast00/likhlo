@@ -222,6 +222,8 @@ class BackupService {
           defaultValue: false,
         ) ==
         true;
+    final localAutomaticBackupDate =
+        boxes.preferences.get('automatic_backup_last_success_v1');
     await boxes.expenses.clear();
     await boxes.expenses.putAll({
       for (final e in backup.expenses)
@@ -245,6 +247,11 @@ class BackupService {
       BiometricService.preferenceKey,
       localAppLockEnabled,
     );
+    if (localAutomaticBackupDate is String) {
+      await boxes.preferences.put(
+        'automatic_backup_last_success_v1', localAutomaticBackupDate,
+      );
+    }
   }
 
   Future<_BackupBoxes> _openBoxes() async {

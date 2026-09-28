@@ -632,14 +632,20 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           );
                           return;
                         }
-                        final saved = await _saveDebtRecord(
-                          name: nameCtrl.text,
+                      final saved = await _saveDebtRecord(
+                        name: nameCtrl.text,
                           amount: double.tryParse(amountCtrl.text.trim()) ?? 0,
                           type: type,
                           walletId: walletId,
-                          dueDate: selectedDate,
-                        );
-                        if (saved && ctx.mounted) Navigator.pop(ctx);
+                        dueDate: selectedDate,
+                      );
+                      if (saved) {
+                        unawaited(NotificationService().showManualLedgerResult(
+                          'Udhaar saved',
+                          '${nameCtrl.text.trim()} · Rs. ${amountCtrl.text.trim()}',
+                        ));
+                      }
+                      if (saved && ctx.mounted) Navigator.pop(ctx);
                       },
                       child: const Text(
                         "Save Record",
@@ -999,6 +1005,10 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       },
                       onDismissed: (_) {
                         if (!mounted) return;
+                        unawaited(NotificationService().showManualLedgerResult(
+                          'Udhaar settled',
+                          '${item.borrowerName} · Rs. ${item.amount.toStringAsFixed(2)}',
+                        ));
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(

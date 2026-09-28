@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:ui';
+import 'dart:ui' show IsolateNameServer;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -124,6 +125,7 @@ class NotificationService {
   static const int eveningReminderId = 902;
   static const int weekendReviewId = 903;
   static const int notificationEntryResultId = 904;
+  static const int manualLedgerResultId = 905;
   static const String inlineEntryActionId = 'action_inline_entry';
   static const String reviewEntryActionId = 'action_review_notification';
 
@@ -396,6 +398,18 @@ class NotificationService {
       remainingToday: status['remainingToday']!,
       spentToday: status['spentToday']!,
     );
+  }
+
+  /// A brief device notification after a confirmed manual ledger operation.
+  /// Notification failures never change whether the ledger operation succeeded.
+  Future<void> showManualLedgerResult(String title, String detail) async {
+    try {
+      if (!_initialized) await initializeForBackgroundAction();
+      final details = await _getDetails();
+      await _notifications.show(manualLedgerResultId, title, detail, details);
+    } catch (error) {
+      debugPrint('Manual entry notification unavailable: $error');
+    }
   }
 
   Map<String, double>? persistentStatusSnapshot() {

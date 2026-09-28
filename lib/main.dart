@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -14,6 +16,7 @@ import 'models/workspace_model.dart';
 
 // Services
 import "./services/notification_service.dart";
+import './services/automatic_backup_service.dart';
 import './services/workspace_retirement_service.dart';
 
 // Providers
@@ -25,7 +28,7 @@ void main() async {
 
   Object? storageError;
   try {
-    await Hive.initFlutter();
+    await Hive.initFlutter().timeout(const Duration(seconds: 20));
 
     // Register Adapters
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
@@ -47,7 +50,7 @@ void main() async {
       Hive.openBox('settings'),
       Hive.openBox('preferences'),
       Hive.openBox<Wallet>('wallets'),
-    ]);
+    ]).timeout(const Duration(seconds: 20));
   } catch (e) {
     storageError = e;
     debugPrint("Hive Initialization Error: $e");
@@ -72,9 +75,10 @@ void main() async {
       } catch (e) {
         debugPrint('Workspace retirement migration error: $e');
       }
+      AutomaticBackupService.instance.start();
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       try {
-        await NotificationService().init();
+        await NotificationService().init().timeout(const Duration(seconds: 6));
       } catch (e) {
         debugPrint("Notification Initialization Error: $e");
       }
