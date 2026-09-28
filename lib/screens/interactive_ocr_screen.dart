@@ -1,6 +1,8 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+
 import '../services/ocr_scanner_service.dart';
 
 class InteractiveOcrScreen extends StatefulWidget {
@@ -12,10 +14,13 @@ class InteractiveOcrScreen extends StatefulWidget {
 }
 
 class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
-  final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+  final TextRecognizer _textRecognizer = TextRecognizer(
+    script: TextRecognitionScript.latin,
+  );
   List<TextLine> _lines = [];
   final Set<TextLine> _selectedLines = {};
   bool _isScanning = true;
+  String? _scanError;
   Size? _imageSize;
 
   @override
@@ -31,34 +36,49 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
     final numericOnly = text.replaceAll(RegExp(r'[^0-9]'), '');
 
     // 1. Keep explicit currency amounts (Fixes the .00 omission bug)
-    if (RegExp(r'\b(rs\.?|pkr|rupees|rupee)\b', caseSensitive: false).hasMatch(lower)) {
+    if (RegExp(
+      r'\b(rs\.?|pkr|rupees|rupee)\b',
+      caseSensitive: false,
+    ).hasMatch(lower)) {
       // Intelligently identify and drop only true 0.00 fees, not "150.00"
       final nums = RegExp(r'\d+(?:[.,]\d+)?').allMatches(lower);
       if (nums.isNotEmpty) {
-        final val = double.tryParse(nums.last.group(0)!.replaceAll(',', '.')) ?? 0.0;
-        if (val == 0.0 && (lower.contains('fee') || lower.contains('tax') || lower.contains('change'))) return false;
+        final val =
+            double.tryParse(nums.last.group(0)!.replaceAll(',', '.')) ?? 0.0;
+        if (val == 0.0 &&
+            (lower.contains('fee') ||
+                lower.contains('tax') ||
+                lower.contains('change')))
+          return false;
       }
       return true;
     }
 
     // 2. Exclude long unformatted digit strings (TIDs, CNICs, Phone Numbers)
-    if (numericOnly.length >= 10 && numericOnly == text.replaceAll(RegExp(r'\s|-'), '')) {
+    if (numericOnly.length >= 10 &&
+        numericOnly == text.replaceAll(RegExp(r'\s|-'), '')) {
       return false;
     }
 
     // 3. Exclude Standard POS Timestamps and Dates
-    if (RegExp(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b').hasMatch(lower)) return false;
+    if (RegExp(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b')
+        .hasMatch(lower))
+      return false;
     if (RegExp(r'\b\d{1,2}[:/]\d{2}\b').hasMatch(lower)) return false;
-    if (lower.startsWith('on ') || lower.startsWith('at ') || lower.startsWith('date:')) return false;
+    if (lower.startsWith('on ') ||
+        lower.startsWith('at ') ||
+        lower.startsWith('date:'))
+      return false;
 
     // 4. Safely Exclude Digital POS Noise (Removed "transaction" to save "Transaction Amount")
     final noisePattern = RegExp(
-        r'\b(successful|success|failed|status|completed|securely|powered|via|sender|branch|terminal|merchant|tid|trx|ref|thanks|thank you|welcome|invoice|receipt|customer|visa|mastercard|balance)\b'
+      r'\b(successful|success|failed|status|completed|securely|powered|via|sender|branch|terminal|merchant|tid|trx|ref|thanks|thank you|welcome|invoice|receipt|customer|visa|mastercard|balance)\b',
     );
     if (noisePattern.hasMatch(lower)) return false;
 
     // 5. Exclude standalone directional structure labels
-    if (lower == 'to' || lower == 'from' || lower == 'fee' || lower == 'tax') return false;
+    if (lower == 'to' || lower == 'from' || lower == 'fee' || lower == 'tax')
+      return false;
 
     // 6. Ensure the row isn't pure punctuation
     if (text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').isEmpty) return false;
@@ -68,31 +88,47 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
   }
 
   Future<void> _scanImage() async {
-    final decodedImage = await decodeImageFromList(await widget.imageFile.readAsBytes());
-    _imageSize = Size(decodedImage.width.toDouble(), decodedImage.height.toDouble());
+    try {
+      final decodedImage = await decodeImageFromList(
+        await widget.imageFile.readAsBytes(),
+      );
+      if (!mounted) return;
+      _imageSize = Size(
+        decodedImage.width.toDouble(),
+        decodedImage.height.toDouble(),
+      );
 
-    final inputImage = InputImage.fromFile(widget.imageFile);
-    final recognizedText = await _textRecognizer.processImage(inputImage);
+      final inputImage = InputImage.fromFile(widget.imageFile);
+      final recognizedText = await _textRecognizer.processImage(inputImage);
+      if (!mounted) return;
 
-    final lines = <TextLine>[];
-    for (var block in recognizedText.blocks) {
-      for (var line in block.lines) {
-        lines.add(line);
-      }
-    }
-
-    setState(() {
-      _lines = lines;
-      _selectedLines.clear();
-
-      for (final line in lines) {
-        if (_shouldAutoSelect(line)) {
-          _selectedLines.add(line);
+      final lines = <TextLine>[];
+      for (var block in recognizedText.blocks) {
+        for (var line in block.lines) {
+          lines.add(line);
         }
       }
 
-      _isScanning = false;
-    });
+      setState(() {
+        _lines = lines;
+        _selectedLines.clear();
+
+        for (final line in lines) {
+          if (_shouldAutoSelect(line)) {
+            _selectedLines.add(line);
+          }
+        }
+
+        _isScanning = false;
+      });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _isScanning = false;
+          _scanError =
+              'The receipt could not be read. Please try another image.';
+        });
+    }
   }
 
   @override
@@ -120,7 +156,8 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
 
       double verticalThreshold = line.boundingBox.height * 0.5;
 
-      if ((line.boundingBox.top - referenceLine.boundingBox.top).abs() < verticalThreshold) {
+      if ((line.boundingBox.top - referenceLine.boundingBox.top).abs() <
+          verticalThreshold) {
         lastRow.add(line);
       } else {
         rows.add([line]);
@@ -146,8 +183,12 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
 
     // Extracts prices with complex mall formatting (e.g., 1,020.00)
     final amountRegExp = RegExp(r'\b\d+(?:[,.]\d+)*\b');
-    final currencyRegExp = RegExp(r'\b(rs\.?|pkr|rupees|rupee|transaction amount)\b|/-|/=', caseSensitive: false);
+    final currencyRegExp = RegExp(
+      r'\b(rs\.?|pkr|rupees|rupee|transaction amount)\b|/-|/=',
+      caseSensitive: false,
+    );
 
+    double? printedTotal;
     for (final text in reconstructedRows) {
       final matches = amountRegExp.allMatches(text);
 
@@ -157,7 +198,8 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
         // Normalize commas for double casting
         if (priceStr.contains(',') && priceStr.contains('.')) {
           priceStr = priceStr.replaceAll(',', '');
-        } else if (priceStr.contains(',') && priceStr.length - priceStr.lastIndexOf(',') == 3) {
+        } else if (priceStr.contains(',') &&
+            priceStr.length - priceStr.lastIndexOf(',') == 3) {
           priceStr = priceStr.replaceAll(',', '.');
         } else {
           priceStr = priceStr.replaceAll(',', '');
@@ -176,6 +218,14 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
         } else if (name.isEmpty) {
           name = 'Item';
         }
+        if (RegExp(
+          r'\b(grand\s+total|total|amount\s+paid|net\s+payable|transaction\s+amount)\b',
+          caseSensitive: false,
+        ).hasMatch(text)) {
+          if (price > 0) printedTotal = price;
+          continue;
+        }
+        if (price <= 0) continue;
         items.add(ReceiptItem(name: name, price: price));
         if (price > grandTotal) grandTotal = price;
       } else {
@@ -188,8 +238,7 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
     }
 
     final sum = items.fold<double>(0, (s, i) => s + i.price);
-    if (sum > grandTotal) grandTotal = sum;
-    if (grandTotal == 0 && sum > 0) grandTotal = sum;
+    grandTotal = printedTotal ?? sum;
 
     return ScannedReceipt(
       vendor: vendor,
@@ -204,6 +253,17 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_scanError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Receipt scan')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(_scanError!, textAlign: TextAlign.center),
+          ),
+        ),
+      );
+    }
     if (_isScanning || _imageSize == null) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -230,12 +290,20 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
             ),
             child: const Row(
               children: [
-                Icon(Icons.auto_awesome_rounded, color: Colors.tealAccent, size: 20),
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Colors.tealAccent,
+                  size: 20,
+                ),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Smart selection applied! Tap any box to manually add missed items or remove unwanted text.',
-                    style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ],
@@ -267,7 +335,9 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  isSelected ? _selectedLines.remove(line) : _selectedLines.add(line);
+                                  isSelected
+                                      ? _selectedLines.remove(line)
+                                      : _selectedLines.add(line);
                                 });
                               },
                               child: Container(
@@ -276,7 +346,9 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
                                       ? Colors.blue.withOpacity(0.4)
                                       : Colors.white.withOpacity(0.15),
                                   border: Border.all(
-                                    color: isSelected ? Colors.blue : Colors.white60,
+                                    color: isSelected
+                                        ? Colors.blue
+                                        : Colors.white60,
                                     width: 2,
                                   ),
                                   borderRadius: BorderRadius.circular(4),
@@ -296,14 +368,20 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
       ),
       floatingActionButton: _selectedLines.isNotEmpty
           ? FloatingActionButton.extended(
-        backgroundColor: Colors.teal,
-        onPressed: () {
-          final receipt = _buildReceipt();
-          Navigator.pop(context, receipt);
-        },
-        icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
-        label: Text('Continue (${_selectedLines.length})', style: const TextStyle(color: Colors.white)),
-      )
+              backgroundColor: Colors.teal,
+              onPressed: () {
+                final receipt = _buildReceipt();
+                Navigator.pop(context, receipt);
+              },
+              icon: const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+              ),
+              label: Text(
+                'Continue (${_selectedLines.length})',
+                style: const TextStyle(color: Colors.white),
+              ),
+            )
           : null,
     );
   }

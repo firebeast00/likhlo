@@ -71,9 +71,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final SpeechRecognitionProvider _speech = SpeechProviderRouter(
     deviceProvider: DeviceSpeechRecognitionProvider(),
   );
-  static const _speechPauseWindow = Duration(milliseconds: 2500);
-  static const _speechStabilityWindow = Duration(milliseconds: 450);
-  static const _speechSessionLimit = Duration(seconds: 20);
+  static const _speechPauseWindow = Duration(seconds: 5);
+  static const _speechStabilityWindow = Duration(seconds: 3);
+  static const _speechSessionLimit = Duration(seconds: 30);
   static const _speechStartupGrace = Duration(milliseconds: 1200);
   static const _prematureSpeechStatusGuard = Duration(milliseconds: 600);
   final SpeechSessionController _speechSession =
@@ -2726,7 +2726,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           final completeness = _speechCompleteness(words);
           final decision = _speechSession.recordTranscript(
             words,
-            isFinal: result.isFinal,
+            // Some recognizers finalize a phrase during a pause. Let the
+            // inactivity window decide when the full command has ended.
+            isFinal: false,
             isComplete: completeness.isComplete,
           );
           final combinedWords = _speechSession.latestDraft;
@@ -2810,12 +2812,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   void _scheduleStableSpeechFinalization(
-      String transcript,
-      SpeechCommandCompleteness completeness, {
-        required bool isFinal,
-      }) {
+    String transcript,
+    SpeechCommandCompleteness completeness, {
+    required bool isFinal,
+  }) {
     _speechStabilityTimer?.cancel();
-    if (isFinal || !completeness.isComplete || transcript.isEmpty) return;
+    if (transcript.isEmpty) return;
 
     final stableTranscript = transcript;
     _speechStabilityTimer = Timer(_speechStabilityWindow, () async {
@@ -2826,16 +2828,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         return;
       }
       final currentCompleteness = _speechCompleteness(stableTranscript);
-      final decision = _speechSession.recordTranscript(
-        stableTranscript,
-        isFinal: currentCompleteness.isComplete,
+      final decision = _speechSession.onSessionExpired(
+        isComplete: currentCompleteness.isComplete,
       );
       _traceSpeechEvent(
         'stable',
         transcript: stableTranscript,
         completeness: currentCompleteness,
       );
-      if (decision.action == SpeechSessionAction.processFinal) {
+      if (decision.action != SpeechSessionAction.none) {
         await _stopRecognizerThenApply(decision);
       }
     });
@@ -3116,7 +3117,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (source == null) return;
 
       final picker = ImagePicker();
-      final image = await picker.pickImage(source: source, imageQuality: 90);
+      final image = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1800,
+        maxHeight: 1800,
+      );
       if (!mounted || image == null) return;
 
       // 🚀 FIXED: Navigate to Interactive Screen
@@ -3220,9 +3226,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       if (!mounted || _restartingSpeech) return;
       final transcript = _speechSession.latestDraft;
       final completeness = _speechCompleteness(transcript);
-      final decision = completeness.isComplete
-          ? _speechSession.onRecognizerStopped()
-          : _speechSession.onRecognizerError(retryable: true);
+      if (transcript.isNotEmpty) {
+        _scheduleStableSpeechFinalization(
+          transcript,
+          completeness,
+          isFinal: false,
+        );
+        return;
+      }
+      final decision = _speechSession.onRecognizerError(retryable: true);
       _traceSpeechEvent(
         'recognizer_stopped',
         transcript: transcript,

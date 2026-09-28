@@ -18,12 +18,11 @@ class SmartInputPlan {
 
   bool get requiresAsrReview =>
       command.source == SmartInputSource.voice &&
-      normalization.appliedRules.any(
-        (rule) => const {
-          'spent_asr_context',
-          'pen_asr_context',
-        }.contains(rule),
-      );
+      (RegExp(r'\d\s*:\s*\d').hasMatch(originalText) ||
+          normalization.appliedRules.any(
+            (rule) =>
+                const {'spent_asr_context', 'pen_asr_context'}.contains(rule),
+          ));
 }
 
 class SmartInputEngine {
@@ -33,8 +32,8 @@ class SmartInputEngine {
   SmartInputEngine({
     PakistaniLanguageNormalizer? normalizer,
     LocalNlpService? nlp,
-  })  : normalizer = normalizer ?? PakistaniLanguageNormalizer(),
-        nlp = nlp ?? LocalNlpService();
+  }) : normalizer = normalizer ?? PakistaniLanguageNormalizer(),
+       nlp = nlp ?? LocalNlpService();
 
   SmartInputPlan parse(
     String input,
@@ -99,9 +98,7 @@ class SmartInputEngine {
     }
   }
 
-  _MutationInterpretation _interpretMutation(
-    ParsedSmartEntryCommand parsed,
-  ) {
+  _MutationInterpretation _interpretMutation(ParsedSmartEntryCommand parsed) {
     final input = parsed.rawInput.toLowerCase();
     final numberPattern = RegExp(
       r'\b\d+(?:\.\d+)?(?:\s*(?:k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr))?\b',
@@ -127,12 +124,8 @@ class SmartInputEngine {
       RegExp(
         r'^(?:change|edit|update)?\s*(?:\d+(?:\.\d+)?\s+(?:ki|ka|ke)\s+)?(.+?)\s+(?:ka|ki|ke)?\s*(?:naam|name)\s+(?:to\s+)?(.+?)\s+(?:karo|kar\s+do|badlo|change|update)$',
       ),
-      RegExp(
-        r'^(?:change|edit|update)\s+(.+?)\s+(?:name|naam)\s+to\s+(.+)$',
-      ),
-      RegExp(
-        r'^(.+?)\s+ko\s+(.+?)\s+kar\s+do$',
-      ),
+      RegExp(r'^(?:change|edit|update)\s+(.+?)\s+(?:name|naam)\s+to\s+(.+)$'),
+      RegExp(r'^(.+?)\s+ko\s+(.+?)\s+kar\s+do$'),
     ];
     for (final pattern in titlePatterns) {
       final match = pattern.firstMatch(input);
@@ -198,20 +191,17 @@ class SmartInputEngine {
         scale == 'hazaar') {
       return base * 1000;
     }
-    if (scale == 'lakh' || scale == 'lac' || scale == 'lak') return base * 100000;
+    if (scale == 'lakh' || scale == 'lac' || scale == 'lak')
+      return base * 100000;
     if (scale == 'million') return base * 1000000;
-    if (scale == 'crore' || scale == 'krore' || scale == 'cr') return base * 10000000;
+    if (scale == 'crore' || scale == 'krore' || scale == 'cr')
+      return base * 10000000;
     return base;
   }
 
   String? _usefulTitle(String value) {
     final normalized = value.trim();
-    const ignored = {
-      '',
-      'Transaction',
-      'Quick Expense',
-      'Income / Allowance',
-    };
+    const ignored = {'', 'Transaction', 'Quick Expense', 'Income / Allowance'};
     return ignored.contains(normalized) ? null : normalized;
   }
 
@@ -240,8 +230,5 @@ class _MutationInterpretation {
   final TransactionSelector selector;
   final TransactionPatch patch;
 
-  const _MutationInterpretation({
-    required this.selector,
-    required this.patch,
-  });
+  const _MutationInterpretation({required this.selector, required this.patch});
 }

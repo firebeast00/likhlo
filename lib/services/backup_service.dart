@@ -440,6 +440,7 @@ class BackupService {
         'type': d.type,
         'dueDate': d.dueDate?.toUtc().toIso8601String(),
         'deletedAt': d.deletedAt?.toUtc().toIso8601String(),
+        'walletId': d.walletId,
       };
 
   static DebtEntry _debtFromJson(Map<String, dynamic> value) {
@@ -464,6 +465,7 @@ class BackupService {
       type: type,
       dueDate: dueDate,
       deletedAt: deletedAt,
+      walletId: value['walletId'] is String ? value['walletId'] as String : null,
     );
   }
 
