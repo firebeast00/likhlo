@@ -19,7 +19,10 @@ class UdharInput {
 class UdharInputService {
   const UdharInputService();
 
-  UdharInput? parse(String text, {Iterable<String> walletNames = const []}) {
+  UdharInput? parse(String text, {
+    Iterable<String> walletNames = const [],
+    Iterable<SmartEntryAccount> accounts = const [],
+  }) {
     // Debt verbs are deliberately local to Udhar; general expense intent stays unchanged.
     final debtText = text
         .replaceAll('ادھار', 'udhaar')
@@ -31,14 +34,20 @@ class UdharInputService {
     final normalized = PakistaniLanguageNormalizer()
         .normalize(debtText)
         .normalized;
+    // Main Smart Entry's negation/alternative safeguards also apply to Udhaar.
+    if (RegExp(r'\b(nahi|nahin|mat|dont|don\x27t|ya|or)\b')
+        .hasMatch(normalized)) {
+      return null;
+    }
     final parsed = LocalNlpService().parseCommand(normalized, const [
       'Udhaar',
       'Debt',
     ]);
     if (parsed.amount <= 0 ||
         !parsed.amount.isFinite ||
-        RegExp(r'\d\s*:\s*\d').hasMatch(text))
+        RegExp(r'\d\s*:\s*\d').hasMatch(text)) {
       return null;
+    }
 
     final borrowed = RegExp(
       r'\b(borrowed|borrow|took|liya|liye|lia|li|receive|received|lena)\b',
@@ -58,6 +67,15 @@ class UdharInputService {
       if (name.isNotEmpty) {
         person = person.replaceAll(RegExp('\\b${RegExp.escape(name)}\\b'), ' ');
       }
+    }
+    final aliases = accounts
+        .expand(smartEntryAccountAliases)
+        .where((alias) => alias.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    for (final alias in aliases) {
+      person = person.replaceAll(RegExp('\\b${RegExp.escape(alias)}\\b'), ' ');
     }
     person = person
         .replaceAll(

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'expense_provider.dart';
+import '../services/udhar_ledger_link_service.dart';
 
 // A clean data model to hold the pre-calculated stats
 class ExpenseStats {
@@ -22,6 +23,7 @@ class ExpenseStats {
 // The Provider that does all the math
 final statsProvider = Provider<ExpenseStats>((ref) {
   final allExpenses = ref.watch(expenseProvider).allExpenses;
+  final linkedUdhaarIds = linkedUdharLedgerIds();
   final now = DateTime.now();
 
   final monthlyTotals = List<double>.filled(6, 0);
@@ -32,7 +34,9 @@ final statsProvider = Provider<ExpenseStats>((ref) {
   double maxMonthTotal = 0;
   final currentMonth = now.year * 12 + now.month;
   for (final e in allExpenses) {
-    if (e.type != 'expense' || e.category == 'Transfer') continue;
+    if (e.type != 'expense' ||
+        e.category == 'Transfer' ||
+        linkedUdhaarIds.contains(e.id)) continue;
     final age = currentMonth - (e.date.year * 12 + e.date.month);
     if (age < 0 || age > 5) continue;
     monthlyTotals[5 - age] += e.amount;

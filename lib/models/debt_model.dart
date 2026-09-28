@@ -25,6 +25,9 @@ class DebtEntry extends HiveObject {
   @HiveField(6)
   String? walletId;
 
+  @HiveField(7)
+  DateTime? settledAt;
+
   DebtEntry({
     required this.id,
     required this.borrowerName,
@@ -33,17 +36,28 @@ class DebtEntry extends HiveObject {
     this.dueDate,
     this.deletedAt,
     this.walletId,
+    this.settledAt,
   });
 
-  DebtEntry copyWith({DateTime? deletedAt, bool clearDeletedAt = false}) {
+  DebtEntry copyWith({
+    String? borrowerName,
+    double? amount,
+    String? type,
+    String? walletId,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
+    DateTime? settledAt,
+    bool clearSettledAt = false,
+  }) {
     return DebtEntry(
       id: id,
-      borrowerName: borrowerName,
-      amount: amount,
-      type: type,
+      borrowerName: borrowerName ?? this.borrowerName,
+      amount: amount ?? this.amount,
+      type: type ?? this.type,
       dueDate: dueDate,
       deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
-      walletId: walletId,
+      walletId: walletId ?? this.walletId,
+      settledAt: clearSettledAt ? null : (settledAt ?? this.settledAt),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_expense_manager/services/udhar_input_service.dart';
+import 'package:student_expense_manager/services/local_nlp_service.dart';
 
 void main() {
   const parser = UdharInputService();
@@ -39,6 +40,21 @@ void main() {
     expect(entry?.person, 'Ali');
   });
 
+  test('spoken wallet aliases are excluded from the person name', () {
+    final entry = parser.parse(
+      'jazz cash se Ali ko 1000 udhaar diya',
+      accounts: const [
+        SmartEntryAccount(
+          id: 'jazzcash',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 5000,
+        ),
+      ],
+    );
+    expect(entry?.person, 'Ali');
+  });
+
   test('unspoken direction needs review', () {
     final entry = parser.parse('Ali 500');
     expect(entry?.canSaveImmediately, false);
@@ -47,5 +63,19 @@ void main() {
   test('ambiguous ASR money and contradictory direction cannot save', () {
     expect(parser.parse('3:30 lakh ka udhaar Ali ko diya'), isNull);
     expect(parser.parse('borrowed 500 and lent 500 to Ali'), isNull);
+  });
+
+  test('Roman Urdu amounts and debt direction use shared number parsing', () {
+    final lent = parser.parse('Bilal ko derh lak udhaar diya');
+    final borrowed = parser.parse('Sara se assi hazar qarz liya');
+    expect(lent?.amount, 150000);
+    expect(lent?.type, 'lent');
+    expect(borrowed?.amount, 80000);
+    expect(borrowed?.type, 'borrowed');
+  });
+
+  test('negated or alternative debt requests cannot save automatically', () {
+    expect(parser.parse('Ali ko 500 udhaar mat do'), isNull);
+    expect(parser.parse('Ali ko 500 diya ya nahi'), isNull);
   });
 }

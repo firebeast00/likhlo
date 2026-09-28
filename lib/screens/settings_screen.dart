@@ -13,6 +13,7 @@ import '../providers/wallet_provider.dart';
 import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
 import '../services/voice_privacy_service.dart';
+import '../services/udhar_ledger_link_service.dart';
 import 'backup_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -696,15 +697,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
       );
 
+      final linkedUdhaarIds = linkedUdharLedgerIds();
       final totalSpent = records
-          .where((e) => e.type == 'expense' && e.category != 'Transfer')
+          .where((e) => e.type == 'expense' &&
+              e.category != 'Transfer' &&
+              !linkedUdhaarIds.contains(e.id))
           .fold<double>(0, (sum, item) => sum + item.amount);
       final remaining = ref.read(walletProvider).fold<double>(0,
           (sum, wallet) => sum + ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id));
       // The three figures reconcile even if opening balances were adjusted.
       final totalAmount = remaining + totalSpent;
       final byCategory = <String, double>{};
-      for (final entry in records.where((e) => e.type == 'expense' && e.category != 'Transfer')) {
+      for (final entry in records.where((e) => e.type == 'expense' &&
+          e.category != 'Transfer' &&
+          !linkedUdhaarIds.contains(e.id))) {
         byCategory.update(entry.category, (sum) => sum + entry.amount,
             ifAbsent: () => entry.amount);
       }

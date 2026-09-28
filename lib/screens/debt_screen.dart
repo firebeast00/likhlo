@@ -17,6 +17,9 @@ import '../services/ocr_scanner_service.dart';
 import '../providers/settings_provider.dart';
 import '../models/expense_model.dart';
 import '../services/transaction_executor.dart';
+import '../services/speech_session_controller.dart';
+import '../services/udhar_ledger_link_service.dart';
+import '../providers/expense_provider.dart';
 
 class DebtScreen extends ConsumerStatefulWidget {
   final bool embedded;
@@ -32,9 +35,10 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
+  bool _voiceFinalizing = false;
   bool _savingDebt = false;
   bool _scanningDebt = false;
-  Timer? _voiceInactivity;
+  final SpeechSessionController _speechSession = SpeechSessionController(maxRetries: 0);
   String? _selectedWalletId;
   final TextEditingController _smartInputCtrl = TextEditingController();
 
@@ -49,39 +53,44 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     return wallets.first.id;
   }
 
+  List<SmartEntryAccount> _udharAccounts() {
+    final wallets = ref.read(walletProvider);
+    return wallets.map((wallet) => SmartEntryAccount(
+      id: wallet.id,
+      name: wallet.name,
+      type: wallet.walletType,
+      isBackup: wallet.isBackup,
+      availableBalance: ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id),
+    )).toList(growable: false);
+  }
+
   String? _walletForCommand(String text) {
     final normalized = PakistaniLanguageNormalizer().normalize(text).normalized;
-    final matches = ref.read(walletProvider).where((wallet) {
-      final name = PakistaniLanguageNormalizer()
-          .normalize(wallet.name)
-          .normalized;
-      return name.isNotEmpty &&
-          RegExp('(^|\\s)${RegExp.escape(name)}(?=\\s|\$)')
-              .hasMatch(normalized);
-    }).toList();
+    final matches = findMentionedSmartEntryAccountIds(normalized, _udharAccounts());
     if (matches.length > 1) return null;
-    return matches.isEmpty ? _activeWalletId : matches.single.id;
+    return matches.isEmpty ? _activeWalletId : matches.single;
   }
 
   @override
   void dispose() {
-    _voiceInactivity?.cancel();
     unawaited(_speech.cancel());
     _smartInputCtrl.dispose();
     super.dispose();
   }
 
   void _listenForInput() async {
+    if (_voiceFinalizing || _savingDebt) return;
     if (!_isListening) {
+      _speechSession.start();
       bool available = await _speech.initialize(
         onStatus: (val) {
           if (!mounted) return;
           if (val == 'done' || val == 'notListening') {
-            _scheduleVoiceCompletion();
+            unawaited(_finishVoiceInput(finalResult: false));
           }
         },
         onError: (val) {
-          _voiceInactivity?.cancel();
+          _speechSession.onRecognizerError(retryable: false);
           if (mounted) {
             setState(() => _isListening = false);
             _smartInputCtrl.clear();
@@ -97,21 +106,32 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       if (!mounted) return;
 
       if (available) {
+        final localeId = await _preferredSpeechLocale();
+        if (!mounted) return;
         setState(() => _isListening = true);
         _smartInputCtrl.clear();
         await _speech.listen(
-          pauseFor: const Duration(seconds: 5),
-          listenFor: const Duration(seconds: 30),
-          partialResults: true,
+          options: stt.SpeechRecognitionListenOptions(
+            localeId: localeId,
+            pauseFor: const Duration(seconds: 7),
+            listenFor: const Duration(seconds: 45),
+            partialResults: true,
+          ),
           onResult: (val) {
             if (!mounted || !_isListening) return;
             final words = val.recognizedWords.trim();
             if (words.isNotEmpty) {
+              final decision = _speechSession.recordTranscript(
+                words,
+                isFinal: val.isFinal,
+              );
               _smartInputCtrl.value = TextEditingValue(
                 text: words,
                 selection: TextSelection.collapsed(offset: words.length),
               );
-              _scheduleVoiceCompletion();
+              if (decision.action == SpeechSessionAction.processFinal) {
+                unawaited(_finishVoiceInput(finalResult: true, decision: decision));
+              }
             }
           },
         );
@@ -126,33 +146,68 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         );
       }
     } else {
-      _voiceInactivity?.cancel();
-      setState(() => _isListening = false);
-      await _speech.stop();
-      if (_smartInputCtrl.text.trim().isNotEmpty) {
-        await _processNLP(_smartInputCtrl.text, fromVoice: true);
-      }
+      await _finishVoiceInput(finalResult: false);
     }
   }
 
-  void _scheduleVoiceCompletion() {
-    _voiceInactivity?.cancel();
-    if (!_isListening) return;
-    _voiceInactivity = Timer(const Duration(seconds: 3), () async {
-      if (!mounted || !_isListening) return;
-      final text = _smartInputCtrl.text.trim();
-      setState(() => _isListening = false);
-      await _speech.stop();
-      if (text.isNotEmpty) await _processNLP(text, fromVoice: true);
-    });
+  Future<String?> _preferredSpeechLocale() async {
+    try {
+      final locales = await _speech.locales();
+      final preferences = ref.read(settingsProvider).smartEntryLanguage == 'romanUrdu'
+          ? const ['ur_pk', 'ur', 'ur_in', 'en_pk', 'en_in']
+          : const ['en_pk', 'en_in', 'en_gb', 'en_us'];
+      for (final preferred in preferences) {
+        for (final locale in locales) {
+          if (locale.localeId.toLowerCase().replaceAll('-', '_') == preferred) {
+            return locale.localeId;
+          }
+        }
+      }
+    } catch (_) {
+      // The recognizer will use its device locale when lookup is unavailable.
+    }
+    return null;
   }
 
-  Future<void> _processNLP(String text, {bool fromVoice = false}) async {
+  Future<void> _finishVoiceInput({
+    required bool finalResult,
+    SpeechSessionDecision? decision,
+  }) async {
+    if (!_isListening || _voiceFinalizing) return;
+    _voiceFinalizing = true;
+    setState(() => _isListening = false);
+    try {
+      final result = decision ?? _speechSession.onRecognizerStopped();
+      await _speech.stop();
+      if (!mounted) return;
+      if (result.action == SpeechSessionAction.processFinal &&
+          result.transcript.isNotEmpty) {
+        await _processNLP(
+          result.transcript,
+          fromVoice: true,
+          allowInstantSave: finalResult,
+        );
+      } else {
+        _smartInputCtrl.clear();
+      }
+    } catch (_) {
+      if (mounted) _smartInputCtrl.clear();
+    } finally {
+      _speechSession.reset();
+      _voiceFinalizing = false;
+    }
+  }
+
+  Future<void> _processNLP(String text, {
+    bool fromVoice = false,
+    bool allowInstantSave = true,
+  }) async {
     if (text.trim().isEmpty || _savingDebt) return;
     final wallets = ref.read(walletProvider);
     final draft = const UdharInputService().parse(
       text,
       walletNames: wallets.map((wallet) => wallet.name),
+      accounts: _udharAccounts(),
     );
     if (draft == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -166,14 +221,14 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       return;
     }
     final walletId = _walletForCommand(text);
-    if (draft.canSaveImmediately && walletId != null) {
+    if (allowInstantSave && draft.canSaveImmediately && walletId != null) {
       final saved = await _saveDebtRecord(
         name: draft.person,
         amount: draft.amount,
         type: draft.type,
         walletId: walletId,
       );
-      if (saved) _smartInputCtrl.clear();
+      if (saved && mounted) _smartInputCtrl.clear();
     } else {
       _showAddDialog(
         initialName: draft.person,
@@ -185,7 +240,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       );
       if (fromVoice) _smartInputCtrl.clear();
     }
-    FocusScope.of(context).unfocus();
+    if (mounted) FocusScope.of(context).unfocus();
   }
 
   void _startReceiptScan() async {
@@ -198,6 +253,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       final draft = const UdharInputService().parse(
         receipt.rawText,
         walletNames: wallets.map((wallet) => wallet.name),
+        accounts: _udharAccounts(),
       );
       if (draft != null &&
           draft.canSaveImmediately &&
@@ -245,7 +301,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     if (_savingDebt) return false;
     final person = name.trim();
     final wallets = ref.read(walletProvider);
-    if (person.isEmpty ||
+    if ((type != 'lent' && type != 'borrowed') ||
+        person.isEmpty ||
         amount <= 0 ||
         !amount.isFinite ||
         !wallets.any((wallet) => wallet.id == walletId)) {
@@ -287,32 +344,32 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           walletId: walletId,
         ),
       );
-      if (type == 'lent') {
-        final result = await ref
-            .read(transactionExecutorProvider)
-            .execute(
-              CreateTransactionCommand(
-                Expense(
-                  id: debtId,
-                  title: 'Udhaar: $person',
-                  amount: amount,
-                  category: 'Udhaar',
-                  date: DateTime.now(),
-                  colorValue: Colors.red.toARGB32(),
-                  walletId: walletId,
-                ),
-              ),
-            );
-        if (!result.succeeded) {
-          await debtBox.delete(key);
-          if (mounted)
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result.reason ?? 'Udhaar could not be saved.'),
-              ),
-            );
-          return false;
+      final result = await ref.read(transactionExecutorProvider).execute(
+        CreateTransactionCommand(
+          Expense(
+            id: debtId,
+            title: type == 'lent' ? 'Udhaar: $person' : 'Borrowed from $person',
+            amount: amount,
+            category: 'Udhaar',
+            date: DateTime.now(),
+            colorValue: type == 'lent'
+                ? Colors.red.toARGB32()
+                : Colors.green.toARGB32(),
+            type: type == 'lent' ? 'expense' : 'income',
+            walletId: walletId,
+          ),
+        ),
+      );
+      if (!result.succeeded) {
+        await debtBox.delete(key);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.reason ?? 'Udhaar could not be saved.'),
+            ),
+          );
         }
+        return false;
       }
       if (dueDate != null && dueDate.isAfter(DateTime.now())) {
         unawaited(
@@ -344,6 +401,75 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             content: Text('Udhaar could not be saved. Try again.'),
           ),
         );
+      return false;
+    } finally {
+      _savingDebt = false;
+    }
+  }
+
+  Future<bool> _settleDebtRecord(DebtEntry debt) async {
+    if (_savingDebt) return false;
+    _savingDebt = true;
+    var createdSettlement = false;
+    try {
+      final original = ref.read(expenseProvider.notifier).findById(debt.id);
+      if (original == null) {
+        // Older borrowed records never created a ledger movement. Preserve
+        // their historical behavior instead of inventing past income.
+        await debtBox.put(
+          debt.key ?? debt.id,
+          debt.copyWith(deletedAt: DateTime.now()),
+        );
+      } else {
+        final walletId = debt.walletId ?? original.walletId;
+        final wallet = ref.read(walletProvider)
+            .where((item) => item.id == walletId);
+        if (wallet.isEmpty) return false;
+        final settlement = Expense(
+          id: UdharLedgerLinkService.settlementId(debt.id),
+          title: debt.type == 'lent'
+              ? 'Udhaar returned: ${debt.borrowerName}'
+              : 'Udhaar repaid: ${debt.borrowerName}',
+          amount: debt.amount,
+          category: 'Udhaar',
+          date: DateTime.now(),
+          colorValue: debt.type == 'lent'
+              ? Colors.green.toARGB32()
+              : Colors.red.toARGB32(),
+          type: debt.type == 'lent' ? 'income' : 'expense',
+          walletId: walletId,
+        );
+        final result = await ref.read(transactionExecutorProvider).execute(
+          CreateTransactionCommand(settlement),
+        );
+        if (!result.succeeded) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(result.reason ?? 'Udhaar could not be settled.'),
+            ));
+          }
+          return false;
+        }
+        createdSettlement = true;
+        await debtBox.put(
+          debt.key ?? debt.id,
+          debt.copyWith(settledAt: DateTime.now()),
+        );
+      }
+      if (mounted) setState(() {});
+      return true;
+    } catch (_) {
+      if (createdSettlement) {
+        final settlementId = UdharLedgerLinkService.settlementId(debt.id);
+        if (await ref.read(expenseProvider.notifier).deleteExpense(settlementId)) {
+          await ref.read(expenseProvider.notifier).permanentlyDelete(settlementId);
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Udhaar could not be settled.')),
+        );
+      }
       return false;
     } finally {
       _savingDebt = false;
@@ -704,8 +830,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(expenseProvider);
     final debts = debtBox.values
-        .where((entry) => entry.deletedAt == null)
+        .where((entry) => entry.deletedAt == null && entry.settledAt == null)
         .toList();
     final settings = ref.watch(settingsProvider);
     final wallets = ref.watch(walletProvider);
@@ -978,30 +1105,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         ),
                       ),
                       confirmDismiss: (_) async {
-                        final result = await ref
-                            .read(transactionExecutorProvider)
-                            .execute(DeleteTransactionCommand(item.id));
-                        if (result.succeeded ||
-                            result.status == TransactionResultStatus.notFound) {
-                          await debtBox.put(
-                            item.key ?? item.id,
-                            item.copyWith(deletedAt: DateTime.now()),
-                          );
-                          if (mounted) setState(() {});
-                          return true;
-                        }
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                result.reason ??
-                                    'This Udhaar record could not be settled.',
-                              ),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                        return false;
+                        return _settleDebtRecord(item);
                       },
                       onDismissed: (_) {
                         if (!mounted) return;

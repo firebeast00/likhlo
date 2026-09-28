@@ -447,6 +447,7 @@ class BackupService {
         'type': d.type,
         'dueDate': d.dueDate?.toUtc().toIso8601String(),
         'deletedAt': d.deletedAt?.toUtc().toIso8601String(),
+        'settledAt': d.settledAt?.toUtc().toIso8601String(),
         'walletId': d.walletId,
       };
 
@@ -460,9 +461,14 @@ class BackupService {
     final deletedAt = deletedAtValue == null
         ? null
         : DateTime.tryParse(_requiredString(deletedAtValue))?.toLocal();
+    final settledAtValue = value['settledAt'];
+    final settledAt = settledAtValue == null
+        ? null
+        : DateTime.tryParse(_requiredString(settledAtValue))?.toLocal();
     if ((type != 'lent' && type != 'borrowed') ||
         (dueDateValue != null && dueDate == null) ||
-        (deletedAtValue != null && deletedAt == null)) {
+        (deletedAtValue != null && deletedAt == null) ||
+        (settledAtValue != null && settledAt == null)) {
       throw const BackupException('An Udhar record is invalid.');
     }
     return DebtEntry(
@@ -472,6 +478,7 @@ class BackupService {
       type: type,
       dueDate: dueDate,
       deletedAt: deletedAt,
+      settledAt: settledAt,
       walletId: value['walletId'] is String ? value['walletId'] as String : null,
     );
   }

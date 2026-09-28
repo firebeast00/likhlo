@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
+import '../services/udhar_ledger_link_service.dart';
 
 class ExpenseState {
   final List<Expense> allExpenses;
@@ -31,6 +32,7 @@ class MonthlyLedgerSummary {
 
 class ExpenseNotifier extends StateNotifier<ExpenseState> {
   final Box<Expense> _box = Hive.box<Expense>('expenses');
+  final UdharLedgerLinkService _udharLinks = const UdharLedgerLinkService();
 
   ExpenseNotifier() : super(const ExpenseState(allExpenses: [])) {
     _loadExpenses();
@@ -129,24 +131,58 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 
   Future<bool> editExpense(String id, Expense updated) async {
-    if (!updated.amount.isFinite || updated.amount <= 0) return false;
+    if (updated.id != id || !updated.amount.isFinite || updated.amount <= 0) {
+      return false;
+    }
+    final previous = findById(id);
+    if (previous == null) return false;
+    // A settlement must always reverse its original loan for the full amount.
+    if (id.endsWith('_settlement') &&
+        _udharLinks.find(id.substring(0, id.length - '_settlement'.length)) !=
+            null &&
+        (updated.amount != previous.amount ||
+            updated.type != previous.type ||
+            updated.walletId != previous.walletId ||
+            updated.category != previous.category)) {
+      return false;
+    }
+    final linkedDebt = _udharLinks.find(id);
+    final linkedSettlement = linkedDebt == null || linkedDebt.settledAt == null
+        ? null
+        : findById(UdharLedgerLinkService.settlementId(id));
+    final updatedSettlement = linkedSettlement?.copyWith(
+      amount: updated.amount,
+      type: updated.type == 'income' ? 'expense' : 'income',
+      walletId: updated.walletId,
+      title: updated.type == 'income'
+          ? 'Udhaar repaid: ${UdharLedgerLinkService.personFromTitle(updated.title)}'
+          : 'Udhaar returned: ${UdharLedgerLinkService.personFromTitle(updated.title)}',
+    );
     if (!keepsWalletBalancesNonNegative(
       openingBalances: {
         for (final wallet in Hive.box<Wallet>('wallets').values)
           wallet.id: wallet.balance,
       },
       existingEntries: state.allExpenses,
-      proposedEntries: [updated],
-      replacedIds: {id},
+      proposedEntries: [updated, if (updatedSettlement != null) updatedSettlement],
+      replacedIds: {id, if (linkedSettlement != null) linkedSettlement.id},
     )) {
       return false;
     }
     final keyToEdit = _findKeyForId(id);
     if (keyToEdit == null) return false;
-    await _box.put(keyToEdit, updated);
+    await _box.putAll({
+      keyToEdit: updated,
+      if (updatedSettlement != null)
+        _findKeyForId(updatedSettlement.id)!: updatedSettlement,
+    });
+    await _udharLinks.updated(updated);
 
-    final updatedExpenses =
-        state.allExpenses.map((entry) => entry.id == id ? updated : entry);
+    final updatedExpenses = state.allExpenses.map((entry) => entry.id == id
+        ? updated
+        : entry.id == updatedSettlement?.id
+            ? updatedSettlement!
+            : entry);
     state = ExpenseState(
       allExpenses: _sortByNewest(updatedExpenses),
       deletedExpenses: state.deletedExpenses,
@@ -157,7 +193,12 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   Future<bool> deleteExpense(String id) async {
     final existing = findById(id);
     if (existing == null) return false;
-    if (existing.type == 'income' &&
+    final linkedDebt = _udharLinks.find(id);
+    final linkedSettlement = linkedDebt == null
+        ? null
+        : findById(UdharLedgerLinkService.settlementId(id));
+    final ids = {id, if (linkedSettlement != null) linkedSettlement.id};
+    if ((existing.type == 'income' || linkedSettlement != null) &&
         !keepsWalletBalancesNonNegative(
           openingBalances: {
             for (final wallet in Hive.box<Wallet>('wallets').values)
@@ -165,19 +206,29 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
           },
           existingEntries: state.allExpenses,
           proposedEntries: const [],
-          replacedIds: {id},
+          replacedIds: ids,
         )) {
       return false;
     }
     final keyToDelete = _findKeyForId(id);
     if (keyToDelete == null) return false;
-    final deleted = existing.copyWith(deletedAt: DateTime.now());
-    await _box.put(keyToDelete, deleted);
+    final now = DateTime.now();
+    final deleted = existing.copyWith(deletedAt: now);
+    await _box.putAll({
+      keyToDelete: deleted,
+      if (linkedSettlement != null)
+        _findKeyForId(linkedSettlement.id)!:
+            linkedSettlement.copyWith(deletedAt: now),
+    });
+    await _udharLinks.deleted(id, now);
     state = ExpenseState(
-      allExpenses: state.allExpenses.where((entry) => entry.id != id).toList(),
+      allExpenses: state.allExpenses
+          .where((entry) => !ids.contains(entry.id)).toList(),
       deletedExpenses: _sortByNewest([
-        ...state.deletedExpenses.where((entry) => entry.id != id),
+        ...state.deletedExpenses.where((entry) => !ids.contains(entry.id)),
         deleted,
+        if (linkedSettlement != null)
+          linkedSettlement.copyWith(deletedAt: now),
       ]),
     );
     return true;
@@ -216,23 +267,44 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   Future<bool> restoreExpense(String id) async {
     final deleted = findDeletedById(id);
     if (deleted == null) return false;
+    if (id.endsWith('_settlement') &&
+        findDeletedById(id.substring(0, id.length - '_settlement'.length)) !=
+            null) {
+      return false;
+    }
     if (!Hive.box<Wallet>('wallets').containsKey(deleted.walletId)) return false;
     final restored = deleted.copyWith(clearDeletedAt: true);
+    final linkedDebt = _udharLinks.find(id);
+    final deletedSettlement = linkedDebt == null
+        ? null
+        : findDeletedById(UdharLedgerLinkService.settlementId(id));
+    final restoredSettlement = deletedSettlement?.copyWith(clearDeletedAt: true);
+    if (restoredSettlement != null &&
+        !Hive.box<Wallet>('wallets').containsKey(restoredSettlement.walletId)) {
+      return false;
+    }
+    final restoredEntries = [
+      restored,
+      if (restoredSettlement != null) restoredSettlement,
+    ];
     if (!keepsWalletBalancesNonNegative(
       openingBalances: {
         for (final wallet in Hive.box<Wallet>('wallets').values)
           wallet.id: wallet.balance,
       },
       existingEntries: state.allExpenses,
-      proposedEntries: [restored],
+      proposedEntries: restoredEntries,
     )) {
       return false;
     }
-    await _box.put(id, restored);
+    await _box.putAll({for (final entry in restoredEntries) entry.id: entry});
+    await _udharLinks.restored(id);
     state = ExpenseState(
-      allExpenses: _sortByNewest([...state.allExpenses, restored]),
+      allExpenses: _sortByNewest([...state.allExpenses, ...restoredEntries]),
       deletedExpenses:
-          state.deletedExpenses.where((entry) => entry.id != id).toList(),
+          state.deletedExpenses
+              .where((entry) => !restoredEntries.any((item) => item.id == entry.id))
+              .toList(),
     );
     return true;
   }
@@ -275,6 +347,11 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   Future<bool> permanentlyDelete(String id) async {
     final deleted = findDeletedById(id);
     if (deleted == null) return false;
+    if (id.endsWith('_settlement') &&
+        findDeletedById(id.substring(0, id.length - '_settlement'.length)) !=
+            null) {
+      return false;
+    }
     final transferId = deleted.category == 'Transfer'
         ? (id.endsWith('_out')
             ? id.substring(0, id.length - 4)
@@ -285,8 +362,13 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     final ids = transferId == null
         ? {id}
         : {'${transferId}_out', '${transferId}_in'};
+    if (_udharLinks.find(id) != null &&
+        findDeletedById(UdharLedgerLinkService.settlementId(id)) != null) {
+      ids.add(UdharLedgerLinkService.settlementId(id));
+    }
     final keys = ids.map(_findKeyForId).where((key) => key != null).toList();
     await _box.deleteAll(keys);
+    await _udharLinks.permanentlyDeleted(id);
     state = ExpenseState(
       allExpenses: state.allExpenses,
       deletedExpenses:
@@ -296,11 +378,15 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 
   Future<void> emptyTrash() async {
+    final deletedIds = state.deletedExpenses.map((entry) => entry.id).toList();
     final keys = state.deletedExpenses
         .map((entry) => _findKeyForId(entry.id))
         .where((key) => key != null)
         .toList(growable: false);
     await _box.deleteAll(keys);
+    for (final id in deletedIds) {
+      await _udharLinks.permanentlyDeleted(id);
+    }
     state = ExpenseState(allExpenses: state.allExpenses);
   }
 
@@ -329,6 +415,9 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
         .where((key) => key != null)
         .toList(growable: false);
     await _box.deleteAll(keys);
+    for (final id in expiredIds) {
+      await _udharLinks.permanentlyDeleted(id);
+    }
     state = ExpenseState(
       allExpenses: state.allExpenses,
       deletedExpenses: state.deletedExpenses
@@ -349,6 +438,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
       for (final entry in entries)
         entry.key: entry.value.copyWith(walletId: toWalletId),
     });
+    await _udharLinks.reassignWallet(fromWalletId, toWalletId);
     state = ExpenseState(
       allExpenses: state.allExpenses
           .map((entry) => entry.walletId == fromWalletId
@@ -446,6 +536,7 @@ final monthlyLedgerProvider =
     Provider.family<MonthlyLedgerSummary, DateTime>((ref, focusedMonth) {
   final allExpenses = ref.watch(expenseProvider).allExpenses;
   final transactions = <Expense>[];
+  final linkedUdhaarIds = linkedUdharLedgerIds();
   double income = 0;
   double spent = 0;
 
@@ -456,7 +547,9 @@ final monthlyLedgerProvider =
     }
 
     transactions.add(entry);
-    if (entry.category == 'Transfer') continue;
+    if (entry.category == 'Transfer' || linkedUdhaarIds.contains(entry.id)) {
+      continue;
+    }
     if (entry.type == 'income') {
       income += entry.amount;
     } else if (entry.type == 'expense') {
@@ -512,6 +605,7 @@ class LedgerReportSummary {
 
 LedgerReportSummary calculateLedgerReportSummary(Iterable<Expense> entries) {
   final transactions = visibleTransactions(entries);
+  final linkedUdhaarIds = linkedUdharLedgerIds();
   var expenseCount = 0;
   var expenseTotal = 0.0;
   var incomeCount = 0;
@@ -520,6 +614,7 @@ LedgerReportSummary calculateLedgerReportSummary(Iterable<Expense> entries) {
   var transferTotal = 0.0;
 
   for (final entry in transactions) {
+    if (linkedUdhaarIds.contains(entry.id)) continue;
     final isTransfer = entry.category.trim().toLowerCase() == 'transfer';
     if (isTransfer) {
       transferCount++;

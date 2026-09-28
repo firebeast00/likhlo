@@ -1656,6 +1656,10 @@ Set<String> _smartEntryAccountAliases(SmartEntryAccount account) {
   return aliases;
 }
 
+/// Udhaar uses the same wallet names and speech aliases as Main Smart Entry.
+Set<String> smartEntryAccountAliases(SmartEntryAccount account) =>
+    _smartEntryAccountAliases(account);
+
 bool _isCashInsideJazzCash(String input, int start, String alias) {
   if (alias != 'cash' || start < 5) return false;
   return input.substring(start - 5, start) == 'jazz ';

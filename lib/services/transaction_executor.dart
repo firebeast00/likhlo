@@ -332,10 +332,16 @@ class TransactionExecutor {
         return TransactionResult(
           status: deleted
               ? TransactionResultStatus.succeeded
-              : TransactionResultStatus.notFound,
+              : existing == null
+                  ? TransactionResultStatus.notFound
+                  : TransactionResultStatus.rejected,
           action: TransactionAction.delete,
           affectedIds: deleted ? [command.id] : const [],
-          reason: deleted ? null : 'The transaction no longer exists.',
+          reason: deleted
+              ? null
+              : existing == null
+                  ? 'The transaction no longer exists.'
+                  : 'Deleting this entry would make a wallet balance negative.',
         );
       case DeleteTransferCommand():
         final existing = store.findById(command.transactionId);

@@ -24,13 +24,14 @@ class DebtEntryAdapter extends TypeAdapter<DebtEntry> {
       dueDate: fields[4] as DateTime?,
       deletedAt: fields[5] as DateTime?,
       walletId: fields[6] as String?,
+      settledAt: fields[7] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, DebtEntry obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class DebtEntryAdapter extends TypeAdapter<DebtEntry> {
       ..writeByte(5)
       ..write(obj.deletedAt)
       ..writeByte(6)
-      ..write(obj.walletId);
+      ..write(obj.walletId)
+      ..writeByte(7)
+      ..write(obj.settledAt);
   }
 
   @override
