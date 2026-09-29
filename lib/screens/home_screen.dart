@@ -1047,7 +1047,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         currentSection: currentSection,
         onSectionChanged: _changeSection,
         dashboardAppBar: DashboardAppBar(
-        activeTab: _activePrimaryTab,
         isSearching: _isSearching,
         onSearchChanged: (value) => setState(() => _searchQuery = value),
         onBeforeOpenDrawer: _dismissKeyboard,
