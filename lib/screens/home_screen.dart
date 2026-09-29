@@ -43,10 +43,23 @@ import 'interactive_ocr_screen.dart';
 part '../features/dashboard/dashboard_coordinator.dart';
 part '../features/dashboard/dashboard_notifications.dart';
 part '../features/dashboard/dashboard_core_actions.dart';
-part '../features/dashboard/dashboard_controls.dart';
-part '../features/dashboard/dashboard_widgets.dart';
-part '../features/dashboard/dashboard_voice_ocr.dart';
-part '../features/dashboard/dashboard_smart_entry.dart';
+part '../features/dashboard/dashboard_navigation.dart';
+part '../features/dashboard/dashboard_categories.dart';
+part '../features/dashboard/dashboard_transaction_form.dart';
+part '../features/dashboard/dashboard_feedback_methods.dart';
+part '../features/dashboard/dashboard_transaction_widgets.dart';
+part '../features/dashboard/dashboard_category_widgets.dart';
+part '../features/dashboard/dashboard_smart_input_widget.dart';
+part '../features/dashboard/dashboard_wallet_actions.dart';
+part '../features/dashboard/dashboard_hero_widgets.dart';
+part '../features/dashboard/dashboard_month_selector.dart';
+part '../features/dashboard/dashboard_voice.dart';
+part '../features/dashboard/dashboard_ocr.dart';
+part '../features/dashboard/dashboard_smart_entry_matching.dart';
+part '../features/dashboard/dashboard_smart_entry_transfer.dart';
+part '../features/dashboard/dashboard_smart_entry_queries.dart';
+part '../features/dashboard/dashboard_smart_entry_mutation.dart';
+part '../features/dashboard/dashboard_smart_entry_processing.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
