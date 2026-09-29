@@ -71,9 +71,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final SpeechRecognitionProvider _speech = SpeechProviderRouter(
     deviceProvider: DeviceSpeechRecognitionProvider(),
   );
-  static const _speechPauseWindow = Duration(seconds: 3);
+  static const _speechPauseWindow = Duration(seconds: 5);
   static const _speechStabilityWindow = Duration(seconds: 3);
-  static const _speechSessionLimit = Duration(seconds: 25);
+  static const _speechSessionLimit = Duration(seconds: 30);
   static const _speechStartupGrace = Duration(milliseconds: 1200);
   static const _prematureSpeechStatusGuard = Duration(milliseconds: 600);
   final SpeechSessionController _speechSession =
@@ -2739,8 +2739,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           final completeness = _speechCompleteness(words);
           final decision = _speechSession.recordTranscript(
             words,
-            // Short recognizer finals can arrive during a natural pause.
-            // Finalize after the inactivity window instead.
+            // Some recognizers finalize a phrase during a pause. Let the
+            // inactivity window decide when the full command has ended.
             isFinal: false,
             isComplete: completeness.isComplete,
           );
@@ -2760,6 +2760,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           );
           _scheduleStableSpeechFinalization(
             combinedWords,
+            completeness,
+            isFinal: result.isFinal,
           );
           await _applySpeechDecision(decision);
         },
@@ -2824,7 +2826,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   void _scheduleStableSpeechFinalization(
     String transcript,
-  ) {
+    SpeechCommandCompleteness completeness, {
+    required bool isFinal,
+  }) {
     _speechStabilityTimer?.cancel();
     if (transcript.isEmpty) return;
 
@@ -3231,13 +3235,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_finalizingRecognizerStop) return;
     _finalizingRecognizerStop = true;
     try {
-      await Future<void>.delayed(const Duration(milliseconds: 550));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
       if (!mounted || _restartingSpeech) return;
       final transcript = _speechSession.latestDraft;
       final completeness = _speechCompleteness(transcript);
       if (transcript.isNotEmpty) {
         _scheduleStableSpeechFinalization(
           transcript,
+          completeness,
+          isFinal: false,
         );
         return;
       }

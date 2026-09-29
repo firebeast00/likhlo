@@ -19,9 +19,7 @@ import '../models/expense_model.dart';
 import '../services/transaction_executor.dart';
 import '../services/speech_session_controller.dart';
 import '../services/udhar_ledger_link_service.dart';
-import '../services/udhar_entry_filter.dart';
 import '../providers/expense_provider.dart';
-import '../widgets/udhar_smart_entry_card.dart';
 
 class DebtScreen extends ConsumerStatefulWidget {
   final bool embedded;
@@ -33,7 +31,6 @@ class DebtScreen extends ConsumerStatefulWidget {
 }
 
 class _DebtScreenState extends ConsumerState<DebtScreen> {
-  static const _walletPreferenceKey = 'udhar_smart_entry_wallet_id';
   final Box<DebtEntry> debtBox = Hive.box<DebtEntry>('debts');
 
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -44,14 +41,6 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   final SpeechSessionController _speechSession = SpeechSessionController(maxRetries: 0);
   String? _selectedWalletId;
   final TextEditingController _smartInputCtrl = TextEditingController();
-  final TextEditingController _searchCtrl = TextEditingController();
-  String _directionFilter = 'all';
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedWalletId = Hive.box('preferences').get(_walletPreferenceKey) as String?;
-  }
 
   String? get _activeWalletId {
     final wallets = ref.read(walletProvider);
@@ -82,48 +71,10 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     return matches.isEmpty ? _activeWalletId : matches.single;
   }
 
-  Future<void> _selectInstantEntryWallet() async {
-    FocusScope.of(context).unfocus();
-    final wallets = ref.read(walletProvider);
-    if (wallets.isEmpty) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const ListTile(
-              title: Text('Udhaar wallet',
-                  style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('Used for instant entries unless you name a wallet'),
-            ),
-            for (final wallet in wallets)
-              ListTile(
-                leading: Icon(Icons.account_balance_wallet_outlined,
-                    color: Color(wallet.colorValue)),
-                title: Text(wallet.name),
-                trailing: wallet.id == _activeWalletId
-                    ? const Icon(Icons.check_circle_rounded)
-                    : null,
-                onTap: () async {
-                  await Hive.box('preferences').put(_walletPreferenceKey, wallet.id);
-                  if (!mounted) return;
-                  setState(() => _selectedWalletId = wallet.id);
-                  if (sheetContext.mounted) Navigator.pop(sheetContext);
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     unawaited(_speech.cancel());
     _smartInputCtrl.dispose();
-    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -135,7 +86,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         onStatus: (val) {
           if (!mounted) return;
           if (val == 'done' || val == 'notListening') {
-            unawaited(_finishVoiceInput());
+            unawaited(_finishVoiceInput(finalResult: false));
           }
         },
         onError: (val) {
@@ -181,7 +132,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 selection: TextSelection.collapsed(offset: words.length),
               );
               if (decision.action == SpeechSessionAction.processFinal) {
-                unawaited(_finishVoiceInput(decision: decision));
+                unawaited(_finishVoiceInput(finalResult: true, decision: decision));
               }
             }
           },
@@ -197,7 +148,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         );
       }
     } else {
-      await _finishVoiceInput();
+      await _finishVoiceInput(finalResult: false);
     }
   }
 
@@ -221,6 +172,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   Future<void> _finishVoiceInput({
+    required bool finalResult,
     SpeechSessionDecision? decision,
   }) async {
     if (!_isListening || _voiceFinalizing) return;
@@ -235,8 +187,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         await _processNLP(
           result.transcript,
           fromVoice: true,
-          // A normal recognizer stop may have only partial callbacks. The
-          // parser still has to confirm person, direction, amount and wallet.
+          allowInstantSave: finalResult,
         );
       } else {
         _smartInputCtrl.clear();
@@ -251,6 +202,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   Future<void> _processNLP(String text, {
     bool fromVoice = false,
+    bool allowInstantSave = true,
   }) async {
     if (text.trim().isEmpty || _savingDebt) return;
     final wallets = ref.read(walletProvider);
@@ -271,7 +223,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       return;
     }
     final walletId = _walletForCommand(text);
-    if (draft.canSaveImmediately && walletId != null) {
+    if (allowInstantSave && draft.canSaveImmediately && walletId != null) {
       final saved = await _saveDebtRecord(
         name: draft.person,
         amount: draft.amount,
@@ -881,17 +833,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(expenseProvider);
-    final debts = filterActiveUdharEntries(debtBox.values);
-    final visibleDebts = filterActiveUdharEntries(
-      debts,
-      query: _searchCtrl.text,
-      direction: _directionFilter,
-    );
+    final debts = debtBox.values
+        .where((entry) => entry.deletedAt == null && entry.settledAt == null)
+        .toList();
     final settings = ref.watch(settingsProvider);
     final wallets = ref.watch(walletProvider);
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     double iGave = debts
         .where((e) => e.type == 'lent')
@@ -904,17 +852,17 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final body = Column(
       children: [
         // 1. 🌟 SUMMARY HERO CARD
-        if (!keyboardOpen) Container(
+        Container(
           width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-          padding: const EdgeInsets.all(18),
+          margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(28),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -971,7 +919,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 24),
               Row(
                 children: [
                   Expanded(
@@ -991,80 +939,114 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ),
         ),
 
-        UdharSmartEntryCard(
-          controller: _smartInputCtrl,
-          walletName: wallets
-              .where((wallet) => wallet.id == _activeWalletId)
-              .map((wallet) => wallet.name)
-              .firstOrNull ?? 'Choose wallet',
-          color: primaryColor,
-          listening: _isListening,
-          scanning: _scanningDebt,
-          saving: _savingDebt,
-          onChooseWallet: _selectInstantEntryWallet,
-          onVoice: _listenForInput,
-          onScan: _startReceiptScan,
-          onSave: (text) => _processNLP(text),
-        ),
-        const SizedBox(height: 10),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: TextField(
-            controller: _searchCtrl,
-            onChanged: (_) => setState(() {}),
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Search people',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: _searchCtrl.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear search',
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() {});
-                      },
-                    ),
-              filled: true,
-              fillColor: Theme.of(context).cardColor,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: wallets.any((wallet) => wallet.id == _activeWalletId)
+                ? _activeWalletId
+                : null,
+            decoration: const InputDecoration(
+              labelText: 'Udhaar wallet',
+              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+              border: OutlineInputBorder(),
               isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
+            ),
+            items: wallets
+                .map(
+                  (wallet) => DropdownMenuItem(
+                    value: wallet.id,
+                    child: Text(wallet.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: (id) => setState(() => _selectedWalletId = id),
+          ),
+        ),
+
+        // 2. 🎙️ SMART VOICE & OCR INPUT BAR
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? primaryColor.withValues(alpha: 0.4)
+                    : Colors.grey.withValues(alpha: 0.2),
+                width: 1.2,
               ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    _isListening ? Icons.mic : Icons.mic_none_rounded,
+                    color: _isListening ? Colors.red : primaryColor,
+                    size: 20,
+                  ),
+                  onPressed: _listenForInput,
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _smartInputCtrl,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: _isListening
+                          ? 'Listening...'
+                          : 'Speak: "Borrowed 500 from Sara"',
+                      border: InputBorder.none,
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 12,
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 8,
+                      ),
+                    ),
+                    onSubmitted: (val) => _processNLP(val),
+                  ),
+                ),
+                IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(
+                    Icons.document_scanner_rounded,
+                    color: Colors.blueAccent,
+                    size: 18,
+                  ),
+                  onPressed: _scanningDebt ? null : _startReceiptScan,
+                  tooltip: "Scan Receipt",
+                ),
+                IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(Icons.send_rounded, color: primaryColor, size: 18),
+                  onPressed: () => _processNLP(_smartInputCtrl.text),
+                ),
+              ],
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        if (!keyboardOpen) SizedBox(
-          height: 42,
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            scrollDirection: Axis.horizontal,
-            children: [
-              for (final (value, label) in [
-                ('all', 'All'),
-                ('lent', 'I Gave'),
-                ('borrowed', 'I Took'),
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(label),
-                    selected: _directionFilter == value,
-                    onSelected: (_) => setState(() => _directionFilter = value),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
 
         // 3. 📋 UDHAAR LIST
         Expanded(
-          child: visibleDebts.isEmpty
+          child: debts.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1076,9 +1058,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        debts.isEmpty
-                            ? "No active records. You're all settled!"
-                            : 'No people match your search or filter.',
+                        "No active records. You're all settled!",
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 13,
@@ -1092,9 +1072,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                     horizontal: 20,
                     vertical: 4,
                   ),
-                  itemCount: visibleDebts.length,
+                  itemCount: debts.length,
                   itemBuilder: (ctx, i) {
-                    final item = visibleDebts[i];
+                    final item = debts[i];
                     final isLent = item.type == 'lent';
 
                     return Dismissible(
