@@ -2601,7 +2601,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _smartInputCtrl.clear();
     _voiceEntry.session.start();
     _speechDeadlineTimer = Timer(
-      _voiceEntry.sessionLimit,
+      VoiceEntryController.sessionLimit,
           () => unawaited(_finishSpeechSession()),
     );
     setState(() => _isListening = true);
@@ -2670,7 +2670,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           localeId: localeId,
           partialResults: true,
           pauseFor: VoiceEntryController.pauseWindow,
-          listenFor: _voiceEntry.sessionLimit,
+          listenFor: VoiceEntryController.sessionLimit,
         ),
         onResult: (result) async {
           if (!mounted) return;
@@ -2740,7 +2740,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return const SpeechCommandCompleteness.incomplete('empty_transcript');
     }
     try {
-      final plan = _smartInputEngine.parse(
+      final plan = ref.read(smartEntryControllerProvider).parse(
         normalized,
         ref.read(categoryProvider),
         source: SmartInputSource.voice,
