@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/local_nlp_service.dart';
+import '../../services/smart_command.dart';
+import '../../services/smart_input_engine.dart';
 
 
 /// Feature-level entry point for Smart Entry interpretation.
