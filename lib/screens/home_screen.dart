@@ -22,6 +22,7 @@ import '../features/voice/voice_entry_controller.dart';
 import '../features/feedback/feedback_coordinator.dart';
 import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
+import '../widgets/dashboard_app_bar.dart';
 import '../widgets/transaction_message_card.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
@@ -1045,123 +1046,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return AppShell(
         currentSection: currentSection,
         onSectionChanged: _changeSection,
-        dashboardAppBar: AppBar(),
-        dashboardBody: const SizedBox.shrink(),
-        sectionBody: _buildOtherViews(),
-      );
-    }
-
-    final ledger = ref.watch(monthlyLedgerProvider(_focusedMonth));
-    final categories = ref.watch(categoryProvider);
-    final wallets = ref.watch(walletProvider);
-    final allExpenses = ref.watch(
-      expenseProvider.select((state) => state.allExpenses),
-    );
-
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
-    final monthlyTransactions = ledger.transactions;
-    final globalSpent = ledger.spent;
-
-    final walletNotifier = ref.read(walletProvider.notifier);
-    final totalAvailable = wallets.fold<double>(
-      0,
-          (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
-    );
-    final showMoneySetup = totalAvailable.abs() < 0.000001 &&
-        allExpenses.isEmpty;
-
-    var displayExpenses = List<Expense>.from(
-      _isSearching && _smartEntrySearchAllHistory
-          ? visibleTransactions(allExpenses)
-          : monthlyTransactions,
-    );
-
-    if (_selectedCategoryTab != 'All' && !categories.contains(_selectedCategoryTab)) {
-      _selectedCategoryTab = 'All';
-    }
-
-    if (_selectedCategoryTab != 'All') displayExpenses = displayExpenses.where((e) => e.category == _selectedCategoryTab).toList();
-    if (_searchQuery.isNotEmpty) displayExpenses = displayExpenses.where((e) => e.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    if (_smartEntryTypeFilter != null) {
-      displayExpenses = displayExpenses
-          .where((entry) => entry.type == _smartEntryTypeFilter)
-          .toList();
-    }
-    if (_smartEntrySearchRange != null) {
-      displayExpenses = displayExpenses
-          .where((entry) => matchesSmartEntryTimeRange(
-        entry.date,
-        _smartEntrySearchRange!,
-      ))
-          .toList();
-    }
-
-    return AppShell(
-      currentSection: currentSection,
-      onSectionChanged: _changeSection,
-      dashboardAppBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: _isSearching
-            ? TextField(
-                style: const TextStyle(fontSize: 15),
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Search transactions...',
-                  hintStyle: TextStyle(
-                    color: Colors.grey.shade400,
-                    fontSize: 14,
-                  ),
-                ),
-                onChanged: (value) => setState(() => _searchQuery = value),
-              )
-            : Text(
-                _activePrimaryTab == PrimaryLedgerTab.main ? 'Main' : 'Udhar',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 17,
-                ),
-              ),
-        centerTitle: true,
-        leading: Builder(
-          builder: (context) => IconButton(
-            tooltip: 'Open sidebar',
-            icon: const Icon(Icons.view_sidebar_outlined, size: 24),
-            onPressed: () {
-              _dismissKeyboard();
-              Scaffold.of(context).openDrawer();
-            },
-          ),
-        ),
-        actions: [
-          if (_activePrimaryTab == PrimaryLedgerTab.main && !_isSearching)
-            IconButton(
-              tooltip: 'Wallets',
-              icon: const Icon(Icons.account_balance_wallet_outlined, size: 22),
-              onPressed: _openIncomeAccounts,
-            ),
-          if (_activePrimaryTab == PrimaryLedgerTab.main)
-            IconButton(
-              tooltip: _isSearching ? 'Close search' : 'Search',
-              icon: Icon(
-                _isSearching ? Icons.close_rounded : Icons.search_rounded,
-                size: 22,
-              ),
-              onPressed: () {
-                _dismissKeyboard();
-                setState(() {
-                  _isSearching = !_isSearching;
-                  if (!_isSearching) {
-                    _searchQuery = '';
-                    _smartEntryTypeFilter = null;
-                    _smartEntrySearchRange = null;
-                    _smartEntrySearchAllHistory = false;
-                  }
-                });
-              },
-            ),
-        ],
+        dashboardAppBar: DashboardAppBar(
+        activeTab: _activePrimaryTab,
+        isSearching: _isSearching,
+        onSearchChanged: (value) => setState(() => _searchQuery = value),
+        onOpenDrawer: () {
+          _dismissKeyboard();
+          Scaffold.of(context).openDrawer();
+        },
+        onOpenWallets: _openIncomeAccounts,
+        onToggleSearch: () {
+          _dismissKeyboard();
+          setState(() {
+            _isSearching = !_isSearching;
+            if (!_isSearching) {
+              _searchQuery = '';
+              _smartEntryTypeFilter = null;
+              _smartEntrySearchRange = null;
+              _smartEntrySearchAllHistory = false;
+            }
+          });
+        },
       ),
       dashboardBody: DashboardScreen(
         controller: _primaryTabsController,
