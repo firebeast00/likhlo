@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:likhlo/app/app_navigation.dart';
-import 'package:likhlo/app/app_shell.dart';
+import 'package:student_expense_manager/app/app_navigation.dart';
+import 'package:student_expense_manager/app/app_shell.dart';
 
 void main() {
   test('AppSection resolves supported drawer labels', () {
