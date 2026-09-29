@@ -16,7 +16,7 @@ extension _DashboardCoreActions on _HomeScreenState {
   }
 
   void _loadSmartEntryLearning() {
-    final stored = Hive.box('preferences').get(_smartEntryLearningKey);
+    final stored = Hive.box('preferences').get(_HomeScreenState._smartEntryLearningKey);
     if (stored is! Map) return;
     for (final item in stored.entries) {
       final key = item.key?.toString() ?? '';
@@ -57,7 +57,7 @@ extension _DashboardCoreActions on _HomeScreenState {
 
     try {
       await Hive.box('preferences').put(
-        _smartEntryLearningKey,
+        _HomeScreenState._smartEntryLearningKey,
         {
           for (final item in _learnedSmartEntryPreferences.entries)
             item.key: item.value.toStored(),
