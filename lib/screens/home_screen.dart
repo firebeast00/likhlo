@@ -17,6 +17,7 @@ import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import '../app/app_shell.dart';
 import '../app/app_navigation.dart';
+import '../features/smart_entry/smart_entry_controller.dart';
 import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/transaction_message_card.dart';
@@ -78,7 +79,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   static const _prematureSpeechStatusGuard = Duration(milliseconds: 600);
   final SpeechSessionController _speechSession =
   SpeechSessionController(maxRetries: 1);
-  final SmartInputEngine _smartInputEngine = SmartInputEngine();
   final SpeechCommandCompletenessEvaluator _speechCompletenessEvaluator =
   const SpeechCommandCompletenessEvaluator();
   bool _isListening = false;
@@ -4171,7 +4171,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (normalized.isEmpty) return false;
 
     final categories = ref.read(categoryProvider);
-    final plan = _smartInputEngine.parse(
+    final plan = ref.read(smartEntryControllerProvider).parse(
       normalized,
       categories,
       source: source,
