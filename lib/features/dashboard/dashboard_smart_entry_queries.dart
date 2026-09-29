@@ -1,0 +1,350 @@
+part of '../../screens/home_screen.dart';
+
+extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
+  Future<void> _handleSmartEntryRepeatCommand(
+      ParsedSmartEntryCommand command,
+      ) async {
+    final wallets = ref.read(walletProvider);
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final accounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+        id: wallet.id,
+        name: wallet.name,
+        type: wallet.walletType,
+        availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+        isBackup: wallet.isBackup,
+      ),
+    )
+        .toList(growable: false);
+    final mentionedIds = findMentionedSmartEntryAccountIds(
+      command.rawInput,
+      accounts,
+    );
+    if (mentionedIds.length > 1) {
+      _showTransactionError(
+        'Mention only one wallet when selecting an entry to repeat.',
+        title: 'Multiple wallets detected',
+      );
+      return;
+    }
+
+    final walletId = mentionedIds.isEmpty ? null : mentionedIds.single;
+    SmartEntryAccount? mentionedAccount;
+    for (final account in accounts) {
+      if (account.id == walletId) mentionedAccount = account;
+    }
+    final allEntries = ref
+        .read(expenseProvider)
+        .allExpenses
+        .toList(growable: false);
+    final match = matchSmartEntryTransaction(
+      command: command,
+      entries: allEntries.map(
+            (entry) => SmartEntryTransaction(
+          id: entry.id,
+          title: entry.title,
+          amount: entry.amount,
+          category: entry.category,
+          type: entry.type,
+          date: entry.date,
+          walletId: entry.walletId,
+        ),
+      ),
+      walletId: walletId,
+      ignoredTitlePhrases: mentionedAccount == null
+          ? const []
+          : [mentionedAccount.name, mentionedAccount.type],
+    );
+    if (match.status == SmartEntryMatchStatus.notFound) {
+      _showTransactionError(
+        'No safe matching entry was found. Add a title, amount, date, or wallet.',
+        title: 'Entry not found',
+      );
+      return;
+    }
+
+    Expense? source;
+    if (match.status == SmartEntryMatchStatus.unique) {
+      final id = match.matches.single.id;
+      for (final entry in allEntries) {
+        if (entry.id == id) source = entry;
+      }
+    } else {
+      source = await _showSmartEntryMatchPicker(
+        match.matches,
+        deleting: false,
+        repeating: true,
+      );
+    }
+    if (source == null || !mounted) return;
+
+    final repeated = source.copyWith(
+      id: const Uuid().v4(),
+      date: DateTime.now(),
+      title: coreTransactionTitle(source.title),
+    );
+    final execution = await ref
+        .read(transactionExecutorProvider)
+        .execute(CreateTransactionCommand(
+      repeated,
+      action: TransactionAction.repeat,
+    ));
+    if (!mounted) return;
+    if (!execution.succeeded) {
+      _showTransactionError(
+        source.type == 'expense'
+            ? 'The original wallet does not have enough balance to repeat this expense.'
+            : 'The original wallet is no longer available.',
+        title: 'Entry not repeated',
+      );
+      return;
+    }
+
+    _smartInputCtrl.clear();
+    _showTopMessage(
+      title: source.type == 'income' ? 'Income repeated' : 'Expense repeated',
+      message: '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
+      tone: source.type == 'income'
+          ? TransactionMessageTone.income
+          : TransactionMessageTone.expense,
+      actionLabel: 'Undo',
+      onAction: () async {
+        await ref
+            .read(transactionExecutorProvider)
+            .execute(DeleteTransactionCommand(repeated.id));
+        if (!mounted) return;
+        _showTransactionInfo(
+          'The repeated entry was removed.',
+          title: 'Repeat undone',
+        );
+      },
+    );
+    unawaited(_rememberSmartEntryPreference(repeated));
+    unawaited(HapticFeedback.lightImpact());
+  }
+
+  void _handleSmartEntryQuery(ParsedSmartEntryCommand command) {
+    final metric = command.queryMetric;
+    if (metric == null) {
+      _showTransactionInfo(
+        "Ask something like 'how much did I spend this month?'",
+        title: 'Question needs more detail',
+      );
+      return;
+    }
+
+    final wallets = ref.read(walletProvider);
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final accounts = wallets
+        .map(
+          (wallet) => SmartEntryAccount(
+        id: wallet.id,
+        name: wallet.name,
+        type: wallet.walletType,
+        availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+        isBackup: wallet.isBackup,
+      ),
+    )
+        .toList(growable: false);
+    final mentionedIds = findMentionedSmartEntryAccountIds(
+      command.rawInput,
+      accounts,
+    );
+    if (mentionedIds.length > 1) {
+      _showTransactionError(
+        'Mention one wallet at a time for a precise answer.',
+        title: 'Multiple wallets detected',
+      );
+      return;
+    }
+
+    if (metric == SmartEntryQueryMetric.balance) {
+      if (mentionedIds.isEmpty) {
+        final total = wallets.fold<double>(
+          0,
+              (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+        );
+        _showTransactionInfo(
+          'Rs. ${total.toStringAsFixed(0)} across ${wallets.length} wallet${wallets.length == 1 ? '' : 's'}.',
+          title: 'Total wallet balance',
+        );
+      } else {
+        final wallet = wallets.firstWhere(
+              (item) => item.id == mentionedIds.single,
+        );
+        final balance = walletNotifier.getBalanceForWallet(wallet.id);
+        _showTransactionInfo(
+          'Rs. ${balance.toStringAsFixed(0)} available.',
+          title: '${wallet.name} balance',
+        );
+      }
+      _smartInputCtrl.clear();
+      return;
+    }
+
+    var entries = ref
+        .read(expenseProvider)
+        .allExpenses
+        .where((entry) => entry.category != 'Transfer')
+        .where((entry) => matchesSmartEntryTimeRange(
+      entry.date,
+      command.timeRange,
+    ));
+    if (mentionedIds.isNotEmpty) {
+      final walletId = mentionedIds.single;
+      entries = entries.where((entry) => entry.walletId == walletId);
+    }
+    final hasCategory = command.category != 'General' &&
+        command.confidenceByField['category']! >= 0.8;
+    if (hasCategory) {
+      entries = entries.where((entry) => entry.category == command.category);
+    } else {
+      final title = _smartQueryTitle(command.title);
+      if (title.isNotEmpty) {
+        entries = entries.where(
+              (entry) => entry.title.toLowerCase().contains(title.toLowerCase()),
+        );
+      }
+    }
+    final matching = entries.toList(growable: false);
+    final income = matching
+        .where((entry) => entry.type == 'income')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+    final spending = matching
+        .where((entry) => entry.type == 'expense')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+    final period = _smartTimeRangeLabel(command.timeRange);
+    final subject = hasCategory ? ' · ${command.category}' : '';
+
+    switch (metric) {
+      case SmartEntryQueryMetric.spending:
+        _showTransactionInfo(
+          '${matching.where((entry) => entry.type == 'expense').length} expense${matching.where((entry) => entry.type == 'expense').length == 1 ? '' : 's'}$subject.',
+          title: 'Rs. ${spending.toStringAsFixed(0)} spent · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.income:
+        _showTransactionInfo(
+          '${matching.where((entry) => entry.type == 'income').length} income entr${matching.where((entry) => entry.type == 'income').length == 1 ? 'y' : 'ies'}$subject.',
+          title: 'Rs. ${income.toStringAsFixed(0)} received · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.net:
+        _showTransactionInfo(
+          'Income Rs. ${income.toStringAsFixed(0)} · Expenses Rs. ${spending.toStringAsFixed(0)}.',
+          title: 'Net Rs. ${(income - spending).toStringAsFixed(0)} · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.transactionCount:
+        final type = command.entryTypeFilter;
+        final count = type == null
+            ? matching.length
+            : matching.where((entry) => entry.type == type).length;
+        _showTransactionInfo(
+          '${type == null ? 'Income and expense' : type == 'income' ? 'Income' : 'Expense'} records$subject.',
+          title: '$count transactions · $period',
+        );
+        break;
+      case SmartEntryQueryMetric.balance:
+        break;
+    }
+    _smartInputCtrl.clear();
+  }
+
+  void _handleSmartEntrySearch(ParsedSmartEntryCommand command) {
+    final category = command.category != 'General' &&
+        command.confidenceByField['category']! >= 0.8
+        ? command.category
+        : 'All';
+    var query = _smartQueryTitle(command.title);
+    if (category != 'All' &&
+        query.toLowerCase() == category.toLowerCase()) {
+      query = '';
+    }
+    ref.read(appNavigationProvider.notifier).openDashboard();
+    setState(() {
+      _activePrimaryTab = PrimaryLedgerTab.main;
+      _isSearching = true;
+      _searchQuery = query;
+      _selectedCategoryTab = category;
+      _smartEntryTypeFilter = command.entryTypeFilter;
+      _smartEntrySearchRange = command.timeRange;
+      _smartEntrySearchAllHistory = true;
+    });
+    _primaryTabsController.select(PrimaryLedgerTab.main);
+    _smartInputCtrl.clear();
+    _showTransactionInfo(
+      'Close search to return to the normal monthly view.',
+      title: 'Transaction filters applied',
+    );
+  }
+
+  Future<void> _handleSmartEntryNavigation(
+      ParsedSmartEntryCommand command,
+      ) async {
+    final target = command.navigationTarget;
+    if (target == null) {
+      _showTransactionInfo(
+        'Try Home, Stats, Wallets, Udhaar, Settings, or About.',
+        title: 'Screen not recognized',
+      );
+      return;
+    }
+    _smartInputCtrl.clear();
+    if (target == 'Wallets') {
+      await _openIncomeAccounts();
+      return;
+    }
+    if (target == 'Dashboard' || target == 'Home' || target == 'Main') {
+      _openPrimaryLedgerTab(PrimaryLedgerTab.main);
+      return;
+    }
+    if (target == 'Udhaar' || target == 'Udhar') {
+      _openPrimaryLedgerTab(PrimaryLedgerTab.udhar);
+      return;
+    }
+    final section = AppSection.fromLabel(target);
+    if (section != null) {
+      _changeSection(section);
+      return;
+    }
+    _showTransactionInfo(
+      'Try Home, Stats, Wallets, Udhaar, Settings, or About.',
+      title: 'Screen not recognized',
+    );
+  }
+
+  String _smartQueryTitle(String value) {
+    final normalized = value.trim();
+    const generic = {
+      '',
+      'Transaction',
+      'Quick Expense',
+      'Income Allowance',
+      'Income / Allowance',
+    };
+    return generic.contains(normalized) ? '' : normalized;
+  }
+
+  String _smartTimeRangeLabel(SmartEntryTimeRange range) {
+    switch (range) {
+      case SmartEntryTimeRange.today:
+        return 'today';
+      case SmartEntryTimeRange.yesterday:
+        return 'yesterday';
+      case SmartEntryTimeRange.thisWeek:
+        return 'this week';
+      case SmartEntryTimeRange.lastWeek:
+        return 'last week';
+      case SmartEntryTimeRange.thisMonth:
+        return 'this month';
+      case SmartEntryTimeRange.lastMonth:
+        return 'last month';
+      case SmartEntryTimeRange.allTime:
+        return 'all time';
+    }
+  }
+
+
+}
