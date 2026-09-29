@@ -84,7 +84,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                           : null,
                       onTap: () async {
                         await Hive.box('preferences')
-                            .delete(_smartEntryDefaultAccountKey);
+                            .delete(_HomeScreenState._smartEntryDefaultAccountKey);
                         if (!mounted) return;
                         setState(() => _smartEntryDefaultWalletId = null);
                         if (sheetContext.mounted) {
@@ -118,7 +118,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                             : null,
                         onTap: () async {
                           await Hive.box('preferences').put(
-                            _smartEntryDefaultAccountKey,
+                            _HomeScreenState._smartEntryDefaultAccountKey,
                             wallet.id,
                           );
                           if (!mounted) return;
@@ -319,7 +319,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
     );
 
     if (savedIds == null || !mounted) return;
-    await Hive.box('preferences').put(_homeVisibleWalletsKey, savedIds);
+    await Hive.box('preferences').put(_HomeScreenState._homeVisibleWalletsKey, savedIds);
     if (!mounted) return;
     setState(() => _homeVisibleWalletIds = savedIds);
   }
