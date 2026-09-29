@@ -17,7 +17,7 @@ import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import '../app/app_shell.dart';
 import '../app/app_navigation.dart';
-import '../widgets/dashboard_content.dart';
+import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/transaction_message_card.dart';
 import 'settings_screen.dart';
@@ -1202,9 +1202,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
         ],
       ),
-      dashboardBody: PrimaryLedgerTabs(
+      dashboardBody: DashboardScreen(
         controller: _primaryTabsController,
-        onChanged: (tab) {
+        activeTab: _activePrimaryTab,
+        onTabChanged: (tab) {
           if (!mounted || _activePrimaryTab == tab) return;
           setState(() {
             _activePrimaryTab = tab;
@@ -1217,30 +1218,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             }
           });
         },
-        mainTab: DashboardContent(
-          isLandscape: isLandscape,
-          isSearching: _isSearching,
-          moneySetupCard:
-              showMoneySetup ? _buildMoneySetupCard(primaryColor) : null,
-          monthSelector: _buildMonthSelector(isDark),
-          heroCard: _buildHeroCard(
-            totalAvailable,
-            globalSpent,
-            wallets,
-            primaryColor,
-          ),
-          smartInputBar: _buildSmartInputBar(primaryColor, isDark, wallets),
-          categoryTabs: _buildCategoryTabsWidget(
-            categories,
-            primaryColor,
-            isDark,
-          ),
-          transactionListBuilder: (isSliver) => _buildExpenseList(
-            displayExpenses,
-            primaryColor,
-            isDark,
-            isSliver: isSliver,
-          ),
+        isLandscape: isLandscape,
+        isSearching: _isSearching,
+        moneySetupCard:
+            showMoneySetup ? _buildMoneySetupCard(primaryColor) : null,
+        monthSelector: _buildMonthSelector(isDark),
+        heroCard: _buildHeroCard(
+          totalAvailable,
+          globalSpent,
+          wallets,
+          primaryColor,
+        ),
+        smartInputBar: _buildSmartInputBar(primaryColor, isDark, wallets),
+        categoryTabs: _buildCategoryTabsWidget(
+          categories,
+          primaryColor,
+          isDark,
+        ),
+        transactionListBuilder: (isSliver) => _buildExpenseList(
+          displayExpenses,
+          primaryColor,
+          isDark,
+          isSliver: isSliver,
         ),
       ),
       dashboardFloatingActionButton: _activePrimaryTab == PrimaryLedgerTab.main
