@@ -41,6 +41,7 @@ import 'package:image_picker/image_picker.dart';
 import 'interactive_ocr_screen.dart';
 
 part '../features/dashboard/dashboard_coordinator.dart';
+part '../features/dashboard/dashboard_feedback.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
