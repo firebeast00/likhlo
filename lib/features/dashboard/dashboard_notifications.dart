@@ -100,7 +100,7 @@ extension _DashboardNotificationMethods on _HomeScreenState {
   }
 
   void _setupNativeQuickTile() {
-    platform.invokeMethod<String>('getQuickAction').then((action) {
+    _HomeScreenState.platform.invokeMethod<String>('getQuickAction').then((action) {
       if (action == 'add_expense') {
         Future.delayed(const Duration(milliseconds: 500), () => _showAddOrEditModal());
       }
@@ -109,7 +109,7 @@ extension _DashboardNotificationMethods on _HomeScreenState {
       return null;
     });
 
-    platform.setMethodCallHandler((call) async {
+    _HomeScreenState.platform.setMethodCallHandler((call) async {
       if (call.method == 'triggerAction' && call.arguments == 'add_expense') {
         _showAddOrEditModal();
       }
