@@ -15,7 +15,7 @@ import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
-import '../widgets/app_drawer.dart';
+import '../app/app_shell.dart';
 import '../widgets/dashboard_content.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/transaction_message_card.dart';
@@ -52,7 +52,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       'smart_entry_default_wallet_id';
   static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
   static const _smartEntryLearningKey = 'smart_entry_learning_v1';
-  String _currentView = 'Dashboard';
+  AppSection _currentSection = AppSection.dashboard;
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
   bool _isSearching = false;
@@ -385,7 +385,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           : PrimaryLedgerTab.main;
       if (!mounted) return;
       setState(() {
-        _currentView = 'Dashboard';
+        _currentSection = AppSection.dashboard;
         _activePrimaryTab = tab;
         _isSearching = false;
         _searchQuery = '';
@@ -399,11 +399,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       }
       return;
     }
-    if (!mounted || view == _currentView) return;
+    final section = AppSection.fromLabel(view);
+    if (!mounted || section == null || section == _currentSection) return;
 
     if (!mounted) return;
     setState(() {
-      _currentView = view;
+      _currentSection = section;
       _isSearching = false;
       _searchQuery = '';
       _smartEntryTypeFilter = null;
@@ -1083,27 +1084,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
-    if (_currentView != 'Dashboard') {
-      return Scaffold(
-        drawer: AppDrawer(
-          currentView: _currentView,
-          onViewChanged: _changeView,
-        ),
-        appBar: AppBar(
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          title: Text(
-            _currentView,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-          ),
-          centerTitle: true,
-          leading: IconButton(
-            tooltip: 'Back to dashboard',
-            icon: const Icon(Icons.arrow_back_rounded, size: 24),
-            onPressed: () => _changeView('Dashboard'),
-          ),
-        ),
-        body: _buildOtherViews(),
+    if (_currentSection != AppSection.dashboard) {
+      return AppShell(
+        currentSection: _currentSection,
+        onSectionChanged: (section) => _changeView(section.label),
+        dashboardAppBar: AppBar(),
+        dashboardBody: const SizedBox.shrink(),
+        sectionBody: _buildOtherViews(),
       );
     }
 
@@ -1153,12 +1140,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           .toList();
     }
 
-    return Scaffold(
-      drawer: AppDrawer(
-        currentView: _currentView,
-        onViewChanged: _changeView,
-      ),
-      appBar: AppBar(
+    return AppShell(
+      currentSection: _currentSection,
+      onSectionChanged: (section) => _changeView(section.label),
+      dashboardAppBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
         title: _isSearching
@@ -1221,7 +1206,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             ),
         ],
       ),
-      body: PrimaryLedgerTabs(
+      dashboardBody: PrimaryLedgerTabs(
         controller: _primaryTabsController,
         onChanged: (tab) {
           if (!mounted || _activePrimaryTab == tab) return;
@@ -1262,8 +1247,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _activePrimaryTab == PrimaryLedgerTab.main
+      dashboardFloatingActionButton: _activePrimaryTab == PrimaryLedgerTab.main
           ? GestureDetector(
         onTapDown: (_) => _fabController.forward(),
         onTapUp: (_) { _fabController.reverse(); _showAddOrEditModal(); },
@@ -1373,10 +1357,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildOtherViews() {
-    if (_currentView == 'Stats') return const StatsScreen();
-    if (_currentView == 'Settings') return const SettingsScreen();
-    if (_currentView == 'About') return const AboutScreen();
-    if (_currentView == 'Trash') return const TrashScreen();
+    if (_currentSection == AppSection.stats) return const StatsScreen();
+    if (_currentSection == AppSection.settings) return const SettingsScreen();
+    if (_currentSection == AppSection.about) return const AboutScreen();
+    if (_currentSection == AppSection.trash) return const TrashScreen();
     return const SizedBox.shrink();
   }
 
@@ -3827,7 +3811,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       query = '';
     }
     setState(() {
-      _currentView = 'Dashboard';
+      _currentSection = AppSection.dashboard;
       _activePrimaryTab = PrimaryLedgerTab.main;
       _isSearching = true;
       _searchQuery = query;
