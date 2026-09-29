@@ -1046,7 +1046,80 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return AppShell(
         currentSection: currentSection,
         onSectionChanged: _changeSection,
-        dashboardAppBar: DashboardAppBar(
+        dashboardAppBar: const PreferredSize(
+          preferredSize: Size.fromHeight(kToolbarHeight),
+          child: SizedBox.shrink(),
+        ),
+        dashboardBody: const SizedBox.shrink(),
+        sectionBody: _buildOtherViews(currentSection),
+      );
+    }
+
+    final ledger = ref.watch(monthlyLedgerProvider(_focusedMonth));
+    final categories = ref.watch(categoryProvider);
+    final wallets = ref.watch(walletProvider);
+    final allExpenses = ref.watch(
+      expenseProvider.select((state) => state.allExpenses),
+    );
+
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    final monthlyTransactions = ledger.transactions;
+    final globalSpent = ledger.spent;
+
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final totalAvailable = wallets.fold<double>(
+      0,
+      (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
+    );
+    final showMoneySetup =
+        totalAvailable.abs() < 0.000001 && allExpenses.isEmpty;
+
+    var displayExpenses = List<Expense>.from(
+      _isSearching && _smartEntrySearchAllHistory
+          ? visibleTransactions(allExpenses)
+          : monthlyTransactions,
+    );
+
+    if (_selectedCategoryTab != 'All' &&
+        !categories.contains(_selectedCategoryTab)) {
+      _selectedCategoryTab = 'All';
+    }
+
+    if (_selectedCategoryTab != 'All') {
+      displayExpenses = displayExpenses
+          .where((entry) => entry.category == _selectedCategoryTab)
+          .toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      displayExpenses = displayExpenses
+          .where(
+            (entry) =>
+                entry.title.toLowerCase().contains(_searchQuery.toLowerCase()),
+          )
+          .toList();
+    }
+    if (_smartEntryTypeFilter != null) {
+      displayExpenses = displayExpenses
+          .where((entry) => entry.type == _smartEntryTypeFilter)
+          .toList();
+    }
+    if (_smartEntrySearchRange != null) {
+      displayExpenses = displayExpenses
+          .where(
+            (entry) => matchesSmartEntryTimeRange(
+              entry.date,
+              _smartEntrySearchRange!,
+            ),
+          )
+          .toList();
+    }
+
+    return AppShell(
+      currentSection: currentSection,
+      onSectionChanged: _changeSection,
+      dashboardAppBar: DashboardAppBar(
+        activeTab: _activePrimaryTab,
         isSearching: _isSearching,
         onSearchChanged: (value) => setState(() => _searchQuery = value),
         onBeforeOpenDrawer: _dismissKeyboard,
@@ -1066,7 +1139,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       ),
       dashboardBody: DashboardScreen(
         controller: _primaryTabsController,
-        activeTab: _activePrimaryTab,
         onTabChanged: (tab) {
           if (!mounted || _activePrimaryTab == tab) return;
           setState(() {
@@ -1104,31 +1176,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           isSliver: isSliver,
         ),
       ),
-      dashboardFloatingActionButton: _activePrimaryTab == PrimaryLedgerTab.main
-          ? GestureDetector(
-        onTapDown: (_) => _fabController.forward(),
-        onTapUp: (_) { _fabController.reverse(); _showAddOrEditModal(); },
-        onTapCancel: () => _fabController.reverse(),
-        child: ScaleTransition(
-          scale: _fabScale,
-          child: Container(
-            height: 52, padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  primaryColor,
-                  primaryColor.withValues(alpha: 0.8),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(26),
-            ),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 22), SizedBox(width: 8), Text("Add Transaction", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))]),
-          ),
-        ),
-            )
-          : null,
+      sectionBody: const SizedBox.shrink(),
+      dashboardFloatingActionButton:
+          _activePrimaryTab == PrimaryLedgerTab.main
+              ? GestureDetector(
+                  onTapDown: (_) => _fabController.forward(),
+                  onTapUp: (_) {
+                    _fabController.reverse();
+                    _showAddOrEditModal();
+                  },
+                  onTapCancel: () => _fabController.reverse(),
+                  child: ScaleTransition(
+                    scale: _fabScale,
+                    child: Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            primaryColor,
+                            primaryColor.withValues(alpha: 0.8),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(26),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Add Transaction',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : null,
     );
   }
 
@@ -1213,12 +1309,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildOtherViews() {
-    if (ref.read(appNavigationProvider) == AppSection.stats) return const StatsScreen();
-    if (ref.read(appNavigationProvider) == AppSection.settings) return const SettingsScreen();
-    if (ref.read(appNavigationProvider) == AppSection.about) return const AboutScreen();
-    if (ref.read(appNavigationProvider) == AppSection.trash) return const TrashScreen();
-    return const SizedBox.shrink();
+  Widget _buildOtherViews(AppSection section) {
+    switch (section) {
+      case AppSection.stats:
+        return const StatsScreen();
+      case AppSection.settings:
+        return const SettingsScreen();
+      case AppSection.about:
+        return const AboutScreen();
+      case AppSection.trash:
+        return const TrashScreen();
+      case AppSection.dashboard:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildExpenseList(List<Expense> expenses, Color primaryColor, bool isDark, {required bool isSliver}) {
