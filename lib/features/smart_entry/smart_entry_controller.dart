@@ -20,7 +20,7 @@ class SmartEntryController {
     String input,
     List<String> categories, {
     required SmartInputSource source,
-    List<SmartEntryAccount> accounts = const [],
+    Iterable<SmartEntryAccount> accounts = const [],
   }) {
     return _engine.parse(
       input,
