@@ -393,8 +393,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   void _openPrimaryLedgerTab(PrimaryLedgerTab tab) {
     _dismissKeyboard();
     if (!mounted) return;
+    ref.read(appNavigationProvider.notifier).openDashboard();
     setState(() {
-      ref.read(appNavigationProvider.notifier).openDashboard();
       _activePrimaryTab = tab;
       _isSearching = false;
       _searchQuery = '';
@@ -3806,8 +3806,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         query.toLowerCase() == category.toLowerCase()) {
       query = '';
     }
+    ref.read(appNavigationProvider.notifier).openDashboard();
     setState(() {
-      ref.read(appNavigationProvider.notifier).openDashboard();
       _activePrimaryTab = PrimaryLedgerTab.main;
       _isSearching = true;
       _searchQuery = query;
