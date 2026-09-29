@@ -16,6 +16,7 @@ import '../providers/wallet_provider.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import '../app/app_shell.dart';
+import '../app/app_navigation.dart';
 import '../widgets/dashboard_content.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/transaction_message_card.dart';
@@ -52,7 +53,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       'smart_entry_default_wallet_id';
   static const _homeVisibleWalletsKey = 'home_visible_wallet_ids_v1';
   static const _smartEntryLearningKey = 'smart_entry_learning_v1';
-  AppSection _currentSection = AppSection.dashboard;
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
   bool _isSearching = false;
@@ -379,22 +379,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   void _changeSection(AppSection section) {
     _dismissKeyboard();
-    if (!mounted || section == _currentSection) return;
+    if (!mounted || section == ref.read(appNavigationProvider)) return;
     setState(() {
-      _currentSection = section;
       _isSearching = false;
       _searchQuery = '';
       _smartEntryTypeFilter = null;
       _smartEntrySearchRange = null;
       _smartEntrySearchAllHistory = false;
     });
+    ref.read(appNavigationProvider.notifier).open(section);
   }
 
   void _openPrimaryLedgerTab(PrimaryLedgerTab tab) {
     _dismissKeyboard();
     if (!mounted) return;
     setState(() {
-      _currentSection = AppSection.dashboard;
+      ref.read(appNavigationProvider.notifier).openDashboard();
       _activePrimaryTab = tab;
       _isSearching = false;
       _searchQuery = '';
@@ -1078,10 +1078,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final currentSection = ref.watch(appNavigationProvider);
 
-    if (_currentSection != AppSection.dashboard) {
+    if (currentSection != AppSection.dashboard) {
       return AppShell(
-        currentSection: _currentSection,
+        currentSection: currentSection,
         onSectionChanged: _changeSection,
         dashboardAppBar: AppBar(),
         dashboardBody: const SizedBox.shrink(),
@@ -1136,7 +1137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     return AppShell(
-      currentSection: _currentSection,
+      currentSection: currentSection,
       onSectionChanged: _changeSection,
       dashboardAppBar: AppBar(
         elevation: 0,
@@ -1352,10 +1353,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildOtherViews() {
-    if (_currentSection == AppSection.stats) return const StatsScreen();
-    if (_currentSection == AppSection.settings) return const SettingsScreen();
-    if (_currentSection == AppSection.about) return const AboutScreen();
-    if (_currentSection == AppSection.trash) return const TrashScreen();
+    if (ref.read(appNavigationProvider) == AppSection.stats) return const StatsScreen();
+    if (ref.read(appNavigationProvider) == AppSection.settings) return const SettingsScreen();
+    if (ref.read(appNavigationProvider) == AppSection.about) return const AboutScreen();
+    if (ref.read(appNavigationProvider) == AppSection.trash) return const TrashScreen();
     return const SizedBox.shrink();
   }
 
@@ -3806,7 +3807,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       query = '';
     }
     setState(() {
-      _currentSection = AppSection.dashboard;
+      ref.read(appNavigationProvider.notifier).openDashboard();
       _activePrimaryTab = PrimaryLedgerTab.main;
       _isSearching = true;
       _searchQuery = query;
