@@ -1,0 +1,27 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:likhlo/app/app_navigation.dart';
+import 'package:likhlo/app/app_shell.dart';
+
+void main() {
+  test('AppSection resolves supported drawer labels', () {
+    expect(AppSection.fromLabel('Stats'), AppSection.stats);
+    expect(AppSection.fromLabel('settings'), AppSection.settings);
+    expect(AppSection.fromLabel('Trash'), AppSection.trash);
+    expect(AppSection.fromLabel('About'), AppSection.about);
+    expect(AppSection.fromLabel('unknown'), isNull);
+  });
+
+  test('AppNavigationController changes top-level shell section', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(container.read(appNavigationProvider), AppSection.dashboard);
+
+    container.read(appNavigationProvider.notifier).open(AppSection.stats);
+    expect(container.read(appNavigationProvider), AppSection.stats);
+
+    container.read(appNavigationProvider.notifier).openDashboard();
+    expect(container.read(appNavigationProvider), AppSection.dashboard);
+  });
+}
