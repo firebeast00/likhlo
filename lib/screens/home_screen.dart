@@ -377,32 +377,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
   }
 
-  Future<void> _changeView(String view) async {
+  void _changeSection(AppSection section) {
     _dismissKeyboard();
-    if (view == 'Dashboard' || view == 'Main' || view == 'Udhaar' || view == 'Udhar') {
-      final tab = view == 'Udhaar' || view == 'Udhar'
-          ? PrimaryLedgerTab.udhar
-          : PrimaryLedgerTab.main;
-      if (!mounted) return;
-      setState(() {
-        _currentSection = AppSection.dashboard;
-        _activePrimaryTab = tab;
-        _isSearching = false;
-        _searchQuery = '';
-        _smartEntryTypeFilter = null;
-        _smartEntrySearchRange = null;
-        _smartEntrySearchAllHistory = false;
-      });
-      _primaryTabsController.select(tab);
-      if (tab == PrimaryLedgerTab.main) {
-        _queuePersistentNotificationUpdate();
-      }
-      return;
-    }
-    final section = AppSection.fromLabel(view);
-    if (!mounted || section == null || section == _currentSection) return;
-
-    if (!mounted) return;
+    if (!mounted || section == _currentSection) return;
     setState(() {
       _currentSection = section;
       _isSearching = false;
@@ -411,6 +388,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _smartEntrySearchRange = null;
       _smartEntrySearchAllHistory = false;
     });
+  }
+
+  void _openPrimaryLedgerTab(PrimaryLedgerTab tab) {
+    _dismissKeyboard();
+    if (!mounted) return;
+    setState(() {
+      _currentSection = AppSection.dashboard;
+      _activePrimaryTab = tab;
+      _isSearching = false;
+      _searchQuery = '';
+      _smartEntryTypeFilter = null;
+      _smartEntrySearchRange = null;
+      _smartEntrySearchAllHistory = false;
+    });
+    _primaryTabsController.select(tab);
+    if (tab == PrimaryLedgerTab.main) {
+      _queuePersistentNotificationUpdate();
+    }
   }
 
   void _showAddCategoryDialog() {
@@ -1087,7 +1082,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_currentSection != AppSection.dashboard) {
       return AppShell(
         currentSection: _currentSection,
-        onSectionChanged: (section) => _changeView(section.label),
+        onSectionChanged: _changeSection,
         dashboardAppBar: AppBar(),
         dashboardBody: const SizedBox.shrink(),
         sectionBody: _buildOtherViews(),
@@ -1142,7 +1137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
     return AppShell(
       currentSection: _currentSection,
-      onSectionChanged: (section) => _changeView(section.label),
+      onSectionChanged: _changeSection,
       dashboardAppBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -2256,7 +2251,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 child: _buildBalanceMetric(
                   label: 'Spent this month',
                   value: 'Rs. ${spent.toStringAsFixed(0)}',
-                  onTap: () => _changeView('Stats'),
+                  onTap: () => _changeSection(AppSection.stats),
                   semanticHint: 'Open monthly statistics',
                 ),
               ),
@@ -3844,7 +3839,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       await _openIncomeAccounts();
       return;
     }
-    await _changeView(target);
+    if (target == 'Dashboard' || target == 'Home' || target == 'Main') {
+      _openPrimaryLedgerTab(PrimaryLedgerTab.main);
+      return;
+    }
+    if (target == 'Udhaar' || target == 'Udhar') {
+      _openPrimaryLedgerTab(PrimaryLedgerTab.udhar);
+      return;
+    }
+    final section = AppSection.fromLabel(target);
+    if (section != null) {
+      _changeSection(section);
+      return;
+    }
+    _showTransactionInfo(
+      'Try Home, Stats, Wallets, Udhaar, Settings, or About.',
+      title: 'Screen not recognized',
+    );
   }
 
   String _smartQueryTitle(String value) {
