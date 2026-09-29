@@ -10,7 +10,6 @@ import '../widgets/primary_ledger_tabs.dart';
 class DashboardScreen extends StatelessWidget {
   final PrimaryLedgerTabsController controller;
   final ValueChanged<PrimaryLedgerTab> onTabChanged;
-  final PrimaryLedgerTab activeTab;
   final bool isLandscape;
   final bool isSearching;
   final Widget? moneySetupCard;
@@ -24,7 +23,6 @@ class DashboardScreen extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onTabChanged,
-    required this.activeTab,
     required this.isLandscape,
     required this.isSearching,
     required this.moneySetupCard,
