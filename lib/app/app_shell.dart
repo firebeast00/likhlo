@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../screens/about_screen.dart';
+import '../screens/settings_screen.dart';
+import '../screens/stats_screen.dart';
+import '../screens/trash_screen.dart';
 import '../widgets/app_drawer.dart';
 
 /// Top-level destinations owned by the application shell.
@@ -33,22 +37,35 @@ enum AppSection {
 class AppShell extends StatelessWidget {
   final AppSection currentSection;
   final ValueChanged<AppSection> onSectionChanged;
-  final PreferredSizeWidget dashboardAppBar;
-  final Widget dashboardBody;
-  final Widget sectionBody;
+  final PreferredSizeWidget? dashboardAppBar;
+  final Widget? dashboardBody;
   final Widget? dashboardFloatingActionButton;
 
   const AppShell({
     super.key,
     required this.currentSection,
     required this.onSectionChanged,
-    required this.dashboardAppBar,
-    required this.dashboardBody,
-    required this.sectionBody,
+    this.dashboardAppBar,
+    this.dashboardBody,
     this.dashboardFloatingActionButton,
   });
 
   bool get _isDashboard => currentSection == AppSection.dashboard;
+
+  Widget _sectionBody() {
+    switch (currentSection) {
+      case AppSection.stats:
+        return const StatsScreen();
+      case AppSection.settings:
+        return const SettingsScreen();
+      case AppSection.trash:
+        return const TrashScreen();
+      case AppSection.about:
+        return const AboutScreen();
+      case AppSection.dashboard:
+        return dashboardBody ?? const SizedBox.shrink();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +96,7 @@ class AppShell extends StatelessWidget {
                 onPressed: () => onSectionChanged(AppSection.dashboard),
               ),
             ),
-      body: _isDashboard ? dashboardBody : sectionBody,
+      body: _isDashboard ? dashboardBody : _sectionBody(),
       floatingActionButtonLocation:
           _isDashboard ? FloatingActionButtonLocation.centerFloat : null,
       floatingActionButton:
