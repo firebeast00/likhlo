@@ -6,7 +6,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   final PrimaryLedgerTab activeTab;
   final bool isSearching;
   final ValueChanged<String> onSearchChanged;
-  final VoidCallback onOpenDrawer;
+  final VoidCallback onBeforeOpenDrawer;
   final VoidCallback onOpenWallets;
   final VoidCallback onToggleSearch;
 
@@ -15,7 +15,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.activeTab,
     required this.isSearching,
     required this.onSearchChanged,
-    required this.onOpenDrawer,
+    required this.onBeforeOpenDrawer,
     required this.onOpenWallets,
     required this.onToggleSearch,
   });
@@ -49,10 +49,15 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
       centerTitle: true,
-      leading: IconButton(
-        tooltip: 'Open sidebar',
-        icon: const Icon(Icons.view_sidebar_outlined, size: 24),
-        onPressed: onOpenDrawer,
+      leading: Builder(
+        builder: (context) => IconButton(
+          tooltip: 'Open sidebar',
+          icon: const Icon(Icons.view_sidebar_outlined, size: 24),
+          onPressed: () {
+            onBeforeOpenDrawer();
+            Scaffold.of(context).openDrawer();
+          },
+        ),
       ),
       actions: [
         if (activeTab == PrimaryLedgerTab.main && !isSearching)
