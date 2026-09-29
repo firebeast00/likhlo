@@ -116,23 +116,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     );
     final text = stored is Map ? stored['text']?.toString().trim() : null;
     if (text == null || text.isEmpty) {
-      _showTransactionInfo(
-        'There is no notification entry waiting for review.',
-        title: 'Nothing to review',
-      );
-      return;
-    }
-    _smartInputCtrl.value = TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-    final saved =
-        await _processNLP(text, source: SmartInputSource.notification);
-    if (saved && Hive.isBoxOpen('preferences')) {
-      await Hive.box('preferences').delete(
-        NotificationEntryService.pendingReviewKey,
-      );
-    }
+
   }
 
   Future<void> _showNotificationVoiceEntrySheet() async {
@@ -379,18 +363,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           .read(categoryProvider.notifier)
                           .addCategory(catCtrl.text.trim());
                       if (!added) {
-                        _showTransactionError(
-                          'Choose a different name for this category.',
-                          title: 'Category already exists',
-                        );
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      Future.delayed(const Duration(milliseconds: 300), () {
-                        if (_categoryScrollCtrl.hasClients) {
-                          _categoryScrollCtrl.animateTo(_categoryScrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-                        }
-                      });
+);
                     }
                   },
                   child: const Text("Save"),
@@ -448,23 +421,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_selectedCategoryTab == category) {
       setState(() => _selectedCategoryTab = 'All');
     }
-    _showDeletionMessage(
-      "Category '$category' was deleted.",
-      title: 'Category deleted',
-    );
-  }
-
-  // ==================== TRANSACTION / TRANSFER MODAL ====================
-  Future<bool?> _showAddOrEditModal({
-    Expense? existing,
-    String? prefilledAmount,
-    String? prefilledTitle,
-    String? prefilledCategory,
-    DateTime? prefilledDate,
-    String? preselectedWalletId,
-    String initialType = 'expense',
-    String? reviewMessage,
-  }) async {
+) async {
     _dismissKeyboard();
     if (existing?.category == 'Transfer') {
       _showTransactionInfo(
@@ -788,33 +745,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           unawaited(NotificationService().showManualLedgerResult(
                             notificationTitle, notificationDetail));
                           if (transactionType == 'transfer') {
-                            _showTransferMessage(
-                              'Money was moved between the selected wallets.',
-                            );
-                          } else if (transactionType == 'income') {
-                            _showIncomeMessage(
-                              'The income was added to the selected wallet.',
-                            );
-                          } else {
-                            _showExpenseMessage(
-                              'The expense was saved to the selected wallet.',
-                            );
-                          }
-                        }
-                        if (preferenceEntry != null) {
-                          unawaited(
-                            _rememberSmartEntryPreference(preferenceEntry),
-                          );
-                        }
-                        unawaited(_refreshSmartEntryReminders());
-                      },
-                      child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
+  ),
         )
     );
   }
@@ -823,25 +754,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       String message, {
         String title = 'Unable to continue',
       }) {
-    _showTopMessage(
-      title: title,
-      message: message,
-      tone: TransactionMessageTone.error,
-    );
-  }
-
-  void _showTransactionSuccess(
-      String message, {
-        String title = 'Completed',
-        String? actionLabel,
-        Future<void> Function()? onAction,
-      }) {
-    _showTopMessage(
-      title: title,
-      message: message,
-      tone: TransactionMessageTone.success,
-      actionLabel: actionLabel,
-      onAction: onAction,
     );
   }
 
