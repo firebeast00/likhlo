@@ -24,9 +24,6 @@ import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/dashboard_app_bar.dart';
 import '../widgets/transaction_message_card.dart';
-import 'settings_screen.dart';
-import 'stats_screen.dart';
-import 'about_screen.dart';
 import '../services/local_nlp_service.dart';
 import '../services/ocr_scanner_service.dart';
 import '../services/speech_session_controller.dart';
@@ -38,7 +35,6 @@ import '../services/speech_recognition_provider.dart';
 import '../services/speech_command_completeness.dart';
 import '../services/transaction_title_policy.dart';
 import './income_accounts_screen.dart';
-import './trash_screen.dart';
 import './receipt_review_screen.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -1046,12 +1042,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       return AppShell(
         currentSection: currentSection,
         onSectionChanged: _changeSection,
-        dashboardAppBar: const PreferredSize(
-          preferredSize: Size.fromHeight(kToolbarHeight),
-          child: SizedBox.shrink(),
-        ),
-        dashboardBody: const SizedBox.shrink(),
-        sectionBody: _buildOtherViews(currentSection),
       );
     }
 
@@ -1176,7 +1166,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           isSliver: isSliver,
         ),
       ),
-      sectionBody: const SizedBox.shrink(),
       dashboardFloatingActionButton:
           _activePrimaryTab == PrimaryLedgerTab.main
               ? GestureDetector(
@@ -1307,21 +1296,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         ],
       ),
     );
-  }
-
-  Widget _buildOtherViews(AppSection section) {
-    switch (section) {
-      case AppSection.stats:
-        return const StatsScreen();
-      case AppSection.settings:
-        return const SettingsScreen();
-      case AppSection.about:
-        return const AboutScreen();
-      case AppSection.trash:
-        return const TrashScreen();
-      case AppSection.dashboard:
-        return const SizedBox.shrink();
-    }
   }
 
   Widget _buildExpenseList(List<Expense> expenses, Color primaryColor, bool isDark, {required bool isSliver}) {
