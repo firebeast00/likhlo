@@ -1050,10 +1050,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         activeTab: _activePrimaryTab,
         isSearching: _isSearching,
         onSearchChanged: (value) => setState(() => _searchQuery = value),
-        onOpenDrawer: () {
-          _dismissKeyboard();
-          Scaffold.of(context).openDrawer();
-        },
+        onBeforeOpenDrawer: _dismissKeyboard,
         onOpenWallets: _openIncomeAccounts,
         onToggleSearch: () {
           _dismissKeyboard();
