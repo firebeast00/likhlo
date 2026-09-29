@@ -421,7 +421,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (_selectedCategoryTab == category) {
       setState(() => _selectedCategoryTab = 'All');
     }
-) async {
+    _showDeletionMessage(
+      "Category '$category' was deleted.",
+      title: 'Category deleted',
+    );
+  }
+
+  // ==================== TRANSACTION / TRANSFER MODAL ====================
+  Future<bool?> _showAddOrEditModal({
+    Expense? existing,
+    String? prefilledAmount,
+    String? prefilledTitle,
+    String? prefilledCategory,
+    DateTime? prefilledDate,
+    String? preselectedWalletId,
+    String initialType = 'expense',
+    String? reviewMessage,
+  }) async {
     _dismissKeyboard();
     if (existing?.category == 'Transfer') {
       _showTransactionInfo(
