@@ -18,6 +18,7 @@ import '../models/wallet_model.dart';
 import '../app/app_shell.dart';
 import '../app/app_navigation.dart';
 import '../features/smart_entry/smart_entry_controller.dart';
+import '../features/voice/voice_entry_controller.dart';
 import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/transaction_message_card.dart';
@@ -69,18 +70,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   late AnimationController _fabController;
   late Animation<double> _fabScale;
 
-  final SpeechRecognitionProvider _speech = SpeechProviderRouter(
-    deviceProvider: DeviceSpeechRecognitionProvider(),
-  );
-  static const _speechPauseWindow = Duration(seconds: 5);
-  static const _speechStabilityWindow = Duration(seconds: 3);
-  static const _speechSessionLimit = Duration(seconds: 30);
-  static const _speechStartupGrace = Duration(milliseconds: 1200);
-  static const _prematureSpeechStatusGuard = Duration(milliseconds: 600);
-  final SpeechSessionController _speechSession =
-  SpeechSessionController(maxRetries: 1);
-  final SpeechCommandCompletenessEvaluator _speechCompletenessEvaluator =
-  const SpeechCommandCompletenessEvaluator();
+  final VoiceEntryController _voiceEntry = VoiceEntryController();
   bool _isListening = false;
   bool _handlingSpeechError = false;
   bool _restartingSpeech = false;
@@ -277,7 +267,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   @override
   void dispose() {
     NotificationService().onActionTriggered = null;
-    _speech.cancel();
+    _voiceEntry.speech.cancel();
     _fabController.dispose();
     _notificationUpdateTimer?.cancel();
     _messageTimer?.cancel();
@@ -2604,12 +2594,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     }
 
     _cancelSpeechTimers();
-    _speechSession.reset();
+    _voiceEntry.session.reset();
     _handlingSpeechError = false;
     _restartingSpeech = false;
     _finalizingRecognizerStop = false;
     if (!_speechInitialized) {
-      final available = await _speech.initialize(
+      final available = await _voiceEntry.speech.initialize(
         onStatus: _handleSpeechStatus,
         onError: (error) => _handleSpeechError(error.message),
       );
@@ -2634,9 +2624,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (!mounted) return;
 
     _smartInputCtrl.clear();
-    _speechSession.start();
+    _voiceEntry.session.start();
     _speechDeadlineTimer = Timer(
-      _speechSessionLimit,
+      _voiceEntry.sessionLimit,
           () => unawaited(_finishSpeechSession()),
     );
     setState(() => _isListening = true);
@@ -2647,8 +2637,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Future<List<String?>> _buildSpeechLocaleCandidates() async {
     final candidates = <String?>[];
     try {
-      final locales = await _speech.locales();
-      final systemLocale = await _speech.systemLocale();
+      final locales = await _voiceEntry.speech.locales();
+      final systemLocale = await _voiceEntry.speech.systemLocale();
 
       String normalize(String value) =>
           value.toLowerCase().replaceAll('-', '_');
@@ -2695,35 +2685,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _speechListenStartedAt = DateTime.now();
     _speechStartupTimer?.cancel();
     _speechStartupTimer = Timer(
-      _speechStartupGrace,
+      VoiceEntryController.startupGrace,
           () => unawaited(_handleSpeechStartupTimeout()),
     );
 
     try {
-      await _speech.listen(
+      await _voiceEntry.speech.listen(
         options: SpeechRecognitionListenOptions(
           localeId: localeId,
           partialResults: true,
-          pauseFor: _speechPauseWindow,
-          listenFor: _speechSessionLimit,
+          pauseFor: VoiceEntryController.pauseWindow,
+          listenFor: _voiceEntry.sessionLimit,
         ),
         onResult: (result) async {
           if (!mounted) return;
-          if (_speechSession.state != SpeechSessionState.listening &&
-              _speechSession.state != SpeechSessionState.finalizing) {
+          if (_voiceEntry.session.state != SpeechSessionState.listening &&
+              _voiceEntry.session.state != SpeechSessionState.finalizing) {
             return;
           }
           _markRecognizerActive();
           final words = result.text.trim();
           final completeness = _speechCompleteness(words);
-          final decision = _speechSession.recordTranscript(
+          final decision = _voiceEntry.session.recordTranscript(
             words,
             // Some recognizers finalize a phrase during a pause. Let the
             // inactivity window decide when the full command has ended.
             isFinal: false,
             isComplete: completeness.isComplete,
           );
-          final combinedWords = _speechSession.latestDraft;
+          final combinedWords = _voiceEntry.session.latestDraft;
           if (combinedWords.isNotEmpty) {
             _smartInputCtrl.value = TextEditingValue(
               text: combinedWords,
@@ -2749,7 +2739,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       debugPrint('Speech listen failed: $error');
       if (!mounted || _handlingSpeechError) return;
       _handlingSpeechError = true;
-      _speechSession.onRecognizerError(retryable: false);
+      _voiceEntry.session.onRecognizerError(retryable: false);
       _cancelSpeechTimers();
       _smartInputCtrl.clear();
       setState(() => _isListening = false);
@@ -2793,7 +2783,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         ),
       )
           .toList(growable: false);
-      return _speechCompletenessEvaluator.evaluate(
+      return _voiceEntry.completeness.evaluate(
         plan,
         accounts: accounts,
       );
@@ -2812,15 +2802,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (transcript.isEmpty) return;
 
     final stableTranscript = transcript;
-    _speechStabilityTimer = Timer(_speechStabilityWindow, () async {
+    _speechStabilityTimer = Timer(VoiceEntryController.stabilityWindow, () async {
       if (!mounted ||
           _restartingSpeech ||
-          _speechSession.state != SpeechSessionState.listening ||
-          _speechSession.latestDraft != stableTranscript) {
+          _voiceEntry.session.state != SpeechSessionState.listening ||
+          _voiceEntry.session.latestDraft != stableTranscript) {
         return;
       }
       final currentCompleteness = _speechCompleteness(stableTranscript);
-      final decision = _speechSession.onSessionExpired(
+      final decision = _voiceEntry.session.onSessionExpired(
         isComplete: currentCompleteness.isComplete,
       );
       _traceSpeechEvent(
@@ -2836,18 +2826,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   Future<void> _finishSpeechSession({bool manual = false}) async {
     if (!mounted) return;
-    final transcript = _speechSession.latestDraft;
+    final transcript = _voiceEntry.session.latestDraft;
     final completeness = _speechCompleteness(transcript);
     final decision = completeness.isComplete && transcript.isNotEmpty
-        ? _speechSession.recordTranscript(transcript, isFinal: true)
-        : _speechSession.onRecognizerError(retryable: false);
+        ? _voiceEntry.session.recordTranscript(transcript, isFinal: true)
+        : _voiceEntry.session.onRecognizerError(retryable: false);
     _traceSpeechEvent(
       manual ? 'manual_stop' : 'session_deadline',
       transcript: transcript,
       completeness: completeness,
     );
     if (decision.action == SpeechSessionAction.none &&
-        _speechSession.state != SpeechSessionState.failed) {
+        _voiceEntry.session.state != SpeechSessionState.failed) {
       return;
     }
     await _stopRecognizerThenApply(decision);
@@ -2859,7 +2849,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _cancelSpeechTimers();
     _restartingSpeech = true;
     try {
-      await _speech.stop();
+      await _voiceEntry.speech.stop();
     } finally {
       _restartingSpeech = false;
     }
@@ -2874,7 +2864,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _speechStartupTimer?.cancel();
     _restartingSpeech = true;
     try {
-      await _speech.cancel();
+      await _voiceEntry.speech.cancel();
       await Future<void>.delayed(const Duration(milliseconds: 120));
       if (!mounted) return;
       if (advanceLocale &&
@@ -2890,8 +2880,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (!_isListening) setState(() => _isListening = true);
     _traceSpeechEvent(
       'restart',
-      transcript: _speechSession.latestDraft,
-      completeness: _speechCompleteness(_speechSession.latestDraft),
+      transcript: _voiceEntry.session.latestDraft,
+      completeness: _speechCompleteness(_voiceEntry.session.latestDraft),
     );
     await _startSpeechListening();
   }
@@ -2915,14 +2905,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     if (!mounted ||
         _restartingSpeech ||
         _recognizerReportedListening ||
-        _speechSession.state != SpeechSessionState.listening) {
+        _voiceEntry.session.state != SpeechSessionState.listening) {
       return;
     }
-    final transcript = _speechSession.latestDraft;
+    final transcript = _voiceEntry.session.latestDraft;
     final completeness = _speechCompleteness(transcript);
     final decision = completeness.isComplete && transcript.isNotEmpty
-        ? _speechSession.recordTranscript(transcript, isFinal: true)
-        : _speechSession.onRecognizerError(retryable: true);
+        ? _voiceEntry.session.recordTranscript(transcript, isFinal: true)
+        : _voiceEntry.session.onRecognizerError(retryable: true);
     _traceSpeechEvent(
       'startup_timeout',
       transcript: transcript,
@@ -2939,8 +2929,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     assert(() {
       debugPrint(
         '[Voice session] time=${DateTime.now().toIso8601String()} '
-            'event=$event state=${_speechSession.state.name} '
-            'retry=${_speechSession.retryCount} '
+            'event=$event state=${_voiceEntry.session.state.name} '
+            'retry=${_voiceEntry.session.retryCount} '
             'complete=${completeness.isComplete} '
             'reason=${completeness.reason} transcript="$transcript"',
       );
@@ -2950,8 +2940,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   Future<void> _handleSpeechError(String errorMessage) async {
     if (!mounted || _handlingSpeechError) return;
-    if (_speechSession.state != SpeechSessionState.listening &&
-        _speechSession.state != SpeechSessionState.finalizing) {
+    if (_voiceEntry.session.state != SpeechSessionState.listening &&
+        _voiceEntry.session.state != SpeechSessionState.finalizing) {
       return;
     }
     debugPrint('STT Error: $errorMessage');
@@ -2966,7 +2956,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             normalized.contains('error_language_not_supported');
     final canTryAnotherLocale = languageFailure &&
         _speechLocaleCandidateIndex + 1 < _speechLocaleCandidates.length;
-    final decision = _speechSession.onRecognizerError(
+    final decision = _voiceEntry.session.onRecognizerError(
       retryable: recoverableEnd || canTryAnotherLocale,
     );
 
@@ -3024,18 +3014,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         if (_isProcessingVoiceCommand) return;
         _cancelSpeechTimers();
         setState(() => _isListening = false);
-        _speechSession.markProcessing();
+        _voiceEntry.session.markProcessing();
         _isProcessingVoiceCommand = true;
         try {
           await _processNLP(
             decision.transcript,
             source: SmartInputSource.voice,
           );
-          _speechSession.markCompleted();
+          _voiceEntry.session.markCompleted();
           _smartInputCtrl.clear();
-          _speechSession.reset();
+          _voiceEntry.session.reset();
         } catch (error) {
-          _speechSession.markFailed();
+          _voiceEntry.session.markFailed();
           _smartInputCtrl.clear();
           rethrow;
         } finally {
@@ -3046,18 +3036,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         _cancelSpeechTimers();
         setState(() => _isListening = false);
         _smartInputCtrl.clear();
-        _speechSession.reset();
+        _voiceEntry.session.reset();
         _showTransactionError(
           'The voice command was incomplete. Please tap the microphone and say the full command again.',
           title: 'Voice command incomplete',
         );
         return;
       case SpeechSessionAction.none:
-        if (_speechSession.state == SpeechSessionState.failed) {
+        if (_voiceEntry.session.state == SpeechSessionState.failed) {
           _cancelSpeechTimers();
           if (_isListening) setState(() => _isListening = false);
           _smartInputCtrl.clear();
-          _speechSession.reset();
+          _voiceEntry.session.reset();
           _showTransactionError(
             'Voice recognition stopped before hearing any words. Tap the microphone and try again.',
             title: 'Voice stopped too soon',
@@ -3196,7 +3186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         : DateTime.now().difference(startedAt);
     if (!_recognizerReportedListening &&
         elapsed != null &&
-        elapsed < _prematureSpeechStatusGuard) {
+        elapsed < VoiceEntryController.prematureStatusGuard) {
       // Android may emit a stale `notListening` status while a new listen call
       // is still starting. The startup timer will retry if no real listening
       // status or transcript arrives.
@@ -3216,7 +3206,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     try {
       await Future<void>.delayed(const Duration(milliseconds: 150));
       if (!mounted || _restartingSpeech) return;
-      final transcript = _speechSession.latestDraft;
+      final transcript = _voiceEntry.session.latestDraft;
       final completeness = _speechCompleteness(transcript);
       if (transcript.isNotEmpty) {
         _scheduleStableSpeechFinalization(
@@ -3226,7 +3216,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         );
         return;
       }
-      final decision = _speechSession.onRecognizerError(retryable: true);
+      final decision = _voiceEntry.session.onRecognizerError(retryable: true);
       _traceSpeechEvent(
         'recognizer_stopped',
         transcript: transcript,
