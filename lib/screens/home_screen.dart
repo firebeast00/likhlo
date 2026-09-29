@@ -19,6 +19,7 @@ import '../app/app_shell.dart';
 import '../app/app_navigation.dart';
 import '../features/smart_entry/smart_entry_controller.dart';
 import '../features/voice/voice_entry_controller.dart';
+import '../features/feedback/feedback_coordinator.dart';
 import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/transaction_message_card.dart';
@@ -71,6 +72,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   late Animation<double> _fabScale;
 
   final VoiceEntryController _voiceEntry = VoiceEntryController();
+  final FeedbackCoordinator _feedback = FeedbackCoordinator();
   bool _isListening = false;
   bool _handlingSpeechError = false;
   bool _restartingSpeech = false;
@@ -86,7 +88,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final Map<String, _LearnedSmartEntryPreference>
   _learnedSmartEntryPreferences = {};
   Timer? _notificationUpdateTimer;
-  Timer? _messageTimer;
   Timer? _speechStabilityTimer;
   Timer? _speechDeadlineTimer;
   Timer? _speechStartupTimer;
@@ -94,7 +95,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _recognizerReportedListening = false;
   bool _finalizingRecognizerStop = false;
   bool _isProcessingVoiceCommand = false;
-  OverlayEntry? _activeMessageEntry;
 
   @override
   void initState() {
@@ -270,12 +270,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _voiceEntry.speech.cancel();
     _fabController.dispose();
     _notificationUpdateTimer?.cancel();
-    _messageTimer?.cancel();
     _speechStabilityTimer?.cancel();
     _speechDeadlineTimer?.cancel();
     _speechStartupTimer?.cancel();
-    _activeMessageEntry?.remove();
-    _activeMessageEntry = null;
+    _feedback.dispose();
     _categoryScrollCtrl.dispose();
     _primaryTabsController.dispose();
     _smartInputCtrl.dispose();
@@ -962,41 +960,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     Future<void> Function()? onAction,
   }) {
     if (!mounted) return;
-
-    _messageTimer?.cancel();
-    _activeMessageEntry?.remove();
-
-    late final OverlayEntry entry;
-    void dismiss() {
-      if (_activeMessageEntry != entry) return;
-      entry.remove();
-      _activeMessageEntry = null;
-      _messageTimer?.cancel();
-      _messageTimer = null;
-    }
-
-    entry = OverlayEntry(
-      builder: (overlayContext) => Positioned(
-        top: MediaQuery.paddingOf(overlayContext).top + 12,
-        left: 16,
-        right: 16,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: TransactionMessageCard(
-            title: title,
-            message: message,
-            tone: tone,
-            actionLabel: actionLabel,
-            onAction: onAction,
-            onDismiss: dismiss,
-          ),
-        ),
-      ),
+    _feedback.show(
+      context,
+      title: title,
+      message: message,
+      tone: tone,
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
-
-    _activeMessageEntry = entry;
-    Overlay.of(context, rootOverlay: true).insert(entry);
-    _messageTimer = Timer(const Duration(seconds: 5), dismiss);
   }
 
   Widget _buildSegment(String current, String type, String label, Color color, VoidCallback onTap) {
