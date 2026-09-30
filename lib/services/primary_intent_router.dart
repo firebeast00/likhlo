@@ -87,6 +87,17 @@ class PrimaryIntentRouter {
       );
     }
 
+    // Udhar amounts must never fall through to a normal expense.
+    if (_hasAmountSignal(text) &&
+        has(r'\b(udhar|udhaar|debt|loan)\b')) {
+      return const PrimaryIntentRoute(
+        intent: RoutedSmartIntent.navigate,
+        confidence: 0.995,
+        rule: 'udhar_amount_requires_udhar_flow',
+        navigationTarget: 'Udhaar',
+      );
+    }
+
     if (has(r'\b(delete|remove|erase|hata|hatao|nikal|nikalo)\b')) {
       return const PrimaryIntentRoute(
         intent: RoutedSmartIntent.deleteEntry,
@@ -136,6 +147,19 @@ class PrimaryIntentRouter {
         has(
           r'\b(spending|expense|expenses|income|kamai|kharch|kharcha|summary|hisaab)\b',
         );
+    final asksForTransactionList =
+        has(r'\b(list|entries|transactions)\b') &&
+        has(
+          r'\b(expense|expenses|income|kharch|kamai)\b',
+        );
+    if (asksForTransactionList) {
+      return const PrimaryIntentRoute(
+        intent: RoutedSmartIntent.searchEntries,
+        confidence: 0.985,
+        rule: 'explicit_transaction_list',
+      );
+    }
+
     final asksFinancialQuestion = has(
           r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net|summary|overview|hisaab)\b',
         ) ||
@@ -342,6 +366,11 @@ class PrimaryIntentRouter {
   }
 
   String? _navigationTarget(String input) {
+    if (RegExp(
+      r'\b(monthly\s+pdf|pdf\s+(?:report|statement)|financial\s+statement|pdf)\b',
+    ).hasMatch(input)) {
+      return 'Settings';
+    }
     if (RegExp(r'\b(monthly\s+plan|smart\s+plan|budget\s+plan|budget|mahine\s+ka\s+plan)\b')
         .hasMatch(input)) {
       return 'Monthly Plan';
