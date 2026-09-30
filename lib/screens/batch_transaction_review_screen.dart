@@ -72,7 +72,7 @@ class _BatchTransactionReviewScreenState
       .where((row) => row.type == 'income')
       .fold<double>(0, (sum, row) => sum + row.amount);
 
-  bool _canSave(List<Wallet> wallets) {
+  bool _canSave(List<Wallet> wallets, List<String> categories) {
     final selected = _selectedRows;
     if (selected.isEmpty) return false;
 
@@ -85,7 +85,9 @@ class _BatchTransactionReviewScreenState
           !validWalletIds.contains(row.walletId)) {
         return false;
       }
-      if (row.type == 'expense' && row.category.trim().isEmpty) {
+      if (row.type == 'expense' &&
+          (row.category.trim().isEmpty ||
+              !categories.contains(row.category))) {
         return false;
       }
     }
@@ -137,8 +139,11 @@ class _BatchTransactionReviewScreenState
     });
   }
 
-  Future<void> _save(List<Wallet> wallets) async {
-    if (_saving || !_canSave(wallets)) return;
+  Future<void> _save(
+    List<Wallet> wallets,
+    List<String> categories,
+  ) async {
+    if (_saving || !_canSave(wallets, categories)) return;
 
     final selected = _selectedRows;
     final colorValue =
@@ -197,7 +202,7 @@ class _BatchTransactionReviewScreenState
   Widget build(BuildContext context) {
     final wallets = ref.watch(walletProvider);
     final categories = ref.watch(categoryProvider);
-    final canSave = _canSave(wallets);
+    final canSave = _canSave(wallets, categories);
 
     return Scaffold(
       appBar: AppBar(
@@ -263,7 +268,9 @@ class _BatchTransactionReviewScreenState
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.all(16),
         child: FilledButton.icon(
-          onPressed: !_saving && canSave ? () => _save(wallets) : null,
+          onPressed: !_saving && canSave
+              ? () => _save(wallets, categories)
+              : null,
           icon: _saving
               ? const SizedBox.square(
                   dimension: 18,
