@@ -8,6 +8,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   static const _smartEntryLearningKey = 'smart_entry_learning_v1';
   DateTime _focusedMonth = DateTime.now();
   String _selectedCategoryTab = 'All';
+  final ValueNotifier<String> _categorySelectionNotifier =
+      ValueNotifier<String>('All');
   bool _isSearching = false;
   String _searchQuery = "";
   final ValueNotifier<String> _searchQueryNotifier = ValueNotifier<String>('');
@@ -126,6 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _speechStartupTimer?.cancel();
     _feedback.dispose();
     _categoryScrollCtrl.dispose();
+    _categorySelectionNotifier.dispose();
     _primaryTabsController.dispose();
     _searchQueryNotifier.dispose();
     _smartInputUiRevision.dispose();
@@ -215,7 +218,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         transactionListBuilder: (isSliver) => _DashboardTransactionSection(
           owner: this,
           focusedMonth: _focusedMonth,
-          selectedCategory: _selectedCategoryTab,
           typeFilter: _smartEntryTypeFilter,
           searchRange: _smartEntrySearchRange,
           searchAllHistory:
