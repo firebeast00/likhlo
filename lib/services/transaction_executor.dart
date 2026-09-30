@@ -224,10 +224,12 @@ class TransactionExecutor {
             ) ||
             command.entries.map((entry) => entry.id).toSet().length !=
                 command.entries.length) {
-          return const TransactionResult(
+          return TransactionResult(
             status: TransactionResultStatus.rejected,
             action: TransactionAction.batch,
-            reason: 'Every selected receipt item needs a valid amount.',
+            reason: command.detectedTotal == null
+                ? 'Every selected batch item needs a valid amount.'
+                : 'Every selected receipt item needs a valid amount.',
           );
         }
         final selectedTotal = command.entries.fold<double>(
@@ -271,7 +273,9 @@ class TransactionExecutor {
               saved ? entries.map((entry) => entry.id).toList() : const [],
           reason: saved
               ? null
-              : 'The receipt could not be saved. No items were added.',
+              : command.detectedTotal == null
+                  ? 'The batch could not be saved. No items were added.'
+                  : 'The receipt could not be saved. No items were added.',
         );
       case CreateTransferCommand():
         if (!_isValidTransfer(command)) {
