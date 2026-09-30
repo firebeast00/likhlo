@@ -105,6 +105,23 @@ void main() {
       expect(income.parsed.timeRange, SmartEntryTimeRange.thisMonth);
     });
 
+    test('treats amount-free daily finance phrases as queries', () {
+      final spending = engine.parse('aaj ka kharcha', categories);
+      final income = engine.parse('aaj ki income', categories);
+      final expenseEntry = engine.parse('aaj 500 petrol', categories);
+
+      expect(spending.parsed.intent, SmartEntryIntent.query);
+      expect(spending.parsed.queryMetric, SmartEntryQueryMetric.spending);
+      expect(spending.parsed.timeRange, SmartEntryTimeRange.today);
+
+      expect(income.parsed.intent, SmartEntryIntent.query);
+      expect(income.parsed.queryMetric, SmartEntryQueryMetric.income);
+      expect(income.parsed.timeRange, SmartEntryTimeRange.today);
+
+      expect(expenseEntry.parsed.intent, SmartEntryIntent.addExpense);
+      expect(expenseEntry.parsed.amount, 500);
+    });
+
     test('understands wallet and category questions used daily', () {
       final wallet = engine.parse('cash me kitna hai', categories);
       final category =
