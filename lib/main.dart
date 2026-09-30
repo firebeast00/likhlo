@@ -17,7 +17,6 @@ import 'models/workspace_model.dart';
 // Services
 import "./services/notification_service.dart";
 import './services/automatic_backup_service.dart';
-import './services/workspace_retirement_service.dart';
 
 // Providers
 import 'providers/settings_provider.dart';
@@ -70,11 +69,6 @@ void main() async {
   // native splash remains visible only while essential local storage opens.
   if (storageError == null) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        await WorkspaceRetirementService.mergeIntoMain();
-      } catch (e) {
-        debugPrint('Workspace retirement migration error: $e');
-      }
       AutomaticBackupService.instance.start();
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       try {
