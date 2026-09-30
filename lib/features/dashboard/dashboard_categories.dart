@@ -3,7 +3,8 @@ part of '../../screens/home_screen.dart';
 extension _DashboardCategoryMethods on _HomeScreenState {
   void _selectCategory(String category, int index) {
     _dismissKeyboard();
-    setState(() => _selectedCategoryTab = category);
+    _selectedCategoryTab = category;
+    _categorySelectionNotifier.value = category;
     double offset = (index * 70.0) - (MediaQuery.of(context).size.width / 2) + 35;
     if (offset < 0) offset = 0;
     if (_categoryScrollCtrl.hasClients) {
@@ -111,7 +112,8 @@ extension _DashboardCategoryMethods on _HomeScreenState {
     ref.read(categoryProvider.notifier).deleteCategory(category);
 
     if (_selectedCategoryTab == category) {
-      setState(() => _selectedCategoryTab = 'All');
+      _selectedCategoryTab = 'All';
+      _categorySelectionNotifier.value = 'All';
     }
     _showDeletionMessage(
       "Category '$category' was deleted.",
