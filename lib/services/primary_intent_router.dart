@@ -312,6 +312,12 @@ class PrimaryIntentRouter {
 
   RoutedSmartAppAction? _appAction(String input) {
     if (RegExp(
+      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.darkModeToggle;
+    }
+    if (RegExp(
       r'\b(?:dark\s*(?:mode|theme)\s*(?:off|band)|(?:turn\s+off|disable)\s+dark\s*(?:mode|theme)|light\s*(?:mode|theme)(?:\s+(?:on|karo|lagao|laga\s+do))?|normal\s+mode\s+karo)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
@@ -322,12 +328,6 @@ class PrimaryIntentRouter {
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeOn;
-    }
-    if (RegExp(
-      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme)\b',
-      caseSensitive: false,
-    ).hasMatch(input)) {
-      return RoutedSmartAppAction.darkModeToggle;
     }
     return null;
   }
