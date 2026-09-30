@@ -1293,12 +1293,12 @@ class LocalNlpService {
       return SmartEntryTimeRange.lastWeek;
     }
     if (RegExp(
-      r'\b(this\s+week|current\s+week|is\s+haftay|iss\s+haftay|is\s+hafte|iss\s+hafte|is\s+week)\b',
+      r'\b(this\s+week|current\s+week|is\s+haftay|iss\s+haftay|is\s+hafte|iss\s+hafte|is\s+week|week|haftay|hafte)\b',
     ).hasMatch(input)) {
       return SmartEntryTimeRange.thisWeek;
     }
     if (RegExp(
-      r'\b(this\s+month|current\s+month|is\s+mahine|iss\s+mahine|is\s+month|iss\s+month|mahine\s+ka|month\s+ka)\b',
+      r'\b(this\s+month|current\s+month|is\s+mahine|iss\s+mahine|is\s+month|iss\s+month|mahine\s+ka|month\s+ka|month|mahine|mahina)\b',
     ).hasMatch(input)) {
       return SmartEntryTimeRange.thisMonth;
     }
@@ -1411,7 +1411,11 @@ class LocalNlpService {
     final isIncome = intent == SmartEntryIntent.addIncome;
     final queryMetric =
         intent == SmartEntryIntent.query ? _queryMetric(lowerInput) : null;
-    final timeRange = _timeRange(lowerInput);
+    var timeRange = _timeRange(lowerInput);
+    if (queryMetric == SmartEntryQueryMetric.summary &&
+        timeRange == SmartEntryTimeRange.allTime) {
+      timeRange = SmartEntryTimeRange.thisMonth;
+    }
     final navigationTarget = intent == SmartEntryIntent.navigate
         ? intentRoute.navigationTarget ?? _navigationTarget(lowerInput)
         : null;
