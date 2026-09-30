@@ -10,6 +10,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   String _selectedCategoryTab = 'All';
   bool _isSearching = false;
   String _searchQuery = "";
+  final ValueNotifier<String> _searchQueryNotifier = ValueNotifier<String>('');
   String? _smartEntryTypeFilter;
   SmartEntryTimeRange? _smartEntrySearchRange;
   bool _smartEntrySearchAllHistory = false;
@@ -113,6 +114,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _feedback.dispose();
     _categoryScrollCtrl.dispose();
     _primaryTabsController.dispose();
+    _searchQueryNotifier.dispose();
     _smartInputCtrl.dispose();
     super.dispose();
   }
@@ -137,65 +139,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       );
     }
 
-    final ledger = ref.watch(monthlyLedgerProvider(_focusedMonth));
-    final categories = ref.watch(categoryProvider);
-    final wallets = ref.watch(walletProvider);
-    final allExpenses = ref.watch(
-      expenseProvider.select((state) => state.allExpenses),
-    );
-
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
-    final monthlyTransactions = ledger.transactions;
-    final globalSpent = ledger.spent;
-
-    final walletNotifier = ref.read(walletProvider.notifier);
-    final totalAvailable = wallets.fold<double>(
-      0,
-      (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
-    );
-    final showMoneySetup =
-        totalAvailable.abs() < 0.000001 && allExpenses.isEmpty;
-
-    var displayExpenses = List<Expense>.from(
-      _isSearching && _smartEntrySearchAllHistory
-          ? visibleTransactions(allExpenses)
-          : monthlyTransactions,
-    );
-
-    if (_selectedCategoryTab != 'All' &&
-        !categories.contains(_selectedCategoryTab)) {
-      _selectedCategoryTab = 'All';
-    }
-
-    if (_selectedCategoryTab != 'All') {
-      displayExpenses = displayExpenses
-          .where((entry) => entry.category == _selectedCategoryTab)
-          .toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      displayExpenses = displayExpenses
-          .where(
-            (entry) =>
-                entry.title.toLowerCase().contains(_searchQuery.toLowerCase()),
-          )
-          .toList();
-    }
-    if (_smartEntryTypeFilter != null) {
-      displayExpenses = displayExpenses
-          .where((entry) => entry.type == _smartEntryTypeFilter)
-          .toList();
-    }
-    if (_smartEntrySearchRange != null) {
-      displayExpenses = displayExpenses
-          .where(
-            (entry) => matchesSmartEntryTimeRange(
-              entry.date,
-              _smartEntrySearchRange!,
-            ),
-          )
-          .toList();
-    }
+    final showMoneySetup = ref.watch(showMoneySetupProvider);
 
     return AppShell(
       currentSection: currentSection,
@@ -203,7 +149,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       dashboardAppBar: DashboardAppBar(
         activeTab: _activePrimaryTab,
         isSearching: _isSearching,
-        onSearchChanged: (value) => setState(() => _searchQuery = value),
+        onSearchChanged: (value) {
+          _searchQuery = value;
+          _searchQueryNotifier.value = value;
+        },
         onBeforeOpenDrawer: _dismissKeyboard,
         onOpenWallets: _openIncomeAccounts,
         onToggleSearch: () {
@@ -217,6 +166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               _smartEntrySearchAllHistory = false;
             }
           });
+          if (!_isSearching) _searchQueryNotifier.value = '';
         },
       ),
       dashboardBody: DashboardScreen(
@@ -233,28 +183,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               _smartEntrySearchAllHistory = false;
             }
           });
+          if (tab == PrimaryLedgerTab.udhar) {
+            _searchQueryNotifier.value = '';
+          }
         },
         isLandscape: isLandscape,
         isSearching: _isSearching,
         moneySetupCard:
             showMoneySetup ? _buildMoneySetupCard(primaryColor) : null,
         monthSelector: _buildMonthSelector(isDark),
-        heroCard: _buildHeroCard(
-          totalAvailable,
-          globalSpent,
-          wallets,
-          primaryColor,
+        heroCard: _DashboardHeroSection(
+          owner: this,
+          focusedMonth: _focusedMonth,
         ),
-        smartInputBar: _buildSmartInputBar(primaryColor, isDark, wallets),
-        categoryTabs: _buildCategoryTabsWidget(
-          categories,
-          primaryColor,
-          isDark,
-        ),
-        transactionListBuilder: (isSliver) => _buildExpenseList(
-          displayExpenses,
-          primaryColor,
-          isDark,
+        smartInputBar: _DashboardSmartInputSection(owner: this),
+        categoryTabs: _DashboardCategorySection(owner: this),
+        transactionListBuilder: (isSliver) => _DashboardTransactionSection(
+          owner: this,
+          focusedMonth: _focusedMonth,
+          selectedCategory: _selectedCategoryTab,
+          typeFilter: _smartEntryTypeFilter,
+          searchRange: _smartEntrySearchRange,
+          searchAllHistory:
+              _isSearching && _smartEntrySearchAllHistory,
           isSliver: isSliver,
         ),
       ),
