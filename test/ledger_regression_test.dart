@@ -222,6 +222,113 @@ void main() {
         isTrue);
   });
 
+  test('ledger index caches month buckets and wallet movements', () {
+    final september = Expense(
+      id: 'sep-food',
+      title: 'Food',
+      amount: 200,
+      date: DateTime(2026, 9, 15),
+      category: 'Food',
+      colorValue: 0,
+      type: 'expense',
+      walletId: 'cash',
+    );
+    final august = Expense(
+      id: 'aug-income',
+      title: 'Salary',
+      amount: 1000,
+      date: DateTime(2026, 8, 1),
+      category: 'Income',
+      colorValue: 0,
+      type: 'income',
+      walletId: 'bank',
+    );
+
+    final index = LedgerIndex.rebuild([september, august]);
+    final septemberBucket = index.bucketFor(DateTime(2026, 9));
+
+    expect(index.byId['sep-food'], same(september));
+    expect(septemberBucket?.spent, 200);
+    expect(septemberBucket?.income, 0);
+    expect(index.walletMovements['cash'], -200);
+    expect(index.walletMovements['bank'], 1000);
+  });
+
+  test('ledger index preserves untouched month bucket identity', () {
+    final august = Expense(
+      id: 'aug',
+      title: 'August',
+      amount: 100,
+      date: DateTime(2026, 8, 10),
+      category: 'Food',
+      colorValue: 0,
+      walletId: 'cash',
+    );
+    final september = Expense(
+      id: 'sep',
+      title: 'September',
+      amount: 200,
+      date: DateTime(2026, 9, 10),
+      category: 'Food',
+      colorValue: 0,
+      walletId: 'cash',
+    );
+    final previous = LedgerIndex.rebuild([september, august]);
+    final augustBucket = previous.bucketFor(DateTime(2026, 8));
+
+    final october = Expense(
+      id: 'oct',
+      title: 'October',
+      amount: 300,
+      date: DateTime(2026, 10, 1),
+      category: 'Food',
+      colorValue: 0,
+      walletId: 'cash',
+    );
+    final next = LedgerIndex.rebuild(
+      [october, september, august],
+      previous: previous,
+    );
+
+    expect(next.bucketFor(DateTime(2026, 8)), same(augustBucket));
+  });
+
+  test('cached add guard matches full-ledger overdraft behavior', () {
+    final existing = Expense(
+      id: 'old',
+      title: 'Old expense',
+      amount: 200,
+      date: DateTime(2026, 9, 1),
+      category: 'Food',
+      colorValue: 0,
+      walletId: 'cash',
+    );
+    final proposed = Expense(
+      id: 'new',
+      title: 'New expense',
+      amount: 301,
+      date: DateTime(2026, 9, 2),
+      category: 'Food',
+      colorValue: 0,
+      walletId: 'cash',
+    );
+    final movements = calculateWalletMovements([existing]);
+
+    final cached = keepsCachedWalletBalancesNonNegative(
+      openingBalances: {'cash': 500},
+      currentMovements: movements,
+      proposedEntries: [proposed],
+    );
+    final full = keepsWalletBalancesNonNegative(
+      openingBalances: {'cash': 500},
+      existingEntries: [existing],
+      proposedEntries: [proposed],
+    );
+
+    expect(cached, full);
+    expect(cached, isFalse);
+  });
+
   test(
       'PDF report totals count transfer pairs once and exclude them from income',
       () {
