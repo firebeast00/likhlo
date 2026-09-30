@@ -17,6 +17,14 @@ void main() {
       expect(result, ['500 petrol', '200 chai', '1200 zong package']);
     });
 
+    test('keeps comma-formatted large amounts as one anchor', () {
+      final result = parser.tryParseBatch(
+        '1200000 hostel fee and 1,200,000 tuition fee',
+      );
+
+      expect(result, ['1200000 hostel fee', '1,200,000 tuition fee']);
+    });
+
     test('does not split one amount with conjunctions in title', () {
       expect(parser.tryParseBatch('tea and biscuits 300'), isNull);
     });
