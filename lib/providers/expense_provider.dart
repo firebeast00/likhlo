@@ -139,6 +139,94 @@ class LedgerIndex {
     );
   }
 
+  LedgerIndex withAdded(Iterable<Expense> additions) {
+    final incoming = additions.toList(growable: false);
+    if (incoming.isEmpty) return this;
+
+    final nextById = Map<String, Expense>.from(byId);
+    final nextBuckets = Map<int, LedgerMonthBucket>.from(byMonth);
+    final nextMovements = Map<String, double>.from(walletMovements);
+    final grouped = <int, List<Expense>>{};
+
+    for (final entry in incoming) {
+      nextById[entry.id] = entry;
+      final key = monthKey(entry.date);
+      (grouped[key] ??= <Expense>[]).add(entry);
+
+      final delta = entry.type == 'income'
+          ? entry.amount
+          : entry.type == 'expense'
+              ? -entry.amount
+              : 0.0;
+      nextMovements.update(
+        entry.walletId,
+        (value) => value + delta,
+        ifAbsent: () => delta,
+      );
+    }
+
+    for (final item in grouped.entries) {
+      final previousBucket = byMonth[item.key];
+      final added = List<Expense>.from(item.value)
+        ..sort((a, b) => b.date.compareTo(a.date));
+      final merged = _mergeSortedExpenseLists(
+        previousBucket?.transactions ?? const <Expense>[],
+        added,
+      );
+
+      var income = previousBucket?.income ?? 0.0;
+      var spent = previousBucket?.spent ?? 0.0;
+      for (final entry in added) {
+        if (entry.category == 'Transfer') continue;
+        if (entry.type == 'income') {
+          income += entry.amount;
+        } else if (entry.type == 'expense') {
+          spent += entry.amount;
+        }
+      }
+
+      nextBuckets[item.key] = LedgerMonthBucket(
+        transactions: List<Expense>.unmodifiable(merged),
+        income: income,
+        spent: spent,
+      );
+    }
+
+    return LedgerIndex(
+      byId: Map<String, Expense>.unmodifiable(nextById),
+      byMonth: Map<int, LedgerMonthBucket>.unmodifiable(nextBuckets),
+      walletMovements: Map<String, double>.unmodifiable(nextMovements),
+    );
+  }
+
+  static List<Expense> _mergeSortedExpenseLists(
+    List<Expense> existing,
+    List<Expense> incoming,
+  ) {
+    final result = <Expense>[];
+    var existingIndex = 0;
+    var incomingIndex = 0;
+    while (existingIndex < existing.length &&
+        incomingIndex < incoming.length) {
+      final current = existing[existingIndex];
+      final added = incoming[incomingIndex];
+      if (!added.date.isBefore(current.date)) {
+        result.add(added);
+        incomingIndex++;
+      } else {
+        result.add(current);
+        existingIndex++;
+      }
+    }
+    if (existingIndex < existing.length) {
+      result.addAll(existing.skip(existingIndex));
+    }
+    if (incomingIndex < incoming.length) {
+      result.addAll(incoming.skip(incomingIndex));
+    }
+    return result;
+  }
+
   static bool _sameExpenseSequence(
     List<Expense> previous,
     List<Expense> next,
@@ -227,14 +315,16 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   ExpenseState _nextState({
     required List<Expense> allExpenses,
     List<Expense>? deletedExpenses,
+    LedgerIndex? index,
   }) {
     return ExpenseState(
       allExpenses: allExpenses,
       deletedExpenses: deletedExpenses ?? state.deletedExpenses,
-      index: LedgerIndex.rebuild(
-        allExpenses,
-        previous: state.index,
-      ),
+      index: index ??
+          LedgerIndex.rebuild(
+            allExpenses,
+            previous: state.index,
+          ),
     );
   }
 
@@ -272,10 +362,16 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   /// use this path so the dashboard never renders a half-complete pair.
   Future<bool> addExpenses(Iterable<Expense> expenses) async {
     final additions = expenses.toList(growable: false);
-    if (!isValidTransactionBatch(
-      additions,
-      existingIds: state.allRecords.map((entry) => entry.id).toSet(),
-    )) {
+    if (additions.isEmpty ||
+        additions.any(
+          (entry) =>
+              entry.id.trim().isEmpty ||
+              !entry.amount.isFinite ||
+              entry.amount <= 0 ||
+              state.index.byId.containsKey(entry.id) ||
+              findDeletedById(entry.id) != null,
+        ) ||
+        additions.map((entry) => entry.id).toSet().length != additions.length) {
       return false;
     }
     if (!keepsCachedWalletBalancesNonNegative(
@@ -293,6 +389,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     state = _nextState(
       allExpenses: _mergeNewest(state.allExpenses, additions),
       deletedExpenses: state.deletedExpenses,
+      index: state.index.withAdded(additions),
     );
     return true;
   }
