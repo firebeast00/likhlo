@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/wallet_provider.dart';
+import '../models/debt_model.dart';
 import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
 import '../services/voice_privacy_service.dart';
@@ -681,12 +682,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // --- PROFESSIONAL PDF GENERATOR ---
   Future<void> _generatePdf(BuildContext context, WidgetRef ref) async {
     try {
+      if (!Hive.isBoxOpen('debts')) {
+        await Hive.openBox<DebtEntry>('debts');
+      }
+
       final records = ref
           .read(expenseProvider)
           .allExpenses
           .toList(growable: false);
-      final expenses = visibleTransactions(records);
+      final wallets = ref.read(walletProvider);
       final settings = ref.read(settingsProvider);
+      final debtBox = Hive.box<DebtEntry>('debts');
+      final udharEntries = debtBox.values
+          .where((entry) => entry.deletedAt == null)
+          .toList(growable: false);
+
+      final linkedUdhaarIds = linkedUdharLedgerIds();
+      final expenses = visibleTransactions(records)
+          .where((entry) => !linkedUdhaarIds.contains(entry.id))
+          .toList(growable: false);
+
       final regularFont = pw.Font.ttf(
         await rootBundle.load('assets/fonts/DejaVuSans.ttf'),
       );
@@ -697,180 +712,830 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
       );
 
-      final linkedUdhaarIds = linkedUdharLedgerIds();
       final totalSpent = records
-          .where((e) => e.type == 'expense' &&
-              e.category != 'Transfer' &&
-              !linkedUdhaarIds.contains(e.id))
+          .where(
+            (entry) =>
+                entry.type == 'expense' &&
+                entry.category != 'Transfer' &&
+                !linkedUdhaarIds.contains(entry.id),
+          )
           .fold<double>(0, (sum, item) => sum + item.amount);
-      final remaining = ref.read(walletProvider).fold<double>(0,
-          (sum, wallet) => sum + ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id));
-      // The three figures reconcile even if opening balances were adjusted.
+      final totalIncome = records
+          .where(
+            (entry) =>
+                entry.type == 'income' &&
+                entry.category != 'Transfer' &&
+                !linkedUdhaarIds.contains(entry.id),
+          )
+          .fold<double>(0, (sum, item) => sum + item.amount);
+      final remaining = wallets.fold<double>(
+        0,
+        (sum, wallet) =>
+            sum + ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id),
+      );
+      // Preserve the existing report definition so historical exports reconcile.
       final totalAmount = remaining + totalSpent;
+
       final byCategory = <String, double>{};
-      for (final entry in records.where((e) => e.type == 'expense' &&
-          e.category != 'Transfer' &&
-          !linkedUdhaarIds.contains(e.id))) {
-        byCategory.update(entry.category, (sum) => sum + entry.amount,
-            ifAbsent: () => entry.amount);
+      for (final entry in records.where(
+        (entry) =>
+            entry.type == 'expense' &&
+            entry.category != 'Transfer' &&
+            !linkedUdhaarIds.contains(entry.id),
+      )) {
+        byCategory.update(
+          entry.category,
+          (sum) => sum + entry.amount,
+          ifAbsent: () => entry.amount,
+        );
       }
       final categories = byCategory.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
+
+      final recordsById = {for (final entry in records) entry.id: entry};
+      final walletNames = {for (final wallet in wallets) wallet.id: wallet.name};
+      final activeUdhar =
+          udharEntries.where((entry) => entry.settledAt == null).toList();
+      final udharReceivable = activeUdhar
+          .where((entry) => entry.type == 'lent')
+          .fold<double>(0, (sum, entry) => sum + entry.amount);
+      final udharPayable = activeUdhar
+          .where((entry) => entry.type == 'borrowed')
+          .fold<double>(0, (sum, entry) => sum + entry.amount);
+
+      udharEntries.sort((a, b) {
+        final aActive = a.settledAt == null;
+        final bActive = b.settledAt == null;
+        if (aActive != bActive) return aActive ? -1 : 1;
+        final aDue = a.dueDate;
+        final bDue = b.dueDate;
+        if (aDue != null && bDue != null) return aDue.compareTo(bDue);
+        if (aDue != null) return -1;
+        if (bDue != null) return 1;
+        return a.borrowerName.compareTo(b.borrowerName);
+      });
+
       final dateStr = DateFormat.yMMMM().format(DateTime.now());
 
       const pdfPrimaryColor = PdfColor.fromInt(0xFF1E3A8A);
-      const categoryColors = <PdfColor>[
-        PdfColor.fromInt(0xFF2563EB), PdfColor.fromInt(0xFF7C3AED),
-        PdfColor.fromInt(0xFFEA580C), PdfColor.fromInt(0xFF0891B2),
-        PdfColor.fromInt(0xFFBE185D),
+      const pageText = PdfColor.fromInt(0xFF0F172A);
+      const mutedText = PdfColor.fromInt(0xFF64748B);
+      const softBorder = PdfColor.fromInt(0xFFE2E8F0);
+      const softSurface = PdfColor.fromInt(0xFFF8FAFC);
+      const alternateRow = PdfColor.fromInt(0xFFFAFCFF);
+
+      const expenseColor = PdfColor.fromInt(0xFFDC2626);
+      const expenseBg = PdfColor.fromInt(0xFFFEF2F2);
+      const incomeColor = PdfColor.fromInt(0xFF15803D);
+      const incomeBg = PdfColor.fromInt(0xFFF0FDF4);
+      const transferColor = PdfColor.fromInt(0xFF2563EB);
+      const transferBg = PdfColor.fromInt(0xFFEFF6FF);
+      const receiveColor = PdfColor.fromInt(0xFF047857);
+      const receiveBg = PdfColor.fromInt(0xFFECFDF5);
+      const payableColor = PdfColor.fromInt(0xFFB91C1C);
+      const payableBg = PdfColor.fromInt(0xFFFEF2F2);
+      const activeColor = PdfColor.fromInt(0xFFB45309);
+      const activeBg = PdfColor.fromInt(0xFFFFFBEB);
+      const settledColor = PdfColor.fromInt(0xFF475569);
+      const settledBg = PdfColor.fromInt(0xFFF1F5F9);
+      const overdueColor = PdfColor.fromInt(0xFFB91C1C);
+      const overdueBg = PdfColor.fromInt(0xFFFEF2F2);
+
+      const categoryForeground = <PdfColor>[
+        PdfColor.fromInt(0xFFC2410C), // orange
+        PdfColor.fromInt(0xFF0369A1), // sky
+        PdfColor.fromInt(0xFF6D28D9), // violet
+        PdfColor.fromInt(0xFFBE185D), // pink
+        PdfColor.fromInt(0xFF047857), // emerald
+        PdfColor.fromInt(0xFF4338CA), // indigo
+        PdfColor.fromInt(0xFF0F766E), // teal
+        PdfColor.fromInt(0xFFB45309), // amber
+        PdfColor.fromInt(0xFF334155), // slate
+        PdfColor.fromInt(0xFF9F1239), // rose
       ];
-      String shortTitle(String value) {
+      const categoryBackground = <PdfColor>[
+        PdfColor.fromInt(0xFFFFF7ED),
+        PdfColor.fromInt(0xFFF0F9FF),
+        PdfColor.fromInt(0xFFF5F3FF),
+        PdfColor.fromInt(0xFFFDF2F8),
+        PdfColor.fromInt(0xFFECFDF5),
+        PdfColor.fromInt(0xFFEEF2FF),
+        PdfColor.fromInt(0xFFF0FDFA),
+        PdfColor.fromInt(0xFFFFFBEB),
+        PdfColor.fromInt(0xFFF1F5F9),
+        PdfColor.fromInt(0xFFFFF1F2),
+      ];
+
+      String shortTitle(String value, {int max = 25}) {
         final text = value.replaceAll(RegExp(r'\s+'), ' ').trim();
-        if (text.runes.length <= 22) return text;
-        return '${String.fromCharCodes(text.runes.take(21)).trimRight()}…';
+        if (text.runes.length <= max) return text;
+        return '${String.fromCharCodes(text.runes.take(max - 3)).trimRight()}...';
       }
-      pw.Widget amountCard(String title, double value, PdfColor color) => pw.Expanded(
-        child: pw.Container(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          decoration: pw.BoxDecoration(
-            color: PdfColor.fromInt(0xFFF8FAFC),
-            border: pw.Border(left: pw.BorderSide(color: color, width: 3)),
+
+      int categoryIndex(String category) {
+        final normalized = category.trim().toLowerCase();
+        const known = <String, int>{
+          'food': 0,
+          'transport': 1,
+          'shopping': 2,
+          'entertainment': 3,
+          'health': 4,
+          'education': 5,
+          'general': 8,
+          'udhaar': 7,
+          'debt': 7,
+        };
+        final fixed = known[normalized];
+        if (fixed != null) return fixed;
+        var hash = 17;
+        for (final unit in normalized.codeUnits) {
+          hash = ((hash * 31) + unit) & 0x7fffffff;
+        }
+        return hash % categoryForeground.length;
+      }
+
+      PdfColor categoryColor(String category) =>
+          categoryForeground[categoryIndex(category)];
+      PdfColor categoryBg(String category) =>
+          categoryBackground[categoryIndex(category)];
+
+      String transactionTypeLabel(dynamic entry) {
+        if (entry.category.toString().trim().toLowerCase() == 'transfer') {
+          return 'Transfer';
+        }
+        return entry.type == 'income' ? 'Income' : 'Expense';
+      }
+
+      PdfColor typeColor(String type) {
+        switch (type) {
+          case 'Income':
+            return incomeColor;
+          case 'Transfer':
+            return transferColor;
+          default:
+            return expenseColor;
+        }
+      }
+
+      PdfColor typeBackground(String type) {
+        switch (type) {
+          case 'Income':
+            return incomeBg;
+          case 'Transfer':
+            return transferBg;
+          default:
+            return expenseBg;
+        }
+      }
+
+      String udharWallet(DebtEntry entry) {
+        final directId = entry.walletId;
+        if (directId != null && walletNames.containsKey(directId)) {
+          return walletNames[directId]!;
+        }
+        final ledgerWallet = recordsById[entry.id]?.walletId;
+        if (ledgerWallet != null && walletNames.containsKey(ledgerWallet)) {
+          return walletNames[ledgerWallet]!;
+        }
+        return 'Legacy';
+      }
+
+      String dueLabel(DebtEntry entry) {
+        if (entry.settledAt != null) return '-';
+        final due = entry.dueDate;
+        if (due == null) return 'No due date';
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final dueDay = DateTime(due.year, due.month, due.day);
+        final days = dueDay.difference(today).inDays;
+        if (days < 0) return '${days.abs()}d overdue';
+        if (days == 0) return 'Today';
+        if (days == 1) return 'Tomorrow';
+        return DateFormat('dd MMM yy').format(due);
+      }
+
+      String udharStatus(DebtEntry entry) {
+        if (entry.settledAt != null) return 'Settled';
+        final due = entry.dueDate;
+        if (due == null) return 'Active';
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final dueDay = DateTime(due.year, due.month, due.day);
+        if (dueDay.isBefore(today)) return 'Overdue';
+        return 'Active';
+      }
+
+      PdfColor statusColor(String status) {
+        switch (status) {
+          case 'Overdue':
+            return overdueColor;
+          case 'Settled':
+            return settledColor;
+          default:
+            return activeColor;
+        }
+      }
+
+      PdfColor statusBackground(String status) {
+        switch (status) {
+          case 'Overdue':
+            return overdueBg;
+          case 'Settled':
+            return settledBg;
+          default:
+            return activeBg;
+        }
+      }
+
+      pw.Widget metricCard(
+        String title,
+        String value,
+        PdfColor color, {
+        String? subtitle,
+      }) {
+        return pw.Expanded(
+          child: pw.Container(
+            padding: const pw.EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 11,
+            ),
+            decoration: pw.BoxDecoration(
+              color: softSurface,
+              border: pw.Border(
+                left: pw.BorderSide(color: color, width: 3),
+              ),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  title,
+                  style: const pw.TextStyle(
+                    fontSize: 8.5,
+                    color: mutedText,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  value,
+                  style: pw.TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: pw.FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    subtitle,
+                    style: const pw.TextStyle(
+                      fontSize: 7.5,
+                      color: mutedText,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start,
+        );
+      }
+
+      pw.Widget amountCard(String title, double value, PdfColor color) =>
+          metricCard(title, 'Rs. ${value.toStringAsFixed(2)}', color);
+
+      pw.Widget pill(
+        String label,
+        PdfColor foreground,
+        PdfColor background, {
+        double fontSize = 7.5,
+      }) {
+        return pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: pw.BoxDecoration(
+            color: background,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+          ),
+          child: pw.Text(
+            label,
+            style: pw.TextStyle(
+              color: foreground,
+              fontSize: fontSize,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        );
+      }
+
+      pw.Widget tableHeaderCell(
+        String text, {
+        pw.TextAlign align = pw.TextAlign.left,
+      }) {
+        return pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          child: pw.Text(
+            text,
+            textAlign: align,
+            style: pw.TextStyle(
+              color: PdfColors.white,
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        );
+      }
+
+      pw.Widget bodyCell(
+        String text, {
+        PdfColor color = pageText,
+        pw.TextAlign align = pw.TextAlign.left,
+        bool bold = false,
+      }) {
+        return pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          child: pw.Text(
+            text,
+            textAlign: align,
+            maxLines: 2,
+            overflow: pw.TextOverflow.clip,
+            style: pw.TextStyle(
+              fontSize: 8,
+              color: color,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        );
+      }
+
+      pw.Widget transactionTable() {
+        final rows = <pw.TableRow>[
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: pdfPrimaryColor),
             children: [
-              pw.Text(title, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-              pw.SizedBox(height: 5),
-              pw.Text('Rs. ${value.toStringAsFixed(2)}', style: pw.TextStyle(
-                fontSize: 12, fontWeight: pw.FontWeight.bold, color: color)),
+              tableHeaderCell('Date'),
+              tableHeaderCell('Title'),
+              tableHeaderCell('Type'),
+              tableHeaderCell('Category'),
+              tableHeaderCell('Amount', align: pw.TextAlign.right),
             ],
           ),
-        ),
-      );
+        ];
+
+        for (var index = 0; index < expenses.length; index++) {
+          final entry = expenses[index];
+          final type = transactionTypeLabel(entry);
+          final catColor = categoryColor(entry.category);
+          final catBg = categoryBg(entry.category);
+          rows.add(
+            pw.TableRow(
+              decoration: pw.BoxDecoration(
+                color: index.isEven ? PdfColors.white : alternateRow,
+                border: const pw.Border(
+                  bottom: pw.BorderSide(color: softBorder, width: 0.5),
+                ),
+              ),
+              children: [
+                bodyCell(DateFormat('dd MMM yy').format(entry.date)),
+                bodyCell(shortTitle(entry.title, max: 30), bold: true),
+                pw.Padding(
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                  child: pill(
+                    type,
+                    typeColor(type),
+                    typeBackground(type),
+                  ),
+                ),
+                pw.Padding(
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      color: catBg,
+                      borderRadius:
+                          const pw.BorderRadius.all(pw.Radius.circular(10)),
+                    ),
+                    child: pw.Row(
+                      mainAxisSize: pw.MainAxisSize.min,
+                      children: [
+                        pw.Container(
+                          width: 5,
+                          height: 5,
+                          decoration: pw.BoxDecoration(
+                            color: catColor,
+                            shape: pw.BoxShape.circle,
+                          ),
+                        ),
+                        pw.SizedBox(width: 4),
+                        pw.Flexible(
+                          child: pw.Text(
+                            shortTitle(entry.category, max: 18),
+                            maxLines: 1,
+                            style: pw.TextStyle(
+                              color: catColor,
+                              fontSize: 7.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                bodyCell(
+                  entry.amount.toStringAsFixed(2),
+                  color: typeColor(type),
+                  align: pw.TextAlign.right,
+                  bold: true,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return pw.Table(
+          columnWidths: const {
+            0: pw.FixedColumnWidth(62),
+            1: pw.FlexColumnWidth(2.1),
+            2: pw.FixedColumnWidth(62),
+            3: pw.FlexColumnWidth(1.45),
+            4: pw.FixedColumnWidth(68),
+          },
+          defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+          children: rows,
+        );
+      }
+
+      pw.Widget udharTable() {
+        final rows = <pw.TableRow>[
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: pdfPrimaryColor),
+            children: [
+              tableHeaderCell('Person'),
+              tableHeaderCell('Direction'),
+              tableHeaderCell('Wallet'),
+              tableHeaderCell('Due'),
+              tableHeaderCell('Status'),
+              tableHeaderCell('Amount', align: pw.TextAlign.right),
+            ],
+          ),
+        ];
+
+        for (var index = 0; index < udharEntries.length; index++) {
+          final entry = udharEntries[index];
+          final isReceive = entry.type == 'lent';
+          final direction = isReceive ? 'To receive' : 'To pay';
+          final directionColor = isReceive ? receiveColor : payableColor;
+          final directionBg = isReceive ? receiveBg : payableBg;
+          final status = udharStatus(entry);
+          rows.add(
+            pw.TableRow(
+              decoration: pw.BoxDecoration(
+                color: index.isEven ? PdfColors.white : alternateRow,
+                border: const pw.Border(
+                  bottom: pw.BorderSide(color: softBorder, width: 0.5),
+                ),
+              ),
+              children: [
+                bodyCell(shortTitle(entry.borrowerName, max: 24), bold: true),
+                pw.Padding(
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                  child: pill(direction, directionColor, directionBg),
+                ),
+                bodyCell(shortTitle(udharWallet(entry), max: 18)),
+                bodyCell(dueLabel(entry)),
+                pw.Padding(
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                  child: pill(
+                    status,
+                    statusColor(status),
+                    statusBackground(status),
+                  ),
+                ),
+                bodyCell(
+                  entry.amount.toStringAsFixed(2),
+                  color: directionColor,
+                  align: pw.TextAlign.right,
+                  bold: true,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return pw.Table(
+          columnWidths: const {
+            0: pw.FlexColumnWidth(1.6),
+            1: pw.FixedColumnWidth(70),
+            2: pw.FlexColumnWidth(1.2),
+            3: pw.FixedColumnWidth(70),
+            4: pw.FixedColumnWidth(60),
+            5: pw.FixedColumnWidth(66),
+          },
+          defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+          children: rows,
+        );
+      }
 
       pdf.addPage(
         pw.MultiPage(
           maxPages: 1000,
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(40),
+          margin: const pw.EdgeInsets.fromLTRB(34, 34, 34, 30),
+          footer: (context) => pw.Container(
+            margin: const pw.EdgeInsets.only(top: 10),
+            padding: const pw.EdgeInsets.only(top: 6),
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(
+                top: pw.BorderSide(color: softBorder, width: 0.5),
+              ),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Likhlo Financial Statement',
+                  style: const pw.TextStyle(fontSize: 7.5, color: mutedText),
+                ),
+                pw.Text(
+                  'Page ${context.pageNumber} of ${context.pagesCount}',
+                  style: const pw.TextStyle(fontSize: 7.5, color: mutedText),
+                ),
+              ],
+            ),
+          ),
           build: (pw.Context context) {
             return [
-              pw.Row(
+              pw.Container(
+                padding: const pw.EdgeInsets.only(bottom: 12),
+                decoration: const pw.BoxDecoration(
+                  border: pw.Border(
+                    bottom: pw.BorderSide(color: softBorder, width: 1),
+                  ),
+                ),
+                child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text("LIKHLO",
-                              style: pw.TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: pdfPrimaryColor)),
-                          pw.SizedBox(height: 4),
-                          pw.Text("Main Financial Statement",
-                              style: const pw.TextStyle(
-                                  fontSize: 14, color: PdfColors.grey700)),
-                        ]),
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'LIKHLO',
+                          style: pw.TextStyle(
+                            fontSize: 27,
+                            fontWeight: pw.FontWeight.bold,
+                            color: pdfPrimaryColor,
+                          ),
+                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Text(
+                          'Financial Statement',
+                          style: const pw.TextStyle(
+                            fontSize: 13,
+                            color: pageText,
+                          ),
+                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Text(
+                          '${expenses.length} ledger entries'
+                          '${udharEntries.isNotEmpty ? ' + ${udharEntries.length} Udhar records' : ''}',
+                          style: const pw.TextStyle(
+                            fontSize: 8.5,
+                            color: mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
                     pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.end,
-                        children: [
-                          pw.Text(
-                              settings.userName.isNotEmpty
-                                  ? settings.userName
-                                  : "Student Account",
-                              style: pw.TextStyle(
-                                  fontWeight: pw.FontWeight.bold,
-                                  fontSize: 14)),
-                          pw.Text(dateStr,
-                              style: const pw.TextStyle(
-                                  fontSize: 12, color: PdfColors.grey600)),
-                        ])
-                  ]),
-              pw.SizedBox(height: 20),
-              pw.Row(children: [
-                amountCard('Total amount', totalAmount, pdfPrimaryColor),
-                pw.SizedBox(width: 8),
-                amountCard('Expenses', totalSpent, const PdfColor.fromInt(0xFFDC2626)),
-                pw.SizedBox(width: 8),
-                amountCard('Remaining', remaining, const PdfColor.fromInt(0xFF15803D)),
-              ]),
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          settings.userName.isNotEmpty
+                              ? settings.userName
+                              : 'Student Account',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 12,
+                            color: pageText,
+                          ),
+                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Text(
+                          dateStr,
+                          style: const pw.TextStyle(
+                            fontSize: 9,
+                            color: mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 14),
+              pw.Row(
+                children: [
+                  amountCard('Total amount', totalAmount, pdfPrimaryColor),
+                  pw.SizedBox(width: 7),
+                  amountCard('Expenses', totalSpent, expenseColor),
+                  pw.SizedBox(width: 7),
+                  amountCard('Income', totalIncome, incomeColor),
+                  pw.SizedBox(width: 7),
+                  amountCard('Remaining', remaining, incomeColor),
+                ],
+              ),
               if (categories.isNotEmpty) ...[
                 pw.SizedBox(height: 18),
-                pw.Text('Spending by category', style: pw.TextStyle(
-                    fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 7),
-                pw.Wrap(spacing: 12, runSpacing: 7, children: [
-                  for (var i = 0; i < categories.length && i < 5; i++)
-                    pw.Row(mainAxisSize: pw.MainAxisSize.min, children: [
-                      pw.Container(width: 7, height: 7, color: categoryColors[i]),
-                      pw.SizedBox(width: 4),
-                      pw.Text('${shortTitle(categories[i].key)}  Rs. ${categories[i].value.toStringAsFixed(0)}',
-                        style: pw.TextStyle(fontSize: 9, color: categoryColors[i])),
-                    ]),
-                ]),
-              ],
-              pw.SizedBox(height: 22),
-              pw.Text("Transaction History",
-                  style: pw.TextStyle(
-                      fontSize: 16, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 6),
-              pw.Row(children: [
-                for (final item in <(String, PdfColor)>[
-                  ('Expense', const PdfColor.fromInt(0xFFDC2626)),
-                  ('Income', const PdfColor.fromInt(0xFF15803D)),
-                  ('Transfer', const PdfColor.fromInt(0xFF2563EB)),
-                ]) ...[
-                  pw.Container(width: 7, height: 7, color: item.$2),
-                  pw.SizedBox(width: 4),
-                  pw.Text(item.$1, style: pw.TextStyle(fontSize: 9, color: item.$2)),
-                  pw.SizedBox(width: 14),
-                ],
-              ]),
-              pw.SizedBox(height: 10),
-              pw.TableHelper.fromTextArray(
-                context: context,
-                border: const pw.TableBorder(
-                  horizontalInside:
-                      pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                  bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                ),
-                headerStyle: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                headerDecoration: const pw.BoxDecoration(color: pdfPrimaryColor),
-                rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-                cellPadding:
-                    const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                columnWidths: const {
-                  0: pw.FixedColumnWidth(77),
-                  1: pw.FixedColumnWidth(135),
-                  2: pw.FixedColumnWidth(62),
-                  3: pw.FixedColumnWidth(102),
-                  4: pw.FixedColumnWidth(74),
-                },
-                headers: const [
-                  'Date',
-                  'Title',
-                  'Type',
-                  'Category',
-                  'Amount (Rs)'
-                ],
-                data: expenses
-                    .map((e) => [
-                          DateFormat('dd MMM yyyy').format(e.date),
-                          shortTitle(e.title),
-                          e.category == 'Transfer' ? 'Transfer' : e.type == 'income' ? 'Income' : 'Expense',
-                          shortTitle(e.category),
-                          e.amount.toStringAsFixed(2)
-                        ])
-                    .toList(),
-              ),
-              pw.SizedBox(height: 16),
-              pw.Divider(color: PdfColors.grey400),
-              pw.SizedBox(height: 8),
-              pw.Center(
-                  child: pw.Text(
-                      "Generated securely via Likhlo Expense Manager.",
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'Spending by category',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                        color: pageText,
+                      ),
+                    ),
+                    pw.Text(
+                      '${categories.length} categories',
                       style: const pw.TextStyle(
-                          fontSize: 10, color: PdfColors.grey600)))
+                        fontSize: 8,
+                        color: mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+                pw.Wrap(
+                  spacing: 7,
+                  runSpacing: 6,
+                  children: [
+                    for (final category in categories)
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          color: categoryBg(category.key),
+                          borderRadius: const pw.BorderRadius.all(
+                            pw.Radius.circular(10),
+                          ),
+                        ),
+                        child: pw.Row(
+                          mainAxisSize: pw.MainAxisSize.min,
+                          children: [
+                            pw.Container(
+                              width: 6,
+                              height: 6,
+                              decoration: pw.BoxDecoration(
+                                color: categoryColor(category.key),
+                                shape: pw.BoxShape.circle,
+                              ),
+                            ),
+                            pw.SizedBox(width: 4),
+                            pw.Text(
+                              '${shortTitle(category.key, max: 18)}  Rs. ${category.value.toStringAsFixed(0)}',
+                              style: pw.TextStyle(
+                                fontSize: 7.5,
+                                color: categoryColor(category.key),
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'Transaction History',
+                    style: pw.TextStyle(
+                      fontSize: 15,
+                      fontWeight: pw.FontWeight.bold,
+                      color: pageText,
+                    ),
+                  ),
+                  pw.Text(
+                    '${expenses.length} entries',
+                    style: const pw.TextStyle(
+                      fontSize: 8,
+                      color: mutedText,
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 5),
+              pw.Wrap(
+                spacing: 9,
+                runSpacing: 4,
+                children: [
+                  pill('Expense', expenseColor, expenseBg),
+                  pill('Income', incomeColor, incomeBg),
+                  pill('Transfer', transferColor, transferBg),
+                ],
+              ),
+              pw.SizedBox(height: 9),
+              if (expenses.isEmpty)
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(14),
+                  color: softSurface,
+                  child: pw.Text(
+                    'No ledger transactions available.',
+                    style: const pw.TextStyle(fontSize: 9, color: mutedText),
+                  ),
+                )
+              else
+                transactionTable(),
+              if (udharEntries.isNotEmpty) ...[
+                pw.SizedBox(height: 22),
+                pw.Container(
+                  padding: const pw.EdgeInsets.fromLTRB(11, 10, 11, 10),
+                  decoration: pw.BoxDecoration(
+                    color: const PdfColor.fromInt(0xFFFFFBEB),
+                    borderRadius:
+                        const pw.BorderRadius.all(pw.Radius.circular(5)),
+                    border: const pw.Border(
+                      left: pw.BorderSide(color: activeColor, width: 3),
+                    ),
+                  ),
+                  child: pw.Row(
+                    children: [
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'Udhar / Debt',
+                              style: pw.TextStyle(
+                                fontSize: 14,
+                                fontWeight: pw.FontWeight.bold,
+                                color: pageText,
+                              ),
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              'Tracked separately from normal spending so debt movements are not counted twice.',
+                              style: const pw.TextStyle(
+                                fontSize: 8,
+                                color: mutedText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.Text(
+                        '${activeUdhar.length} active',
+                        style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                          color: activeColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 9),
+                pw.Row(
+                  children: [
+                    amountCard('To receive', udharReceivable, receiveColor),
+                    pw.SizedBox(width: 7),
+                    amountCard('To pay', udharPayable, payableColor),
+                    pw.SizedBox(width: 7),
+                    metricCard(
+                      'Udhar records',
+                      '${udharEntries.length}',
+                      activeColor,
+                      subtitle:
+                          '${udharEntries.where((entry) => entry.settledAt != null).length} settled',
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 9),
+                udharTable(),
+              ],
+              pw.SizedBox(height: 14),
+              pw.Center(
+                child: pw.Text(
+                  'Generated securely via Likhlo Expense Manager.',
+                  style: const pw.TextStyle(
+                    fontSize: 8,
+                    color: mutedText,
+                  ),
+                ),
+              ),
             ];
           },
         ),
@@ -878,15 +1543,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       final bytes = await pdf.save();
       await Printing.layoutPdf(
-          onLayout: (format) async => bytes,
-          name: 'Likhlo_Statement_$dateStr.pdf');
+        onLayout: (format) async => bytes,
+        name: 'Likhlo_Statement_$dateStr.pdf',
+      );
     } catch (error) {
       debugPrint('PDF export failed: $error');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Could not export the report. Please try again.')),
+          content: Text('Could not export the report. Please try again.'),
+        ),
       );
     }
   }
+
 }
