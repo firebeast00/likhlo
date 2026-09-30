@@ -121,12 +121,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<ExpenseState>(expenseProvider, (_, __) {
-      _queuePersistentNotificationUpdate();
-    });
-    ref.listen<List<Wallet>>(walletProvider, (_, __) {
-      _queuePersistentNotificationUpdate();
-    });
+    ref.listen<PersistentNotificationSnapshot>(
+      persistentNotificationSnapshotProvider,
+      (_, next) {
+        _queuePersistentNotificationUpdate(snapshot: next);
+      },
+    );
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
