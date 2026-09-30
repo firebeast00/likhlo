@@ -52,6 +52,7 @@ part '../features/dashboard/dashboard_categories.dart';
 part '../features/dashboard/dashboard_transaction_form.dart';
 part '../features/dashboard/dashboard_feedback_methods.dart';
 part '../features/dashboard/dashboard_transaction_widgets.dart';
+part '../features/dashboard/dashboard_performance_sections.dart';
 part '../features/dashboard/dashboard_category_widgets.dart';
 part '../features/dashboard/dashboard_smart_input_widget.dart';
 part '../features/dashboard/dashboard_wallet_actions.dart';
