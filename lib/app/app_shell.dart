@@ -13,7 +13,7 @@ import '../widgets/app_drawer.dart';
 /// represented here.
 enum AppSection {
   dashboard('Dashboard'),
-  budget('Budget Planner'),
+  budget('Monthly Plan'),
   stats('Stats'),
   settings('Settings'),
   trash('Trash'),
@@ -25,6 +25,7 @@ enum AppSection {
 
   static AppSection? fromLabel(String value) {
     final normalized = value.trim().toLowerCase();
+    if (normalized == 'budget planner') return AppSection.budget;
     for (final section in AppSection.values) {
       if (section.label.toLowerCase() == normalized) return section;
     }
