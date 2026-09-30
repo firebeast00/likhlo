@@ -52,7 +52,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       VoiceEntryController.sessionLimit,
           () => unawaited(_finishSpeechSession()),
     );
-    setState(() => _isListening = true);
+    _setListening(true);
     unawaited(HapticFeedback.mediumImpact());
     await _startSpeechListening();
   }
@@ -165,7 +165,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       _voiceEntry.session.onRecognizerError(retryable: false);
       _cancelSpeechTimers();
       _smartInputCtrl.clear();
-      setState(() => _isListening = false);
+      _setListening(false);
       _showTransactionError(
         'Voice recognition could not start. Check microphone permission and the phone\'s speech-recognition service.',
         title: 'Voice Log unavailable',
@@ -304,7 +304,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       _restartingSpeech = false;
     }
     if (!mounted) return;
-    if (_isListening) setState(() => _isListening = false);
+    if (_isListening) _setListening(false);
     await _applySpeechDecision(decision);
   }
 
@@ -327,7 +327,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     }
     if (!mounted) return;
     _handlingSpeechError = false;
-    if (!_isListening) setState(() => _isListening = true);
+    if (!_isListening) _setListening(true);
     _traceSpeechEvent(
       'restart',
       transcript: _voiceEntry.session.latestDraft,
@@ -419,7 +419,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     }
 
     _cancelSpeechTimers();
-    setState(() => _isListening = false);
+    _setListening(false);
 
     if (decision.action == SpeechSessionAction.processFinal) {
       await _applySpeechDecision(decision);
@@ -465,7 +465,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       case SpeechSessionAction.processFinal:
         if (_isProcessingVoiceCommand) return;
         _cancelSpeechTimers();
-        setState(() => _isListening = false);
+        _setListening(false);
         _voiceEntry.session.markProcessing();
         _isProcessingVoiceCommand = true;
         try {
@@ -486,7 +486,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         return;
       case SpeechSessionAction.discardDraft:
         _cancelSpeechTimers();
-        setState(() => _isListening = false);
+        _setListening(false);
         _smartInputCtrl.clear();
         _voiceEntry.session.reset();
         _showTransactionError(
@@ -497,7 +497,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       case SpeechSessionAction.none:
         if (_voiceEntry.session.state == SpeechSessionState.failed) {
           _cancelSpeechTimers();
-          if (_isListening) setState(() => _isListening = false);
+          if (_isListening) _setListening(false);
           _smartInputCtrl.clear();
           _voiceEntry.session.reset();
           _showTransactionError(
