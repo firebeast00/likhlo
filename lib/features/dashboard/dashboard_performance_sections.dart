@@ -14,6 +14,9 @@ class _DashboardHeroSection extends ConsumerWidget {
     final totalAvailable = ref.watch(totalAvailableProvider);
     final spent = ref.watch(monthlySpentProvider(focusedMonth));
     final wallets = ref.watch(walletProvider);
+    // Total balance is unchanged by transfers, but individual wallet pills are
+    // not. Keep this section subscribed to movement-map identity.
+    ref.watch(walletMovementsProvider);
     final primaryColor = Theme.of(context).colorScheme.primary;
     return owner._buildHeroCard(
       totalAvailable,
