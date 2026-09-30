@@ -221,11 +221,36 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     SpeechCommandCompleteness completeness, {
     required bool isFinal,
   }) {
+    if (transcript.isEmpty) {
+      _speechStabilityTimer?.cancel();
+      _speechStabilityTimer = null;
+      _speechStableTranscript = '';
+      _speechStableReason = '';
+      return;
+    }
+
+    if (_speechStableTranscript == transcript &&
+        _speechStableReason == completeness.reason &&
+        (_speechStabilityTimer?.isActive ?? false)) {
+      return;
+    }
+
     _speechStabilityTimer?.cancel();
-    if (transcript.isEmpty) return;
+    _speechStableTranscript = transcript;
+    _speechStableReason = completeness.reason;
+
+    final fastReadOnly = completeness.isComplete &&
+        const {
+          'query_metric',
+          'navigation_target',
+          'app_control',
+        }.contains(completeness.reason);
+    final window = fastReadOnly
+        ? VoiceEntryController.readOnlyStabilityWindow
+        : VoiceEntryController.stabilityWindow;
 
     final stableTranscript = transcript;
-    _speechStabilityTimer = Timer(VoiceEntryController.stabilityWindow, () async {
+    _speechStabilityTimer = Timer(window, () async {
       if (!mounted ||
           _restartingSpeech ||
           _voiceEntry.session.state != SpeechSessionState.listening ||
@@ -241,6 +266,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         transcript: stableTranscript,
         completeness: currentCompleteness,
       );
+      _speechStableTranscript = '';
+      _speechStableReason = '';
       if (decision.action != SpeechSessionAction.none) {
         await _stopRecognizerThenApply(decision);
       }
@@ -312,6 +339,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
   void _cancelSpeechTimers() {
     _speechStabilityTimer?.cancel();
     _speechStabilityTimer = null;
+    _speechStableTranscript = '';
+    _speechStableReason = '';
     _speechDeadlineTimer?.cancel();
     _speechDeadlineTimer = null;
     _speechStartupTimer?.cancel();
