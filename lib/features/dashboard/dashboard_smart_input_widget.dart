@@ -5,6 +5,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
       Color primaryColor,
       bool isDark,
       List<Wallet> wallets,
+      String smartEntryLanguage,
       ) {
     final cardColor = Theme.of(context).cardColor;
     final inputColor = isDark
@@ -124,7 +125,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
               decoration: InputDecoration(
                 hintText: _isListening
                     ? 'Listening…'
-                    : ref.watch(settingsProvider).smartEntryLanguage == 'romanUrdu'
+                    : smartEntryLanguage == 'romanUrdu'
                         ? 'Misal: 500 biryani par kharch kiya'
                         : 'e.g. 500 biryani from JazzCash',
                 hintStyle: TextStyle(
