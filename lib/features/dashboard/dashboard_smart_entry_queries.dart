@@ -12,7 +12,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         id: wallet.id,
         name: wallet.name,
         type: wallet.walletType,
-        availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+        availableBalance: ref.read(walletBalanceProvider(wallet.id)),
         isBackup: wallet.isBackup,
       ),
     )
@@ -253,7 +253,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         id: wallet.id,
         name: wallet.name,
         type: wallet.walletType,
-        availableBalance: walletNotifier.getBalanceForWallet(wallet.id),
+        availableBalance: ref.read(walletBalanceProvider(wallet.id)),
         isBackup: wallet.isBackup,
       ),
     )
@@ -272,10 +272,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
 
     if (metric == SmartEntryQueryMetric.balance) {
       if (mentionedIds.isEmpty) {
-        final total = wallets.fold<double>(
-          0,
-              (sum, wallet) => sum + walletNotifier.getBalanceForWallet(wallet.id),
-        );
+        final total = ref.read(totalAvailableProvider);
         _showTransactionInfo(
           'Rs. ${total.toStringAsFixed(0)} across ${wallets.length} wallet${wallets.length == 1 ? '' : 's'}.',
           title: 'Total wallet balance',
@@ -284,7 +281,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         final wallet = wallets.firstWhere(
               (item) => item.id == mentionedIds.single,
         );
-        final balance = walletNotifier.getBalanceForWallet(wallet.id);
+        final balance = ref.read(walletBalanceProvider(wallet.id));
         _showTransactionInfo(
           'Rs. ${balance.toStringAsFixed(0)} available.',
           title: '${wallet.name} balance',
