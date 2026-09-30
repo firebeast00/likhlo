@@ -5,6 +5,7 @@ import 'package:student_expense_manager/app/app_shell.dart';
 
 void main() {
   test('AppSection resolves supported drawer labels', () {
+    expect(AppSection.fromLabel('Monthly Plan'), AppSection.budget);
     expect(AppSection.fromLabel('Budget Planner'), AppSection.budget);
     expect(AppSection.fromLabel('Stats'), AppSection.stats);
     expect(AppSection.fromLabel('settings'), AppSection.settings);
