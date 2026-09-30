@@ -1070,6 +1070,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       pw.Widget transactionTable() {
         final rows = <pw.TableRow>[
           pw.TableRow(
+            repeat: true,
             decoration: const pw.BoxDecoration(color: pdfPrimaryColor),
             children: [
               tableHeaderCell('Date'),
@@ -1173,6 +1174,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       pw.Widget udharTable() {
         final rows = <pw.TableRow>[
           pw.TableRow(
+            repeat: true,
             decoration: const pw.BoxDecoration(color: pdfPrimaryColor),
             children: [
               tableHeaderCell('Person'),
