@@ -5,7 +5,6 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       ParsedSmartEntryCommand command,
       ) async {
     final wallets = ref.read(walletProvider);
-    final walletNotifier = ref.read(walletProvider.notifier);
     final accounts = wallets
         .map(
           (wallet) => SmartEntryAccount(
