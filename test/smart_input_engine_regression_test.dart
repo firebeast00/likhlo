@@ -51,6 +51,99 @@ void main() {
     });
   });
 
+  group('daily read-only commands', () {
+    test('routes dark mode controls without creating transactions', () {
+      final on = engine.parse('dark mode on', categories);
+      final off = engine.parse('dark mode band krdo', categories);
+      final light = engine.parse('light mode karo', categories);
+
+      expect(on.parsed.intent, SmartEntryIntent.appControl);
+      expect(on.parsed.appAction, SmartEntryAppAction.darkModeOn);
+      expect(on.command, isA<ReadOnlySmartCommand>());
+      expect(on.parsed.amount, 0);
+
+      expect(off.parsed.intent, SmartEntryIntent.appControl);
+      expect(off.parsed.appAction, SmartEntryAppAction.darkModeOff);
+      expect(off.command, isA<ReadOnlySmartCommand>());
+
+      expect(light.parsed.intent, SmartEntryIntent.appControl);
+      expect(light.parsed.appAction, SmartEntryAppAction.darkModeOff);
+    });
+
+    test('understands monthly and daily summary phrases', () {
+      final roman =
+          engine.parse('is mahine ka hisaab dikhao', categories);
+      final english =
+          engine.parse('show total summary of month', categories);
+      final today = engine.parse('aaj ka summary', categories);
+
+      expect(roman.parsed.intent, SmartEntryIntent.query);
+      expect(roman.parsed.queryMetric, SmartEntryQueryMetric.summary);
+      expect(roman.parsed.timeRange, SmartEntryTimeRange.thisMonth);
+
+      expect(english.parsed.queryMetric, SmartEntryQueryMetric.summary);
+      expect(english.parsed.timeRange, SmartEntryTimeRange.thisMonth);
+
+      expect(today.parsed.queryMetric, SmartEntryQueryMetric.summary);
+      expect(today.parsed.timeRange, SmartEntryTimeRange.today);
+    });
+
+    test('understands common Roman Urdu balance and income questions', () {
+      final balance =
+          engine.parse('mere paas kitne paise hain', categories);
+      final income =
+          engine.parse('is mahine kitna paisa aya', categories);
+
+      expect(balance.parsed.intent, SmartEntryIntent.query);
+      expect(balance.parsed.queryMetric, SmartEntryQueryMetric.balance);
+
+      expect(income.parsed.intent, SmartEntryIntent.query);
+      expect(income.parsed.queryMetric, SmartEntryQueryMetric.income);
+      expect(income.parsed.timeRange, SmartEntryTimeRange.thisMonth);
+    });
+
+    test('opens new navigation targets with Roman Urdu aliases', () {
+      final plan =
+          engine.parse('mahine ka plan dikhado', categories);
+      final trash =
+          engine.parse('deleted entries dikhado', categories);
+      final wallets = engine.parse('accounts dikhao', categories);
+
+      expect(plan.parsed.intent, SmartEntryIntent.navigate);
+      expect(plan.parsed.navigationTarget, 'Monthly Plan');
+      expect(trash.parsed.intent, SmartEntryIntent.navigate);
+      expect(trash.parsed.navigationTarget, 'Trash');
+      expect(wallets.parsed.intent, SmartEntryIntent.navigate);
+      expect(wallets.parsed.navigationTarget, 'Wallets');
+    });
+
+    test('routes Udhar questions to dedicated read-only metrics', () {
+      final summary =
+          engine.parse('udhar ka hisaab batao', categories);
+      final receive =
+          engine.parse('mujhe kitna udhar wapas lena hai', categories);
+      final pay =
+          engine.parse('mujhe kitna udhar wapas dena hai', categories);
+
+      expect(summary.parsed.intent, SmartEntryIntent.query);
+      expect(summary.parsed.queryMetric, SmartEntryQueryMetric.udharSummary);
+      expect(receive.parsed.queryMetric,
+          SmartEntryQueryMetric.udharReceivable);
+      expect(pay.parsed.queryMetric, SmartEntryQueryMetric.udharPayable);
+    });
+
+    test('existing transaction and search commands keep their paths', () {
+      final expense = engine.parse('500 petrol', categories);
+      final deletion = engine.parse('delete burger', categories);
+      final search = engine.parse('petrol wali entries dikhao', categories);
+
+      expect(expense.parsed.intent, SmartEntryIntent.addExpense);
+      expect(expense.command, isA<AddSmartTransactionCommand>());
+      expect(deletion.parsed.intent, SmartEntryIntent.deleteEntry);
+      expect(search.parsed.intent, SmartEntryIntent.searchEntries);
+    });
+  });
+
   group('field-specific edits', () {
     test('title edits create only a title patch', () {
       final cases = <String, List<String>>{
