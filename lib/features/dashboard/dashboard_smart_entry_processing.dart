@@ -10,6 +10,73 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     if (normalized.isEmpty) return false;
 
     final categories = ref.read(categoryProvider);
+
+    if (source == SmartInputSource.typed || source == SmartInputSource.voice) {
+      final wallets = ref.read(walletProvider);
+      final walletNotifier = ref.read(walletProvider.notifier);
+      final accounts = wallets
+          .map(
+            (wallet) => SmartEntryAccount(
+              id: wallet.id,
+              name: wallet.name,
+              type: wallet.walletType,
+              availableBalance:
+                  walletNotifier.getBalanceForWallet(wallet.id),
+              isBackup: wallet.isBackup,
+            ),
+          )
+          .toList(growable: false);
+
+      final batchAttempt = ref.read(smartEntryBatchControllerProvider).tryBuild(
+            rawText: normalized,
+            categories: categories,
+            source: source,
+            accounts: accounts,
+            preferredAccountId: _selectedSmartEntryWallet(wallets)?.id,
+          );
+
+      if (batchAttempt.status == SmartEntryBatchStatus.poisoned) {
+        _showTransactionError(
+          batchAttempt.reason ??
+              'One of the detected entries could not be safely interpreted. Nothing was saved.',
+          title: 'Multiple entries not saved',
+        );
+        return false;
+      }
+
+      if (batchAttempt.status == SmartEntryBatchStatus.ready &&
+          batchAttempt.draft != null) {
+        if (wallets.isEmpty) {
+          _showTransactionError(
+            'Create a Cash or JazzCash wallet before using Smart Entry.',
+            title: 'Wallet required',
+          );
+          return false;
+        }
+
+        final confirmed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => BatchTransactionReviewScreen(
+              draft: batchAttempt.draft!,
+            ),
+          ),
+        );
+        if (!mounted) return false;
+
+        if (confirmed == true) {
+          _smartInputCtrl.clear();
+          FocusScope.of(context).unfocus();
+          _showTransactionSuccess(
+            'The reviewed entries were saved together.',
+            title: 'Entries saved',
+          );
+          unawaited(HapticFeedback.lightImpact());
+          return true;
+        }
+        return false;
+      }
+    }
+
     final plan = ref.read(smartEntryControllerProvider).parse(
       normalized,
       categories,
