@@ -406,7 +406,15 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     setState(() => _isListening = false);
     try {
       final result = decision ?? _speechSession.onRecognizerStopped();
-      await _speech.stop();
+      final fastValidatedFinal =
+          finalResult &&
+          decision?.action == SpeechSessionAction.processFinal &&
+          decision!.transcript.isNotEmpty;
+      if (fastValidatedFinal) {
+        unawaited(_speech.stop().catchError((_) {}));
+      } else {
+        await _speech.stop();
+      }
       if (!mounted) return;
       if (result.action == SpeechSessionAction.processFinal &&
           result.transcript.isNotEmpty) {
