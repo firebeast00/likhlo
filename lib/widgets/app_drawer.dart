@@ -163,6 +163,13 @@ class AppDrawer extends ConsumerWidget {
                             children: [
                               _buildDrawerItem(
                                 context,
+                                'Budget Planner',
+                                Icons.savings_outlined,
+                                primaryColor,
+                                isDark,
+                              ),
+                              _buildDrawerItem(
+                                context,
                                 'Stats',
                                 Icons.insights_rounded,
                                 primaryColor,
