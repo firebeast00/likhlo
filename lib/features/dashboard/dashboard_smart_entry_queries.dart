@@ -124,6 +124,48 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     unawaited(HapticFeedback.lightImpact());
   }
 
+  Future<void> _handleSmartEntryAppControl(
+    ParsedSmartEntryCommand command,
+  ) async {
+    final action = command.appAction;
+    if (action == null) {
+      _showTransactionInfo(
+        'Try dark mode on, dark mode off, or toggle dark mode.',
+        title: 'App control not recognized',
+      );
+      return;
+    }
+
+    final settings = ref.read(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    final currentlyDark = settings.themeMode == 'dark';
+
+    late final bool enableDark;
+    switch (action) {
+      case SmartEntryAppAction.darkModeOn:
+        enableDark = true;
+        break;
+      case SmartEntryAppAction.darkModeOff:
+        enableDark = false;
+        break;
+      case SmartEntryAppAction.darkModeToggle:
+        enableDark = !currentlyDark;
+        break;
+    }
+
+    _smartInputCtrl.clear();
+    if (currentlyDark != enableDark) {
+      notifier.updateThemeMode(enableDark ? 'dark' : 'light');
+    }
+    if (!mounted) return;
+    _showTransactionInfo(
+      enableDark
+          ? 'Dark mode is now enabled.'
+          : 'Light mode is now enabled.',
+      title: enableDark ? 'Dark mode on' : 'Dark mode off',
+    );
+  }
+
   void _handleSmartEntryQuery(ParsedSmartEntryCommand command) {
     final metric = command.queryMetric;
     if (metric == null) {
@@ -199,7 +241,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         command.confidenceByField['category']! >= 0.8;
     if (hasCategory) {
       entries = entries.where((entry) => entry.category == command.category);
-    } else {
+    } else if (metric != SmartEntryQueryMetric.summary) {
       final title = _smartQueryTitle(command.title);
       if (title.isNotEmpty) {
         entries = entries.where(
@@ -246,6 +288,33 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
           title: '$count transactions · $period',
         );
         break;
+      case SmartEntryQueryMetric.summary:
+        final expenseEntries =
+            matching.where((entry) => entry.type == 'expense').toList();
+        final byCategory = <String, double>{};
+        for (final entry in expenseEntries) {
+          byCategory.update(
+            entry.category,
+            (value) => value + entry.amount,
+            ifAbsent: () => entry.amount,
+          );
+        }
+        MapEntry<String, double>? topCategory;
+        for (final entry in byCategory.entries) {
+          if (topCategory == null || entry.value > topCategory.value) {
+            topCategory = entry;
+          }
+        }
+        final topText = topCategory == null
+            ? 'No expense category yet.'
+            : 'Top: ${topCategory.key} Rs. ${topCategory.value.toStringAsFixed(0)}.';
+        _showTransactionInfo(
+          'Income Rs. ${income.toStringAsFixed(0)} · Spent Rs. ${spending.toStringAsFixed(0)} · '
+          'Net Rs. ${(income - spending).toStringAsFixed(0)} · '
+          '${matching.length} entr${matching.length == 1 ? 'y' : 'ies'}. $topText',
+          title: 'Financial summary · $period',
+        );
+        break;
       case SmartEntryQueryMetric.balance:
         break;
     }
@@ -286,7 +355,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final target = command.navigationTarget;
     if (target == null) {
       _showTransactionInfo(
-        'Try Home, Stats, Wallets, Udhaar, Settings, or About.',
+        'Try Home, Wallets, Udhaar, Monthly Plan, Stats, Settings, Trash, or About.',
         title: 'Screen not recognized',
       );
       return;
@@ -310,7 +379,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       return;
     }
     _showTransactionInfo(
-      'Try Home, Stats, Wallets, Udhaar, Settings, or About.',
+      'Try Home, Wallets, Udhaar, Monthly Plan, Stats, Settings, Trash, or About.',
       title: 'Screen not recognized',
     );
   }
