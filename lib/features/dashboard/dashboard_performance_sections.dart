@@ -12,7 +12,7 @@ class _DashboardHeroSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final totalAvailable = ref.watch(totalAvailableProvider);
-    final spent = ref.watch(monthlyLedgerProvider(focusedMonth)).spent;
+    final spent = ref.watch(monthlySpentProvider(focusedMonth));
     final wallets = ref.watch(walletProvider);
     final primaryColor = Theme.of(context).colorScheme.primary;
     return owner._buildHeroCard(
@@ -93,7 +93,7 @@ class _DashboardTransactionSection extends StatelessWidget {
               );
               source = visibleTransactions(allExpenses);
             } else {
-              source = ref.watch(monthlyLedgerProvider(focusedMonth)).transactions;
+              source = ref.watch(monthlyTransactionsProvider(focusedMonth));
             }
 
             var displayExpenses = List<Expense>.from(source);
