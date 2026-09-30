@@ -17,6 +17,14 @@ void main() {
       expect(result, ['500 petrol', '200 chai', '1200 zong package']);
     });
 
+    test('supports scaled numeric amounts behind the intent gate', () {
+      final result = parser.tryParseBatch(
+        '1.5k petrol aur 2k chai',
+      );
+
+      expect(result, ['1.5k petrol', '2k chai']);
+    });
+
     test('keeps comma-formatted large amounts as one anchor', () {
       final result = parser.tryParseBatch(
         '1200000 hostel fee and 1,200,000 tuition fee',
