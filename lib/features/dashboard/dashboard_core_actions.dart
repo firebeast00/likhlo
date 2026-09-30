@@ -2,12 +2,18 @@ part of '../../screens/home_screen.dart';
 
 extension _DashboardCoreActions on _HomeScreenState {
   void _queuePersistentNotificationUpdate({
-    Duration delay = const Duration(milliseconds: 350),
+    Duration delay = const Duration(milliseconds: 700),
+    PersistentNotificationSnapshot? snapshot,
   }) {
     _notificationUpdateTimer?.cancel();
     _notificationUpdateTimer = Timer(delay, () async {
       if (!mounted) return;
-      await NotificationService().refreshPersistentStatusBarWidget();
+      final current =
+          snapshot ?? ref.read(persistentNotificationSnapshotProvider);
+      await NotificationService().updatePersistentStatusBarWidget(
+        remainingToday: current.remainingToday,
+        spentToday: current.spentToday,
+      );
     });
   }
 
