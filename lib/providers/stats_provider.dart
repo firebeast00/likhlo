@@ -20,32 +20,54 @@ class ExpenseStats {
   });
 }
 
-// The Provider that does all the math
+// Watches only the six month buckets used by this screen. Transactions added
+// outside this window no longer invalidate the Stats calculations.
 final statsProvider = Provider<ExpenseStats>((ref) {
-  final allExpenses = ref.watch(expenseProvider).allExpenses;
   final linkedUdhaarIds = linkedUdharLedgerIds();
   final now = DateTime.now();
 
+  final months = List<DateTime>.generate(
+    6,
+    (i) => DateTime(now.year, now.month - 5 + i, 1),
+  );
+  final buckets = <LedgerMonthBucket?>[
+    for (final month in months)
+      ref.watch(
+        expenseProvider.select(
+          (state) => state.index.byMonth[LedgerIndex.monthKey(month)],
+        ),
+      ),
+  ];
+
   final monthlyTotals = List<double>.filled(6, 0);
-  final monthLabels = List<String>.generate(6,
-      (i) => DateFormat.MMM().format(DateTime(now.year, now.month - 5 + i, 1)));
+  final monthLabels = [
+    for (final month in months) DateFormat.MMM().format(month),
+  ];
   final categoryTotals = <String, double>{};
-  double totalSpentThisMonth = 0;
-  double maxMonthTotal = 0;
-  final currentMonth = now.year * 12 + now.month;
-  for (final e in allExpenses) {
-    if (e.type != 'expense' ||
-        e.category == 'Transfer' ||
-        linkedUdhaarIds.contains(e.id)) continue;
-    final age = currentMonth - (e.date.year * 12 + e.date.month);
-    if (age < 0 || age > 5) continue;
-    monthlyTotals[5 - age] += e.amount;
-    if (age == 0) {
-      categoryTotals.update(e.category, (v) => v + e.amount,
-          ifAbsent: () => e.amount);
-      totalSpentThisMonth += e.amount;
+  var totalSpentThisMonth = 0.0;
+  var maxMonthTotal = 0.0;
+
+  for (var i = 0; i < buckets.length; i++) {
+    final bucket = buckets[i];
+    if (bucket == null) continue;
+    for (final entry in bucket.transactions) {
+      if (entry.type != 'expense' ||
+          entry.category == 'Transfer' ||
+          linkedUdhaarIds.contains(entry.id)) {
+        continue;
+      }
+      monthlyTotals[i] += entry.amount;
+      if (i == buckets.length - 1) {
+        categoryTotals.update(
+          entry.category,
+          (value) => value + entry.amount,
+          ifAbsent: () => entry.amount,
+        );
+        totalSpentThisMonth += entry.amount;
+      }
     }
   }
+
   for (final total in monthlyTotals) {
     if (total > maxMonthTotal) maxMonthTotal = total;
   }
