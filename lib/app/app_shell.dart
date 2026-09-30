@@ -33,6 +33,10 @@ enum AppSection {
   }
 }
 
+AppSection? systemBackDestination(AppSection currentSection) {
+  return currentSection == AppSection.dashboard ? null : AppSection.dashboard;
+}
+
 /// Owns the global Scaffold, drawer and top-level section chrome.
 ///
 /// Feature state and business logic deliberately stay outside this widget.
@@ -75,10 +79,11 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _isDashboard,
+      canPop: systemBackDestination(currentSection) == null,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop || _isDashboard) return;
-        onSectionChanged(AppSection.dashboard);
+        if (didPop) return;
+        final destination = systemBackDestination(currentSection);
+        if (destination != null) onSectionChanged(destination);
       },
       child: Scaffold(
         drawer: AppDrawer(
