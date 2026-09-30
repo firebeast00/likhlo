@@ -57,6 +57,7 @@ class BudgetSuggestionEngine {
     required DateTime targetMonth,
     required Iterable<Expense> allTransactions,
     Set<String> excludedTransactionIds = const {},
+    Set<String> rememberedPatternKeys = const {},
     int surpriseLookbackMonths = 3,
   }) {
     final normalizedTarget = DateTime(targetMonth.year, targetMonth.month, 1);
@@ -85,7 +86,11 @@ class BudgetSuggestionEngine {
     final habits = <BudgetSuggestion>[];
 
     for (final group in sourceGroups) {
-      final intent = evaluator.evaluateIntent(group);
+      final key = suggestionKey(group.canonicalTitle, group.category);
+      final remembered = rememberedPatternKeys.contains(key);
+      final intent = remembered
+          ? ExpenseIntent.frequentHabit
+          : evaluator.evaluateIntent(group);
       switch (intent) {
         case ExpenseIntent.fixedBill:
           fixed.add(
@@ -108,8 +113,9 @@ class BudgetSuggestionEngine {
               intent,
               amount: group.totalAmount,
               confidence: _habitConfidence(group),
-              reason:
-                  'Logged ${group.frequency} times last month · Rs. ${group.totalAmount.toStringAsFixed(0)} total',
+              reason: remembered
+                  ? 'Remembered from your plan · Rs. ${group.totalAmount.toStringAsFixed(0)} last month'
+                  : 'Logged ${group.frequency} times last month · Rs. ${group.totalAmount.toStringAsFixed(0)} total',
               selectedByDefault: true,
             ),
           );
@@ -170,16 +176,15 @@ class BudgetSuggestionEngine {
   List<BudgetExpenseGroup> groupExpenses(Iterable<Expense> expenses) {
     final buckets = <String, List<Expense>>{};
     for (final entry in expenses) {
-      final canonicalTitle = _canonicalTitle(entry.title);
-      final key =
-          '${entry.category.trim().toLowerCase()}|${canonicalTitle}';
+      final canonicalTitle = canonicalizeTitle(entry.title);
+      final key = suggestionKey(canonicalTitle, entry.category);
       buckets.putIfAbsent(key, () => <Expense>[]).add(entry);
     }
 
     return buckets.values.map((items) {
       items.sort((a, b) => b.date.compareTo(a.date));
       final first = items.first;
-      final title = _displayTitle(_canonicalTitle(first.title));
+      final title = _displayTitle(canonicalizeTitle(first.title));
       return BudgetExpenseGroup(
         canonicalTitle: title,
         category: first.category,
@@ -198,7 +203,7 @@ class BudgetSuggestionEngine {
     required bool selectedByDefault,
   }) {
     return BudgetSuggestion(
-      id: '${group.category.toLowerCase()}|${_canonicalTitle(group.canonicalTitle)}',
+      id: suggestionKey(group.canonicalTitle, group.category),
       title: group.canonicalTitle,
       category: group.category,
       intent: intent,
@@ -235,7 +240,11 @@ class BudgetSuggestionEngine {
     return (buffered / 100).ceilToDouble() * 100;
   }
 
-  String _canonicalTitle(String value) {
+  String suggestionKey(String title, String category) {
+    return '${category.trim().toLowerCase()}|${canonicalizeTitle(title)}';
+  }
+
+  String canonicalizeTitle(String value) {
     final title = value
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ')
