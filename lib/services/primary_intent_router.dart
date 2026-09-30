@@ -8,7 +8,14 @@ enum RoutedSmartIntent {
   query,
   searchEntries,
   navigate,
+  appControl,
   unknown,
+}
+
+enum RoutedSmartAppAction {
+  darkModeOn,
+  darkModeOff,
+  darkModeToggle,
 }
 
 class PrimaryIntentRoute {
@@ -16,12 +23,14 @@ class PrimaryIntentRoute {
   final double confidence;
   final String rule;
   final String? navigationTarget;
+  final RoutedSmartAppAction? appAction;
 
   const PrimaryIntentRoute({
     required this.intent,
     required this.confidence,
     required this.rule,
     this.navigationTarget,
+    this.appAction,
   });
 }
 
@@ -45,13 +54,25 @@ class PrimaryIntentRouter {
 
     bool has(String pattern) => RegExp(pattern).hasMatch(text);
 
+    final appAction = _appAction(text);
+    if (appAction != null) {
+      return PrimaryIntentRoute(
+        intent: RoutedSmartIntent.appControl,
+        confidence: 0.995,
+        rule: 'explicit_app_control',
+        appAction: appAction,
+      );
+    }
+
     final navigationTarget = _navigationTarget(text);
     final hasStrongNavigationTrigger = has(
-      r'\b(open|goto|go\s+to|take\s+me\s+to|khol|kholo)\b',
+      r'\b(open|goto|go\s+to|take\s+me\s+to|khol|kholo|jao|le\s+chalo)\b',
     );
-    final hasShowMeTrigger = has(r'\b(show\s+me|mujhe\s+dikhao|dikhao)\b');
+    final hasShowMeTrigger = has(
+      r'\b(show\s+me|show|mujhe\s+dikhao|dikhao|dikhado|dikhaye)\b',
+    );
     final hasFinancialSubject = has(
-      r'\b(expense|expenses|spent|spending|income|earned|received|balance|total|count|net|kharch|kamai|transactions?|entries)\b',
+      r'\b(expense|expenses|spent|spending|income|earned|received|balance|total|count|net|summary|overview|hisaab|kharch|kamai|transactions?|entries)\b',
     );
     if (navigationTarget != null &&
         (hasStrongNavigationTrigger ||
@@ -106,11 +127,18 @@ class PrimaryIntentRouter {
     }
 
     final asksFinancialQuestion = has(
-        r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net)\b') ||
+          r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net|summary|overview|hisaab)\b',
+        ) ||
         has(
-            r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining|net)\b') ||
-        (has(r'\b(show|tell|calculate|summary|report|dikhao|batao)\b') &&
-            has(r'\b(spent|spending|expense|expenses|income|earned|received|kamai)\b'));
+          r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining|net)\b',
+        ) ||
+        has(
+          r'\b(mere\s+paas|paas\s+mere)\b.{0,30}\b(paisa|paise|balance)\b',
+        ) ||
+        (has(r'\b(show|tell|calculate|summary|overview|report|dikhao|batao)\b') &&
+            has(
+              r'\b(spent|spending|expense|expenses|income|earned|received|kamai|kharch|hisaab|balance)\b',
+            ));
     if (asksFinancialQuestion) {
       return const PrimaryIntentRoute(
         intent: RoutedSmartIntent.query,
@@ -279,13 +307,56 @@ class PrimaryIntentRouter {
         .any((token) => token.length > 1 && !nonItemWords.contains(token));
   }
 
+  RoutedSmartAppAction? _appAction(String input) {
+    if (RegExp(
+      r'\b(?:dark\s*(?:mode|theme)\s*(?:off|band)|(?:turn\s+off|disable)\s+dark\s*(?:mode|theme)|light\s*(?:mode|theme)(?:\s+(?:on|karo|lagao|laga\s+do))?|normal\s+mode\s+karo)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.darkModeOff;
+    }
+    if (RegExp(
+      r'\b(?:dark\s*(?:mode|theme)(?:\s+(?:on|karo|lagao|laga\s+do|chalao))?|(?:turn\s+on|enable)\s+dark\s*(?:mode|theme)|theme\s+dark\s+karo)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.darkModeOn;
+    }
+    if (RegExp(
+      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.darkModeToggle;
+    }
+    return null;
+  }
+
   String? _navigationTarget(String input) {
-    if (RegExp(r'\b(wallet|wallets)\b').hasMatch(input)) return 'Wallets';
-    if (RegExp(r'\b(stats|statistics)\b').hasMatch(input)) return 'Stats';
-    if (RegExp(r'\b(udhaar|udhar)\b').hasMatch(input)) return 'Udhaar';
-    if (RegExp(r'\b(settings|setting)\b').hasMatch(input)) return 'Settings';
-    if (RegExp(r'\babout\b').hasMatch(input)) return 'About';
-    if (RegExp(r'\b(home|dashboard)\b').hasMatch(input)) return 'Dashboard';
+    if (RegExp(r'\b(monthly\s+plan|smart\s+plan|budget\s+plan|budget|mahine\s+ka\s+plan)\b')
+        .hasMatch(input)) {
+      return 'Monthly Plan';
+    }
+    if (RegExp(r'\b(trash|deleted\s+(?:entries|transactions|items))\b')
+        .hasMatch(input)) {
+      return 'Trash';
+    }
+    if (RegExp(r'\b(wallet|wallets|accounts|income\s+accounts)\b')
+        .hasMatch(input)) {
+      return 'Wallets';
+    }
+    if (RegExp(r'\b(stats|statistics|analytics|spending\s+trends)\b')
+        .hasMatch(input)) {
+      return 'Stats';
+    }
+    if (RegExp(r'\b(udhaar|udhar|debt|loan)\b').hasMatch(input)) {
+      return 'Udhaar';
+    }
+    if (RegExp(r'\b(settings|setting|preferences)\b').hasMatch(input)) {
+      return 'Settings';
+    }
+    if (RegExp(r'\babout(?:\s+app)?\b').hasMatch(input)) return 'About';
+    if (RegExp(r'\b(home|dashboard|main\s+screen|main\s+page)\b')
+        .hasMatch(input)) {
+      return 'Dashboard';
+    }
     return null;
   }
 }
