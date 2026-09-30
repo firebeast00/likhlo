@@ -964,7 +964,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               border: pw.Border(
                 left: pw.BorderSide(color: color, width: 3),
               ),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
             ),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -1465,11 +1464,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 pw.SizedBox(height: 22),
                 pw.Container(
                   padding: const pw.EdgeInsets.fromLTRB(11, 10, 11, 10),
-                  decoration: pw.BoxDecoration(
-                    color: const PdfColor.fromInt(0xFFFFFBEB),
-                    borderRadius:
-                        const pw.BorderRadius.all(pw.Radius.circular(5)),
-                    border: const pw.Border(
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFFFFFBEB),
+                    border: pw.Border(
                       left: pw.BorderSide(color: activeColor, width: 3),
                     ),
                   ),
