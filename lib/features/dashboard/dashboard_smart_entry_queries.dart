@@ -124,6 +124,67 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     unawaited(HapticFeedback.lightImpact());
   }
 
+  Future<void> _handleSmartEntryUdharQuery(
+    SmartEntryQueryMetric metric,
+  ) async {
+    if (!Hive.isBoxOpen('debts')) {
+      await Hive.openBox<DebtEntry>('debts');
+    }
+    if (!mounted) return;
+
+    final active = Hive.box<DebtEntry>('debts')
+        .values
+        .where(
+          (entry) => entry.deletedAt == null && entry.settledAt == null,
+        )
+        .toList(growable: false);
+
+    final receivableEntries =
+        active.where((entry) => entry.type == 'lent').toList(growable: false);
+    final payableEntries = active
+        .where((entry) => entry.type == 'borrowed')
+        .toList(growable: false);
+    final receivable = receivableEntries.fold<double>(
+      0,
+      (sum, entry) => sum + entry.amount,
+    );
+    final payable = payableEntries.fold<double>(
+      0,
+      (sum, entry) => sum + entry.amount,
+    );
+
+    if (metric == SmartEntryQueryMetric.udharReceivable) {
+      _showTransactionInfo(
+        '${receivableEntries.length} active record${receivableEntries.length == 1 ? '' : 's'}.',
+        title: 'Rs. ${receivable.toStringAsFixed(0)} to receive',
+      );
+      return;
+    }
+    if (metric == SmartEntryQueryMetric.udharPayable) {
+      _showTransactionInfo(
+        '${payableEntries.length} active record${payableEntries.length == 1 ? '' : 's'}.',
+        title: 'Rs. ${payable.toStringAsFixed(0)} to pay',
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final overdue = active.where((entry) {
+      final due = entry.dueDate;
+      if (due == null) return false;
+      final dueDay = DateTime(due.year, due.month, due.day);
+      return dueDay.isBefore(today);
+    }).length;
+
+    _showTransactionInfo(
+      'To receive Rs. ${receivable.toStringAsFixed(0)} · '
+      'To pay Rs. ${payable.toStringAsFixed(0)} · '
+      '${active.length} active · $overdue overdue.',
+      title: 'Udhar net Rs. ${(receivable - payable).toStringAsFixed(0)}',
+    );
+  }
+
   Future<void> _handleSmartEntryAppControl(
     ParsedSmartEntryCommand command,
   ) async {
@@ -166,13 +227,21 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     );
   }
 
-  void _handleSmartEntryQuery(ParsedSmartEntryCommand command) {
+  Future<void> _handleSmartEntryQuery(ParsedSmartEntryCommand command) async {
     final metric = command.queryMetric;
     if (metric == null) {
       _showTransactionInfo(
         "Ask something like 'how much did I spend this month?'",
         title: 'Question needs more detail',
       );
+      return;
+    }
+
+    if (metric == SmartEntryQueryMetric.udharSummary ||
+        metric == SmartEntryQueryMetric.udharReceivable ||
+        metric == SmartEntryQueryMetric.udharPayable) {
+      await _handleSmartEntryUdharQuery(metric);
+      _smartInputCtrl.clear();
       return;
     }
 
@@ -316,6 +385,9 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         );
         break;
       case SmartEntryQueryMetric.balance:
+      case SmartEntryQueryMetric.udharSummary:
+      case SmartEntryQueryMetric.udharReceivable:
+      case SmartEntryQueryMetric.udharPayable:
         break;
     }
     _smartInputCtrl.clear();
