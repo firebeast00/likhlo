@@ -92,6 +92,7 @@ class SmartInputEngine {
       case SmartEntryIntent.query:
       case SmartEntryIntent.searchEntries:
       case SmartEntryIntent.navigate:
+      case SmartEntryIntent.appControl:
         return ReadOnlySmartCommand(parsed: parsed, source: source);
       case SmartEntryIntent.unknown:
         return UnknownSmartCommand(parsed: parsed, source: source);
