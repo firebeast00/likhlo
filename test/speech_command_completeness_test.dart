@@ -21,6 +21,12 @@ void main() {
       type: 'jazzcash',
       availableBalance: 10000,
     ),
+    SmartEntryAccount(
+      id: 'bank',
+      name: 'Bank Account',
+      type: 'custom',
+      availableBalance: 10000,
+    ),
   ];
 
   SpeechCommandCompleteness check(String input) {
@@ -28,6 +34,7 @@ void main() {
       input,
       categories,
       source: SmartInputSource.voice,
+      accounts: accounts,
     );
     return evaluator.evaluate(plan, accounts: accounts);
   }
@@ -35,6 +42,16 @@ void main() {
   test('navigation waits for its destination', () {
     expect(check('open').isComplete, isFalse);
     expect(check('open wallets').isComplete, isTrue);
+  });
+
+  test('app controls complete once the action is recognized', () {
+    final dark = check('turn on dark mode');
+    final light = check('dark mode band karo');
+
+    expect(dark.isComplete, isTrue);
+    expect(dark.reason, 'app_control');
+    expect(light.isComplete, isTrue);
+    expect(light.reason, 'app_control');
   });
 
   test('expense waits for both amount and item', () {
@@ -50,6 +67,10 @@ void main() {
     );
     expect(
       check('transfer 5000 from jazzcash to cash').isComplete,
+      isTrue,
+    );
+    expect(
+      check('5000 JSK se bank account mein transfer karo').isComplete,
       isTrue,
     );
   });
