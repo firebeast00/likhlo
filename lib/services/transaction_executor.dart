@@ -257,9 +257,12 @@ class TransactionExecutor {
         final entries = command.entries.map(_prepareForMainLedger).toList();
         final saved = await store.addAll(entries);
         if (saved && enableAudio) {
+          final feedbackAction = entries.every((entry) => entry.type == 'income')
+              ? FinancialFeedbackAction.income
+              : FinancialFeedbackAction.expense;
           unawaited(
             audioFeedback.announce(
-              action: FinancialFeedbackAction.expense,
+              action: feedbackAction,
               entry: entries.first,
             ),
           );
