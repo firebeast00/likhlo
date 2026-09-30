@@ -33,6 +33,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   List<String?> _speechLocaleCandidates = const [null];
   int _speechLocaleCandidateIndex = 0;
   bool _isScanningReceipt = false;
+  final ValueNotifier<int> _smartInputUiRevision = ValueNotifier<int>(0);
   final TextEditingController _smartInputCtrl = TextEditingController();
   String? _smartEntryDefaultWalletId;
   List<String> _homeVisibleWalletIds = const [];
@@ -48,6 +49,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   bool _recognizerReportedListening = false;
   bool _finalizingRecognizerStop = false;
   bool _isProcessingVoiceCommand = false;
+
+  void _setListening(bool value) {
+    if (_isListening == value) return;
+    _isListening = value;
+    _smartInputUiRevision.value++;
+  }
+
+  void _setScanningReceipt(bool value) {
+    if (_isScanningReceipt == value) return;
+    _isScanningReceipt = value;
+    _smartInputUiRevision.value++;
+  }
 
   @override
   void initState() {
@@ -115,6 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     _categoryScrollCtrl.dispose();
     _primaryTabsController.dispose();
     _searchQueryNotifier.dispose();
+    _smartInputUiRevision.dispose();
     _smartInputCtrl.dispose();
     super.dispose();
   }
