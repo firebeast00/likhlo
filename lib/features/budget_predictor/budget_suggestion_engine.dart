@@ -88,7 +88,16 @@ class BudgetSuggestionEngine {
     for (final group in sourceGroups) {
       final key = suggestionKey(group.canonicalTitle, group.category);
       final remembered = rememberedPatternKeys.contains(key);
-      final intent = remembered
+      final recentTotals = _recentPatternTotals(
+        eligible,
+        key,
+        sourceMonth,
+        months: 3,
+      );
+      final recurringAcrossMonths =
+          recentTotals.length >= 2 &&
+          !evaluator.isDiscretionaryCategory(group.category);
+      final intent = remembered || recurringAcrossMonths
           ? ExpenseIntent.frequentHabit
           : evaluator.evaluateIntent(group);
       switch (intent) {
@@ -107,15 +116,25 @@ class BudgetSuggestionEngine {
           );
           break;
         case ExpenseIntent.frequentHabit:
+          final recurringAverage = recentTotals.isEmpty
+              ? group.totalAmount
+              : recentTotals.fold<double>(0, (sum, value) => sum + value) /
+                  recentTotals.length;
           habits.add(
             _suggestionFor(
               group,
               intent,
-              amount: group.totalAmount,
-              confidence: _habitConfidence(group),
+              amount: recurringAcrossMonths
+                  ? recurringAverage
+                  : group.totalAmount,
+              confidence: recurringAcrossMonths
+                  ? math.max(_habitConfidence(group), 0.8)
+                  : _habitConfidence(group),
               reason: remembered
                   ? 'Remembered from your plan · Rs. ${group.totalAmount.toStringAsFixed(0)} last month'
-                  : 'Logged ${group.frequency} times last month · Rs. ${group.totalAmount.toStringAsFixed(0)} total',
+                  : recurringAcrossMonths
+                      ? 'Seen in ${recentTotals.length} of the last 3 months · around Rs. ${recurringAverage.toStringAsFixed(0)} monthly'
+                      : 'Logged ${group.frequency} times last month · Rs. ${group.totalAmount.toStringAsFixed(0)} total',
               selectedByDefault: true,
             ),
           );
@@ -226,6 +245,31 @@ class BudgetSuggestionEngine {
     var score = 0.65;
     if (group.frequency >= 5) score += 0.15;
     return math.min(score, 0.9);
+  }
+
+  List<double> _recentPatternTotals(
+    List<Expense> eligible,
+    String key,
+    DateTime sourceMonth, {
+    required int months,
+  }) {
+    final totals = <double>[];
+    for (var offset = 0; offset < months; offset++) {
+      final month = DateTime(
+        sourceMonth.year,
+        sourceMonth.month - offset,
+        1,
+      );
+      final matching = eligible.where(
+        (entry) =>
+            _sameMonth(entry.date, month) &&
+            suggestionKey(entry.title, entry.category) == key,
+      );
+      final total =
+          matching.fold<double>(0, (sum, entry) => sum + entry.amount);
+      if (total > 0) totals.add(total);
+    }
+    return totals;
   }
 
   double _surpriseBuffer(List<double> monthlyTotals) {
