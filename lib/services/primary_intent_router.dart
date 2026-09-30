@@ -74,9 +74,11 @@ class PrimaryIntentRouter {
     final hasFinancialSubject = has(
       r'\b(expense|expenses|spent|spending|income|earned|received|balance|total|count|net|summary|overview|hisaab|kharch|kamai|transactions?|entries)\b',
     );
+    final showCanNavigate =
+        !hasFinancialSubject || navigationTarget == 'Trash';
     if (navigationTarget != null &&
         (hasStrongNavigationTrigger ||
-            (hasShowMeTrigger && !hasFinancialSubject))) {
+            (hasShowMeTrigger && showCanNavigate))) {
       return PrimaryIntentRoute(
         intent: RoutedSmartIntent.navigate,
         confidence: 0.99,
@@ -135,6 +137,7 @@ class PrimaryIntentRouter {
         has(
           r'\b(mere\s+paas|paas\s+mere)\b.{0,30}\b(paisa|paise|balance)\b',
         ) ||
+        has(r'\bwho\s+owes\s+me\b') ||
         (has(r'\b(show|tell|calculate|summary|overview|report|dikhao|batao)\b') &&
             has(
               r'\b(spent|spending|expense|expenses|income|earned|received|kamai|kharch|hisaab|balance)\b',
