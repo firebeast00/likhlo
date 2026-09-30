@@ -7,6 +7,7 @@ import '../features/smart_entry/transaction_batch_draft.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import '../providers/category_provider.dart';
+import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../services/transaction_executor.dart';
@@ -89,19 +90,29 @@ class _BatchTransactionReviewScreenState
       }
     }
 
-    final balances = <String, double>{
-      for (final wallet in wallets)
-        wallet.id:
-            ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id),
-    };
+    final proposed = selected.asMap().entries.map((item) {
+      final row = item.value;
+      return Expense(
+        id: 'preview-${item.key}',
+        title: row.title.text.trim(),
+        amount: row.amount,
+        date: row.date,
+        category: row.type == 'income'
+            ? 'Income / Allowance'
+            : row.category,
+        colorValue: 0,
+        type: row.type,
+        walletId: row.walletId!,
+      );
+    }).toList(growable: false);
 
-    for (final row in selected) {
-      final walletId = row.walletId!;
-      final delta = row.type == 'income' ? row.amount : -row.amount;
-      balances[walletId] = (balances[walletId] ?? 0) + delta;
-    }
-
-    return balances.values.every((balance) => balance >= -0.000001);
+    return keepsWalletBalancesNonNegative(
+      openingBalances: {
+        for (final wallet in wallets) wallet.id: wallet.balance,
+      },
+      existingEntries: ref.read(expenseProvider).allExpenses,
+      proposedEntries: proposed,
+    );
   }
 
   void _applyGlobalWallet(String? walletId) {
