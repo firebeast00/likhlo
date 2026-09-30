@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/budget_predictor/budget_planner_screen.dart';
 import '../screens/about_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/stats_screen.dart';
@@ -12,6 +13,7 @@ import '../widgets/app_drawer.dart';
 /// represented here.
 enum AppSection {
   dashboard('Dashboard'),
+  budget('Budget Planner'),
   stats('Stats'),
   settings('Settings'),
   trash('Trash'),
@@ -54,6 +56,8 @@ class AppShell extends StatelessWidget {
 
   Widget _sectionBody() {
     switch (currentSection) {
+      case AppSection.budget:
+        return const BudgetPlannerScreen();
       case AppSection.stats:
         return const StatsScreen();
       case AppSection.settings:
