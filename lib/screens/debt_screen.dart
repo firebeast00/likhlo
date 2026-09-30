@@ -548,11 +548,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       if (mounted) {
         _smartInputCtrl.clear();
         setState(() {});
+        final walletName = _walletLabel(wallets, walletId);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Udhaar recorded: Rs. ${amount.toStringAsFixed(0)} · $person',
+              'Udhaar recorded: Rs. ${amount.toStringAsFixed(0)} · $person · $walletName',
             ),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
