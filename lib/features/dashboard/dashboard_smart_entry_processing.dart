@@ -103,7 +103,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           await _handleSmartEntryRepeatCommand(command);
           return _smartInputCtrl.text.trim().isEmpty;
         case SmartEntryIntent.query:
-          _handleSmartEntryQuery(command);
+          await _handleSmartEntryQuery(command);
           return _smartInputCtrl.text.trim().isEmpty;
         case SmartEntryIntent.searchEntries:
           _handleSmartEntrySearch(command);
