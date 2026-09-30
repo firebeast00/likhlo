@@ -4,7 +4,7 @@ extension _DashboardOcrMethods on _HomeScreenState {
   Future<void> _scanReceiptIntoInput() async {
     if (_isScanningReceipt) return;
     _dismissKeyboard();
-    setState(() => _isScanningReceipt = true);
+    _setScanningReceipt(true);
 
     try {
       // 🚀 FIXED: Show Bottom Sheet for Camera / Gallery
@@ -73,20 +73,20 @@ extension _DashboardOcrMethods on _HomeScreenState {
         const SnackBar(content: Text('Camera or scanner error occurred.')),
       );
     } finally {
-      if (mounted) setState(() => _isScanningReceipt = false);
+      if (mounted) _setScanningReceipt(false);
     }
   }
 
   Future<void> _recoverLostReceiptScan() async {
     if (_isScanningReceipt || !mounted) return;
-    setState(() => _isScanningReceipt = true);
+    _setScanningReceipt(true);
     try {
       final scanner = OcrScannerService();
       final receipt = await scanner.recoverLostReceiptDetailed();
       if (!mounted || receipt == null) return;
       await _reviewScannedReceipt(receipt);
     } finally {
-      if (mounted) setState(() => _isScanningReceipt = false);
+      if (mounted) _setScanningReceipt(false);
     }
   }
 
