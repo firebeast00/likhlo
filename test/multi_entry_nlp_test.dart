@@ -9,6 +9,22 @@ void main() {
   group('MultiEntryParser', () {
     const parser = MultiEntryParser();
 
+    test('segments natural amount-first speech without conjunctions', () {
+      final result = parser.tryParseBatch(
+        '500 ka burger 100 ki biryani 40 pen',
+      );
+
+      expect(result, ['500 ka burger', '100 ki biryani', '40 pen']);
+    });
+
+    test('keeps optional conjunctions as cleanup noise only', () {
+      final result = parser.tryParseBatch(
+        '500 petrol aur 200 chai',
+      );
+
+      expect(result, ['500 petrol', '200 chai']);
+    });
+
     test('segments multiple numeric transactions', () {
       final result = parser.tryParseBatch(
         '500 petrol, 200 chai and 1200 zong package',
@@ -35,6 +51,14 @@ void main() {
 
     test('does not split one amount with conjunctions in title', () {
       expect(parser.tryParseBatch('tea and biscuits 300'), isNull);
+    });
+
+    test('segments without conjunction while preserving a date number', () {
+      final result = parser.tryParseBatch(
+        'kal 500 petrol 200 chai',
+      );
+
+      expect(result, ['kal 500 petrol', '200 chai']);
     });
 
     test('ignores a date number as an amount anchor', () {
