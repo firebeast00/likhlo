@@ -56,6 +56,7 @@ void main() {
       final on = engine.parse('dark mode on', categories);
       final off = engine.parse('dark mode band krdo', categories);
       final light = engine.parse('light mode karo', categories);
+      final toggle = engine.parse('toggle dark mode', categories);
 
       expect(on.parsed.intent, SmartEntryIntent.appControl);
       expect(on.parsed.appAction, SmartEntryAppAction.darkModeOn);
@@ -68,6 +69,8 @@ void main() {
 
       expect(light.parsed.intent, SmartEntryIntent.appControl);
       expect(light.parsed.appAction, SmartEntryAppAction.darkModeOff);
+      expect(toggle.parsed.intent, SmartEntryIntent.appControl);
+      expect(toggle.parsed.appAction, SmartEntryAppAction.darkModeToggle);
     });
 
     test('understands monthly and daily summary phrases', () {
@@ -100,6 +103,20 @@ void main() {
       expect(income.parsed.intent, SmartEntryIntent.query);
       expect(income.parsed.queryMetric, SmartEntryQueryMetric.income);
       expect(income.parsed.timeRange, SmartEntryTimeRange.thisMonth);
+    });
+
+    test('understands wallet and category questions used daily', () {
+      final wallet = engine.parse('cash me kitna hai', categories);
+      final category =
+          engine.parse('pichlay month shopping kitni thi', categories);
+
+      expect(wallet.parsed.intent, SmartEntryIntent.query);
+      expect(wallet.parsed.queryMetric, SmartEntryQueryMetric.balance);
+
+      expect(category.parsed.intent, SmartEntryIntent.query);
+      expect(category.parsed.queryMetric, SmartEntryQueryMetric.spending);
+      expect(category.parsed.category, 'Shopping');
+      expect(category.parsed.timeRange, SmartEntryTimeRange.lastMonth);
     });
 
     test('opens new navigation targets with Roman Urdu aliases', () {
