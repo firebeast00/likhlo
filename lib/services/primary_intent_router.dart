@@ -128,9 +128,18 @@ class PrimaryIntentRouter {
       );
     }
 
+    final hasTimeScopedFinancialNoun =
+        !_hasAmountSignal(text) &&
+        has(
+          r'\b(today|aaj|aj|yesterday|kal|this\s+week|is\s+haftay|is\s+hafte|this\s+month|is\s+mahine|is\s+month|last\s+month|pichlay\s+mahine|pichle\s+mahine)\b',
+        ) &&
+        has(
+          r'\b(spending|expense|expenses|income|kamai|kharch|kharcha|summary|hisaab)\b',
+        );
     final asksFinancialQuestion = has(
           r'\b(how\s+much|how\s+many|kitna|kitni|kitne|balance|total|count|remaining|net|summary|overview|hisaab)\b',
         ) ||
+        hasTimeScopedFinancialNoun ||
         has(
           r'\bwhat\b.{0,30}\b(spend|spent|income|earned|received|balance|remaining|net)\b',
         ) ||
