@@ -14,7 +14,14 @@ enum SmartEntryIntent {
   query,
   searchEntries,
   navigate,
+  appControl,
   unknown,
+}
+
+enum SmartEntryAppAction {
+  darkModeOn,
+  darkModeOff,
+  darkModeToggle,
 }
 
 enum SmartEntryQueryMetric {
@@ -23,6 +30,7 @@ enum SmartEntryQueryMetric {
   balance,
   net,
   transactionCount,
+  summary,
 }
 
 enum SmartEntryTimeRange {
@@ -87,6 +95,8 @@ extension SmartEntryIntentDetails on SmartEntryIntent {
         return 'search_entries';
       case SmartEntryIntent.navigate:
         return 'navigate';
+      case SmartEntryIntent.appControl:
+        return 'app_control';
       case SmartEntryIntent.unknown:
         return 'unknown';
     }
@@ -112,6 +122,7 @@ class ParsedSmartEntryCommand {
   final SmartEntryQueryMetric? queryMetric;
   final SmartEntryTimeRange timeRange;
   final String? navigationTarget;
+  final SmartEntryAppAction? appAction;
   final String? entryTypeFilter;
 
   const ParsedSmartEntryCommand({
@@ -128,6 +139,7 @@ class ParsedSmartEntryCommand {
     this.queryMetric,
     this.timeRange = SmartEntryTimeRange.allTime,
     this.navigationTarget,
+    this.appAction,
     this.entryTypeFilter,
   });
 
@@ -154,6 +166,7 @@ class ParsedSmartEntryCommand {
       'queryMetric': queryMetric?.name,
       'timeRange': timeRange.name,
       'navigationTarget': navigationTarget,
+      'appAction': appAction?.name,
       'entryTypeFilter': entryTypeFilter,
       'needsReview': needsClarification || confidence < 0.75,
     };
@@ -1228,29 +1241,41 @@ class LocalNlpService {
         return SmartEntryIntent.searchEntries;
       case RoutedSmartIntent.navigate:
         return SmartEntryIntent.navigate;
+      case RoutedSmartIntent.appControl:
+        return SmartEntryIntent.appControl;
       case RoutedSmartIntent.unknown:
         return SmartEntryIntent.unknown;
     }
   }
 
   SmartEntryQueryMetric? _queryMetric(String input) {
-    if (RegExp(r'\b(balance|available|bachay|bacha)\b').hasMatch(input)) {
+    if (RegExp(
+      r'\b(summary|overview|hisaab|hisab)\b|\b(?:month|mahine|mahina)\b.{0,25}\btotal\b|\btotal\b.{0,25}\b(?:month|mahine|mahina)\b',
+    ).hasMatch(input)) {
+      return SmartEntryQueryMetric.summary;
+    }
+    if (RegExp(
+      r'\b(balance|available|bachay|bacha)\b|\bmere\s+paas\b.{0,30}\b(?:paisa|paise|rupay|rupees?)\b',
+    ).hasMatch(input)) {
       return SmartEntryQueryMetric.balance;
     }
     if (RegExp(r'\b(net|difference|remaining|bacha\s+kitna)\b')
         .hasMatch(input)) {
       return SmartEntryQueryMetric.net;
     }
-    if (RegExp(r'\b(how\s+many|count|kitni\s+entries|kitne\s+transactions)\b')
-        .hasMatch(input)) {
+    if (RegExp(
+      r'\b(how\s+many|count|kitni\s+entries|kitne\s+transactions|kitne\s+expense|kitni\s+income\s+entries)\b',
+    ).hasMatch(input)) {
       return SmartEntryQueryMetric.transactionCount;
     }
-    if (RegExp(r'\b(income|earned|received|salary|kamai|aayi|mili)\b')
-        .hasMatch(input)) {
+    if (RegExp(
+      r'\b(income|earned|received|salary|kamai|aayi|ayi|aaya|aya|aaye|aye|mili|mila)\b',
+    ).hasMatch(input)) {
       return SmartEntryQueryMetric.income;
     }
-    if (RegExp(r'\b(spend|spent|spending|expense|expenses|kharch|kharcha)\b')
-        .hasMatch(input)) {
+    if (RegExp(
+      r'\b(spend|spent|spending|expense|expenses|kharch|kharcha|kharach)\b',
+    ).hasMatch(input)) {
       return SmartEntryQueryMetric.spending;
     }
     return null;
@@ -1258,40 +1283,78 @@ class LocalNlpService {
 
   SmartEntryTimeRange _timeRange(String input) {
     if (RegExp(
-            r'\b(last\s+month|previous\s+month|pichlay\s+mahine|pichle\s+mahine)\b')
-        .hasMatch(input)) {
+      r'\b(last\s+month|previous\s+month|pichlay\s+mahine|pichle\s+mahine|pichla\s+mahina|last\s+mahina)\b',
+    ).hasMatch(input)) {
       return SmartEntryTimeRange.lastMonth;
     }
     if (RegExp(
-            r'\b(last\s+week|previous\s+week|pichlay\s+haftay|pichle\s+haftay)\b')
-        .hasMatch(input)) {
+      r'\b(last\s+week|previous\s+week|pichlay\s+haftay|pichle\s+haftay|pichlay\s+hafte|pichle\s+hafte)\b',
+    ).hasMatch(input)) {
       return SmartEntryTimeRange.lastWeek;
     }
-    if (RegExp(r'\b(this\s+week|current\s+week|is\s+haftay)\b')
-        .hasMatch(input)) {
+    if (RegExp(
+      r'\b(this\s+week|current\s+week|is\s+haftay|iss\s+haftay|is\s+hafte|iss\s+hafte|is\s+week)\b',
+    ).hasMatch(input)) {
       return SmartEntryTimeRange.thisWeek;
     }
-    if (RegExp(r'\b(this\s+month|current\s+month|is\s+mahine)\b')
-        .hasMatch(input)) {
+    if (RegExp(
+      r'\b(this\s+month|current\s+month|is\s+mahine|iss\s+mahine|is\s+month|iss\s+month|mahine\s+ka|month\s+ka)\b',
+    ).hasMatch(input)) {
       return SmartEntryTimeRange.thisMonth;
     }
-    if (RegExp(r'\b(yesterday|kal)\b').hasMatch(input)) {
+    if (RegExp(r'\b(yesterday|kal|guzra\s+kal)\b').hasMatch(input)) {
       return SmartEntryTimeRange.yesterday;
     }
-    if (RegExp(r'\b(today|aaj)\b').hasMatch(input)) {
+    if (RegExp(r'\b(today|aaj|aj)\b').hasMatch(input)) {
       return SmartEntryTimeRange.today;
     }
     return SmartEntryTimeRange.allTime;
   }
 
   String? _navigationTarget(String input) {
-    if (RegExp(r'\b(wallet|wallets)\b').hasMatch(input)) return 'Wallets';
-    if (RegExp(r'\b(stats|statistics)\b').hasMatch(input)) return 'Stats';
-    if (RegExp(r'\b(udhaar|udhar)\b').hasMatch(input)) return 'Udhaar';
-    if (RegExp(r'\b(settings|setting)\b').hasMatch(input)) return 'Settings';
-    if (RegExp(r'\babout\b').hasMatch(input)) return 'About';
-    if (RegExp(r'\b(home|dashboard)\b').hasMatch(input)) return 'Dashboard';
+    if (RegExp(r'\b(monthly\s+plan|smart\s+plan|budget\s+plan|budget|mahine\s+ka\s+plan)\b')
+        .hasMatch(input)) {
+      return 'Monthly Plan';
+    }
+    if (RegExp(r'\b(trash|deleted\s+(?:entries|transactions|items))\b')
+        .hasMatch(input)) {
+      return 'Trash';
+    }
+    if (RegExp(r'\b(wallet|wallets|accounts|income\s+accounts)\b')
+        .hasMatch(input)) {
+      return 'Wallets';
+    }
+    if (RegExp(r'\b(stats|statistics|analytics|spending\s+trends)\b')
+        .hasMatch(input)) {
+      return 'Stats';
+    }
+    if (RegExp(r'\b(udhaar|udhar|debt|loan)\b').hasMatch(input)) {
+      return 'Udhaar';
+    }
+    if (RegExp(r'\b(settings|setting|preferences)\b').hasMatch(input)) {
+      return 'Settings';
+    }
+    if (RegExp(r'\babout(?:\s+app)?\b').hasMatch(input)) return 'About';
+    if (RegExp(r'\b(home|dashboard|main\s+screen|main\s+page)\b')
+        .hasMatch(input)) {
+      return 'Dashboard';
+    }
     return null;
+  }
+
+  SmartEntryAppAction? _appActionFromRoute(
+    RoutedSmartAppAction? action,
+  ) {
+    switch (action) {
+      case RoutedSmartAppAction.darkModeOn:
+        return SmartEntryAppAction.darkModeOn;
+      case RoutedSmartAppAction.darkModeOff:
+        return SmartEntryAppAction.darkModeOff;
+      case RoutedSmartAppAction.darkModeToggle:
+        return SmartEntryAppAction.darkModeToggle;
+      case null:
+        return null;
+    }
   }
 
   String? _entryTypeFilter(String input) {
@@ -1351,6 +1414,9 @@ class LocalNlpService {
     final timeRange = _timeRange(lowerInput);
     final navigationTarget = intent == SmartEntryIntent.navigate
         ? intentRoute.navigationTarget ?? _navigationTarget(lowerInput)
+        : null;
+    final appAction = intent == SmartEntryIntent.appControl
+        ? _appActionFromRoute(intentRoute.appAction)
         : null;
     final entryTypeFilter = _entryTypeFilter(lowerInput);
 
@@ -1574,6 +1640,9 @@ class LocalNlpService {
     if (intent == SmartEntryIntent.navigate && navigationTarget == null) {
       clarificationReasons.add('The destination was not recognized.');
     }
+    if (intent == SmartEntryIntent.appControl && appAction == null) {
+      clarificationReasons.add('The app control was not recognized.');
+    }
 
     return ParsedSmartEntryCommand(
       rawInput: rawInput,
@@ -1589,6 +1658,7 @@ class LocalNlpService {
       queryMetric: queryMetric,
       timeRange: timeRange,
       navigationTarget: navigationTarget,
+      appAction: appAction,
       entryTypeFilter: entryTypeFilter,
     );
   }
