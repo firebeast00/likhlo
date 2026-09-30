@@ -180,7 +180,9 @@ class PrimaryIntentRouter {
   }
 
   bool _hasAmountSignal(String input) {
-    if (RegExp(r'(^|\s)(?:rs\.?|pkr)?\s*\d+(?:[,.]\d+)?\b').hasMatch(input)) {
+    if (RegExp(
+      r'(^|\s)(?:rs\.?|pkr)?\s*(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*(?:sau|hundred|k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr))?\b',
+    ).hasMatch(input)) {
       return true;
     }
     return RegExp(
