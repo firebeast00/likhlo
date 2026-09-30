@@ -8,6 +8,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:async';
 
 import '../models/debt_model.dart';
+import '../models/wallet_model.dart';
 import '../services/notification_service.dart';
 import '../services/local_nlp_service.dart';
 import '../services/udhar_input_service.dart';
@@ -31,6 +32,8 @@ class DebtScreen extends ConsumerStatefulWidget {
 }
 
 class _DebtScreenState extends ConsumerState<DebtScreen> {
+  static const _udharDefaultWalletKey = 'udhar_default_wallet_id';
+
   final Box<DebtEntry> debtBox = Hive.box<DebtEntry>('debts');
 
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -38,17 +41,30 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   bool _voiceFinalizing = false;
   bool _savingDebt = false;
   bool _scanningDebt = false;
-  final SpeechSessionController _speechSession = SpeechSessionController(maxRetries: 0);
+  final SpeechSessionController _speechSession =
+      SpeechSessionController(maxRetries: 0);
   String? _selectedWalletId;
+  String _udharFilter = 'all';
   final TextEditingController _smartInputCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final stored = Hive.box('preferences').get(_udharDefaultWalletKey);
+    _selectedWalletId =
+        stored is String && stored.trim().isNotEmpty ? stored : null;
+  }
 
   String? get _activeWalletId {
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) return null;
-    if (wallets.any((wallet) => wallet.id == _selectedWalletId))
+    if (wallets.any((wallet) => wallet.id == _selectedWalletId)) {
       return _selectedWalletId;
+    }
     for (final wallet in wallets) {
-      if (!wallet.isBackup && wallet.walletType == 'cash') return wallet.id;
+      if (!wallet.isBackup && wallet.walletType == 'cash') {
+        return wallet.id;
+      }
     }
     return wallets.first.id;
   }
@@ -65,10 +81,156 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   String? _walletForCommand(String text) {
-    final normalized = PakistaniLanguageNormalizer().normalize(text).normalized;
-    final matches = findMentionedSmartEntryAccountIds(normalized, _udharAccounts());
+    final normalized =
+        PakistaniLanguageNormalizer().normalize(text).normalized;
+    final matches =
+        findMentionedSmartEntryAccountIds(normalized, _udharAccounts());
     if (matches.length > 1) return null;
     return matches.isEmpty ? _activeWalletId : matches.single;
+  }
+
+  Wallet? _walletById(List<Wallet> wallets, String? id) {
+    if (id == null) return null;
+    for (final wallet in wallets) {
+      if (wallet.id == id) return wallet;
+    }
+    return null;
+  }
+
+  String _walletLabel(List<Wallet> wallets, String? id) {
+    return _walletById(wallets, id)?.name ?? 'Wallet unavailable';
+  }
+
+  String _quickWalletLabel(List<Wallet> wallets) {
+    if (_selectedWalletId == null) return 'Automatic';
+    return _walletLabel(wallets, _selectedWalletId);
+  }
+
+  IconData _walletIcon(Wallet wallet) {
+    final type = wallet.walletType.toLowerCase();
+    if (type == 'cash') return Icons.payments_outlined;
+    if (type == 'jazzcash' || type == 'easypaisa') {
+      return Icons.account_balance_wallet_outlined;
+    }
+    if (type == 'bank') return Icons.account_balance_outlined;
+    return Icons.wallet_outlined;
+  }
+
+  Future<void> _showUdharWalletPicker() async {
+    FocusScope.of(context).unfocus();
+    final wallets = ref.read(walletProvider);
+    if (wallets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Create a wallet first.')),
+      );
+      return;
+    }
+    final walletNotifier = ref.read(walletProvider.notifier);
+    final selectedId =
+        wallets.any((wallet) => wallet.id == _selectedWalletId)
+            ? _selectedWalletId
+            : null;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.72,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Default Quick Udhar wallet',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 12),
+                children: [
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(sheetContext)
+                          .colorScheme
+                          .primaryContainer,
+                      child: Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Theme.of(sheetContext).colorScheme.primary,
+                      ),
+                    ),
+                    title: const Text(
+                      'Automatic',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: const Text(
+                      'Use Cash first; an explicitly named wallet still wins',
+                    ),
+                    trailing: selectedId == null
+                        ? const Icon(Icons.check_circle_rounded)
+                        : null,
+                    onTap: () async {
+                      await Hive.box('preferences')
+                          .delete(_udharDefaultWalletKey);
+                      if (!mounted) return;
+                      setState(() => _selectedWalletId = null);
+                      if (sheetContext.mounted) {
+                        Navigator.pop(sheetContext);
+                      }
+                    },
+                  ),
+                  const Divider(height: 1),
+                  for (final wallet in wallets)
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Color(wallet.colorValue)
+                            .withValues(alpha: 0.14),
+                        child: Icon(
+                          _walletIcon(wallet),
+                          color: Color(wallet.colorValue),
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        wallet.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        '${wallet.isBackup ? 'Reserve wallet' : 'Available'} · Rs. ${walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}',
+                      ),
+                      trailing: selectedId == wallet.id
+                          ? const Icon(Icons.check_circle_rounded)
+                          : null,
+                      onTap: () async {
+                        await Hive.box('preferences').put(
+                          _udharDefaultWalletKey,
+                          wallet.id,
+                        );
+                        if (!mounted) return;
+                        setState(() => _selectedWalletId = wallet.id);
+                        if (sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
