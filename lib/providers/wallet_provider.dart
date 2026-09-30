@@ -128,3 +128,44 @@ final walletProvider =
     StateNotifierProvider<WalletNotifier, List<Wallet>>((ref) {
   return WalletNotifier(ref);
 });
+
+
+final walletBalanceProvider =
+    Provider.family<double, String>((ref, walletId) {
+  final openingBalance = ref.watch(
+    walletProvider.select((wallets) {
+      for (final wallet in wallets) {
+        if (wallet.id == walletId) return wallet.balance;
+      }
+      return 0.0;
+    }),
+  );
+  final movement = ref.watch(walletMovementProvider(walletId));
+  return openingBalance + movement;
+});
+
+final totalAvailableProvider = Provider<double>((ref) {
+  final wallets = ref.watch(walletProvider);
+  final movements = ref.watch(walletMovementsProvider);
+  return wallets.fold<double>(
+    0,
+    (sum, wallet) => sum + wallet.balance + (movements[wallet.id] ?? 0.0),
+  );
+});
+
+final walletCountProvider = Provider<int>((ref) {
+  return ref.watch(walletProvider.select((wallets) => wallets.length));
+});
+
+typedef PersistentNotificationSnapshot = ({
+  double remainingToday,
+  double spentToday,
+});
+
+final persistentNotificationSnapshotProvider =
+    Provider<PersistentNotificationSnapshot>((ref) {
+  return (
+    remainingToday: ref.watch(totalAvailableProvider),
+    spentToday: ref.watch(todaySpentProvider),
+  );
+});
