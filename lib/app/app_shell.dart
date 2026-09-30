@@ -74,38 +74,45 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: AppDrawer(
-        currentView: currentSection.label,
-        onViewChanged: (view) {
-          final section = AppSection.fromLabel(view);
-          if (section != null) onSectionChanged(section);
-        },
-      ),
-      appBar: _isDashboard
-          ? dashboardAppBar
-          : AppBar(
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              title: Text(
-                currentSection.label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 17,
+    return PopScope(
+      canPop: _isDashboard,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop || _isDashboard) return;
+        onSectionChanged(AppSection.dashboard);
+      },
+      child: Scaffold(
+        drawer: AppDrawer(
+          currentView: currentSection.label,
+          onViewChanged: (view) {
+            final section = AppSection.fromLabel(view);
+            if (section != null) onSectionChanged(section);
+          },
+        ),
+        appBar: _isDashboard
+            ? dashboardAppBar
+            : AppBar(
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                title: Text(
+                  currentSection.label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
+                ),
+                centerTitle: true,
+                leading: IconButton(
+                  tooltip: 'Back to dashboard',
+                  icon: const Icon(Icons.arrow_back_rounded, size: 24),
+                  onPressed: () => onSectionChanged(AppSection.dashboard),
                 ),
               ),
-              centerTitle: true,
-              leading: IconButton(
-                tooltip: 'Back to dashboard',
-                icon: const Icon(Icons.arrow_back_rounded, size: 24),
-                onPressed: () => onSectionChanged(AppSection.dashboard),
-              ),
-            ),
-      body: _isDashboard ? dashboardBody : _sectionBody(),
-      floatingActionButtonLocation:
-          _isDashboard ? FloatingActionButtonLocation.centerFloat : null,
-      floatingActionButton:
-          _isDashboard ? dashboardFloatingActionButton : null,
+        body: _isDashboard ? dashboardBody : _sectionBody(),
+        floatingActionButtonLocation:
+            _isDashboard ? FloatingActionButtonLocation.centerFloat : null,
+        floatingActionButton:
+            _isDashboard ? dashboardFloatingActionButton : null,
+      ),
     );
   }
 }
