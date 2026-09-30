@@ -38,11 +38,16 @@ class _DashboardSmartInputSection extends ConsumerWidget {
     final language = ref.watch(
       settingsProvider.select((settings) => settings.smartEntryLanguage),
     );
-    return owner._buildSmartInputBar(
-      Theme.of(context).colorScheme.primary,
-      Theme.of(context).brightness == Brightness.dark,
-      wallets,
-      language,
+    return ValueListenableBuilder<int>(
+      valueListenable: owner._smartInputUiRevision,
+      builder: (context, _, __) {
+        return owner._buildSmartInputBar(
+          Theme.of(context).colorScheme.primary,
+          Theme.of(context).brightness == Brightness.dark,
+          wallets,
+          language,
+        );
+      },
     );
   }
 }
