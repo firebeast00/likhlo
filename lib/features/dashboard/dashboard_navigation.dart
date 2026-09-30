@@ -11,6 +11,7 @@ extension _DashboardNavigationMethods on _HomeScreenState {
       _smartEntrySearchRange = null;
       _smartEntrySearchAllHistory = false;
     });
+    _searchQueryNotifier.value = '';
     ref.read(appNavigationProvider.notifier).open(section);
   }
 
@@ -26,6 +27,7 @@ extension _DashboardNavigationMethods on _HomeScreenState {
       _smartEntrySearchRange = null;
       _smartEntrySearchAllHistory = false;
     });
+    _searchQueryNotifier.value = '';
     _primaryTabsController.select(tab);
     if (tab == PrimaryLedgerTab.main) {
       _queuePersistentNotificationUpdate();
