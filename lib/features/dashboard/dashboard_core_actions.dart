@@ -8,7 +8,7 @@ extension _DashboardCoreActions on _HomeScreenState {
     _notificationUpdateTimer?.cancel();
     _notificationUpdateTimer = Timer(delay, () async {
       if (!mounted) return;
-      final current =
+      final PersistentNotificationSnapshot current =
           snapshot ?? ref.read(persistentNotificationSnapshotProvider);
       await NotificationService().updatePersistentStatusBarWidget(
         remainingToday: current.remainingToday,
