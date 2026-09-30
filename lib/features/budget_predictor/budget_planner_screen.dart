@@ -107,17 +107,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
         ? draft.previousMonthIncome - suggestedTotal
         : null;
 
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text(
-          'Budget Planner',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-      ),
-      body: ListView(
+    return ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
         children: [
           _MonthHeader(
@@ -212,8 +202,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 }
 
