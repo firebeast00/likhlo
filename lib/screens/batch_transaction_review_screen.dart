@@ -318,9 +318,11 @@ class _BatchTransactionReviewScreenState
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               isExpanded: true,
-              value: wallets.any((wallet) => wallet.id == _globalWalletId)
-                  ? _globalWalletId
-                  : null,
+              key: ValueKey('global-wallet-$_globalWalletId'),
+              initialValue:
+                  wallets.any((wallet) => wallet.id == _globalWalletId)
+                      ? _globalWalletId
+                      : null,
               decoration: const InputDecoration(
                 labelText: 'Wallet',
                 border: OutlineInputBorder(),
@@ -342,7 +344,8 @@ class _BatchTransactionReviewScreenState
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               isExpanded: true,
-              value: categories.contains(_globalCategory)
+              key: ValueKey('global-category-$_globalCategory'),
+              initialValue: categories.contains(_globalCategory)
                   ? _globalCategory
                   : null,
               decoration: const InputDecoration(
@@ -443,7 +446,8 @@ class _BatchTransactionReviewScreenState
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               isExpanded: true,
-              value: wallets.any((wallet) => wallet.id == row.walletId)
+              key: ValueKey('row-wallet-$index-${row.walletId}'),
+              initialValue: wallets.any((wallet) => wallet.id == row.walletId)
                   ? row.walletId
                   : null,
               decoration: const InputDecoration(
@@ -469,7 +473,8 @@ class _BatchTransactionReviewScreenState
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: categories.contains(row.category)
+                key: ValueKey('row-category-$index-${row.category}'),
+                initialValue: categories.contains(row.category)
                     ? row.category
                     : null,
                 decoration: const InputDecoration(
