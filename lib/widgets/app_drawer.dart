@@ -209,7 +209,7 @@ class AppDrawer extends ConsumerWidget {
                         fontSize: 14.5,
                         height: 1.1,
                         fontWeight:
-                            isSelected ? FontWeight.w800 : FontWeight.w650,
+                            isSelected ? FontWeight.w800 : FontWeight.w600,
                         color: isSelected
                             ? primaryColor
                             : colorScheme.onSurface,
