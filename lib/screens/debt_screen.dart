@@ -353,6 +353,11 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   void _scheduleFastUdharVoiceSave(String transcript) {
+    if (_udharVoiceStableTranscript == transcript &&
+        (_udharVoiceStableTimer?.isActive ?? false)) {
+      return;
+    }
+
     _udharVoiceStableTimer?.cancel();
     _udharVoiceStableTranscript = '';
 
