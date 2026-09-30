@@ -78,6 +78,42 @@ void main() {
       expect(entries[1].hasExplicitWallet, isTrue);
     });
 
+    test('inherits one explicit date across otherwise implicit rows', () {
+      final controller = SmartEntryBatchController();
+      final attempt = controller.tryBuild(
+        rawText: '500 petrol and 200 chai kal',
+        categories: const ['General', 'Food', 'Transport'],
+        source: SmartInputSource.typed,
+        accounts: accounts,
+        preferredAccountId: 'cash',
+      );
+
+      expect(attempt.status, SmartEntryBatchStatus.ready);
+      final entries = attempt.draft!.entries;
+      expect(entries, hasLength(2));
+      expect(entries[0].date.year, entries[1].date.year);
+      expect(entries[0].date.month, entries[1].date.month);
+      expect(entries[0].date.day, entries[1].date.day);
+      expect(entries[0].hasExplicitDate, isFalse);
+      expect(entries[1].hasExplicitDate, isTrue);
+    });
+
+    test('keeps different explicit wallets separate', () {
+      final controller = SmartEntryBatchController();
+      final attempt = controller.tryBuild(
+        rawText: '500 petrol from Cash and 200 chai from JazzCash',
+        categories: const ['General', 'Food', 'Transport'],
+        source: SmartInputSource.typed,
+        accounts: accounts,
+        preferredAccountId: 'cash',
+      );
+
+      expect(attempt.status, SmartEntryBatchStatus.ready);
+      final entries = attempt.draft!.entries;
+      expect(entries.map((entry) => entry.walletId).toList(), ['cash', 'jazz']);
+      expect(entries.every((entry) => entry.hasExplicitWallet), isTrue);
+    });
+
     test('does not inherit transaction type across entries', () {
       final controller = SmartEntryBatchController();
       final attempt = controller.tryBuild(
