@@ -169,3 +169,10 @@ final persistentNotificationSnapshotProvider =
     spentToday: ref.watch(todaySpentProvider),
   );
 });
+
+
+final showMoneySetupProvider = Provider<bool>((ref) {
+  final total = ref.watch(totalAvailableProvider);
+  final count = ref.watch(activeTransactionCountProvider);
+  return total.abs() < 0.000001 && count == 0;
+});
