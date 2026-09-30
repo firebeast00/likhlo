@@ -837,12 +837,10 @@ final todaySpentProvider = Provider<double>((ref) {
   );
   if (bucket == null) return 0.0;
 
-  final linkedUdhaarIds = linkedUdharLedgerIds();
   var spent = 0.0;
   for (final entry in bucket.transactions) {
     if (entry.type != 'expense' ||
         entry.category == 'Transfer' ||
-        linkedUdhaarIds.contains(entry.id) ||
         entry.date.year != now.year ||
         entry.date.month != now.month ||
         entry.date.day != now.day) {
