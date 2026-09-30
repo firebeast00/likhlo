@@ -11,11 +11,11 @@ class ExpenseState {
   final List<Expense> deletedExpenses;
   final LedgerIndex index;
 
-  const ExpenseState({
+  ExpenseState({
     required this.allExpenses,
     this.deletedExpenses = const [],
-    this.index = const LedgerIndex.empty(),
-  });
+    LedgerIndex? index,
+  }) : index = index ?? LedgerIndex.rebuild(allExpenses);
 
   List<Expense> get allRecords => [...allExpenses, ...deletedExpenses];
 }
@@ -166,7 +166,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   final Box<Expense> _box = Hive.box<Expense>('expenses');
   final UdharLedgerLinkService _udharLinks = const UdharLedgerLinkService();
 
-  ExpenseNotifier() : super(const ExpenseState(allExpenses: [])) {
+  ExpenseNotifier() : super(ExpenseState(allExpenses: const [])) {
     _loadExpenses();
     unawaited(cleanupExpiredTrash());
   }
