@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_expense_manager/features/budget_predictor/budget_prediction_models.dart';
 import 'package:student_expense_manager/features/budget_predictor/budget_suggestion_engine.dart';
+import 'package:student_expense_manager/features/budget_predictor/monthly_smart_plan_service.dart';
 import 'package:student_expense_manager/models/expense_model.dart';
 
 Expense tx({
@@ -170,6 +171,66 @@ void main() {
       expect(draft.surpriseBuffer, 0);
     });
 
+    test('learns a recurring item across recent months', () {
+      final engine = BudgetSuggestionEngine();
+      final draft = engine.buildDraft(
+        targetMonth: DateTime(2026, 10),
+        allTransactions: [
+          tx(
+            id: 'laundry-jul',
+            title: 'Laundry',
+            amount: 700,
+            date: DateTime(2026, 7, 5),
+            category: 'General',
+          ),
+          tx(
+            id: 'laundry-aug',
+            title: 'Laundry',
+            amount: 800,
+            date: DateTime(2026, 8, 5),
+            category: 'General',
+          ),
+          tx(
+            id: 'laundry-sep',
+            title: 'Laundry',
+            amount: 750,
+            date: DateTime(2026, 9, 5),
+            category: 'General',
+          ),
+        ],
+      );
+
+      final laundry = draft.routineHabits.singleWhere(
+        (item) => item.title == 'Laundry',
+      );
+      expect(laundry.amount, 750);
+      expect(laundry.reason, contains('last 3 months'));
+    });
+
+    test('remembered one-off becomes a next-month expected item', () {
+      final engine = BudgetSuggestionEngine();
+      final key = engine.suggestionKey('Bike Repair', 'General');
+      final draft = engine.buildDraft(
+        targetMonth: DateTime(2026, 10),
+        rememberedPatternKeys: {key},
+        allTransactions: [
+          tx(
+            id: 'repair',
+            title: 'Bike Repair',
+            amount: 1800,
+            date: DateTime(2026, 9, 15),
+            category: 'General',
+          ),
+        ],
+      );
+
+      final repair = draft.routineHabits.singleWhere(
+        (item) => item.title == 'Bike Repair',
+      );
+      expect(repair.amount, 1800);
+      expect(repair.reason, contains('Remembered'));
+    });
+
     test('intent evaluator detects a one-time bill by title', () {
       final evaluator = BudgetIntentEvaluator();
       final expense = tx(
@@ -187,6 +248,100 @@ void main() {
       );
 
       expect(evaluator.evaluateIntent(group), ExpenseIntent.fixedBill);
+    });
+  });
+
+  group('MonthlySmartPlanService', () {
+    test('matches expected items and separates new expenses', () {
+      final engine = BudgetSuggestionEngine();
+      final entries = <Expense>[
+        tx(
+          id: 'sep-hostel',
+          title: 'Hostel Fee',
+          amount: 8000,
+          date: DateTime(2026, 9, 2),
+          category: 'Hostel',
+        ),
+        tx(
+          id: 'sep-petrol-1',
+          title: 'Petrol',
+          amount: 1000,
+          date: DateTime(2026, 9, 3),
+          category: 'Transport',
+        ),
+        tx(
+          id: 'sep-petrol-2',
+          title: 'Petrol',
+          amount: 1000,
+          date: DateTime(2026, 9, 10),
+          category: 'Transport',
+        ),
+        tx(
+          id: 'sep-petrol-3',
+          title: 'Petrol',
+          amount: 1000,
+          date: DateTime(2026, 9, 20),
+          category: 'Transport',
+        ),
+        tx(
+          id: 'oct-hostel',
+          title: 'Hostel Fee',
+          amount: 8000,
+          date: DateTime(2026, 10, 2),
+          category: 'Hostel',
+        ),
+        tx(
+          id: 'oct-petrol',
+          title: 'Petrol',
+          amount: 500,
+          date: DateTime(2026, 10, 5),
+          category: 'Transport',
+        ),
+        tx(
+          id: 'oct-repair',
+          title: 'Bike Repair',
+          amount: 2500,
+          date: DateTime(2026, 10, 6),
+          category: 'General',
+        ),
+        tx(
+          id: 'oct-income',
+          title: 'Home Allowance',
+          amount: 30000,
+          date: DateTime(2026, 10, 1),
+          category: 'Income / Allowance',
+          type: 'income',
+        ),
+      ];
+
+      final draft = engine.buildDraft(
+        targetMonth: DateTime(2026, 10),
+        allTransactions: entries,
+      );
+      final repairKey = engine.suggestionKey('Bike Repair', 'General');
+      final plan = MonthlySmartPlanService(engine: engine).build(
+        draft: draft,
+        allTransactions: entries,
+        rememberedPatternKeys: {repairKey},
+      );
+
+      final hostel = plan.expectedItems.singleWhere(
+        (item) => item.suggestion.title == 'Hostel Fee',
+      );
+      final petrol = plan.expectedItems.singleWhere(
+        (item) => item.suggestion.title == 'Petrol',
+      );
+      final repair = plan.newExpenses.singleWhere(
+        (item) => item.title == 'Bike Repair',
+      );
+
+      expect(hostel.status, MonthlyPlanItemStatus.handled);
+      expect(hostel.actualAmount, 8000);
+      expect(petrol.status, MonthlyPlanItemStatus.inProgress);
+      expect(petrol.actualAmount, 500);
+      expect(repair.rememberedForFuture, isTrue);
+      expect(plan.currentMonthIncome, 30000);
+      expect(plan.currentMonthSpent, 11000);
     });
   });
 }
