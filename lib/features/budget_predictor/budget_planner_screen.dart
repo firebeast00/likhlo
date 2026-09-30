@@ -17,7 +17,8 @@ class BudgetPlannerScreen extends ConsumerStatefulWidget {
 }
 
 class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
-  DateTime _targetMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  DateTime _targetMonth =
+      DateTime(DateTime.now().year, DateTime.now().month, 1);
   final Set<String> _selectedIds = {};
   final TextEditingController _bufferController = TextEditingController();
   String? _initializedMonthKey;
@@ -29,18 +30,18 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
     super.dispose();
   }
 
-  void _initializeDraft(BudgetDraft draft) {
-    final key = DateFormat('yyyy-MM').format(draft.targetMonth);
+  void _initializePlan(MonthlySmartPlan plan) {
+    final key = DateFormat('yyyy-MM').format(plan.draft.targetMonth);
     if (_initializedMonthKey == key) return;
     _initializedMonthKey = key;
     _selectedIds
       ..clear()
       ..addAll(
-        draft.suggestions
+        plan.draft.suggestions
             .where((item) => item.selectedByDefault)
             .map((item) => item.id),
       );
-    _bufferController.text = draft.surpriseBuffer.toStringAsFixed(0);
+    _bufferController.text = plan.draft.surpriseBuffer.toStringAsFixed(0);
   }
 
   void _changeMonth(int delta) {
@@ -61,20 +62,22 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
     return value;
   }
 
-  double _selectedTotal(BudgetDraft draft) {
-    final suggestions = draft.suggestions
-        .where((item) => _selectedIds.contains(item.id));
-    return suggestions.fold<double>(0, (sum, item) => sum + item.amount);
+  double _selectedExpectedTotal(MonthlySmartPlan plan) {
+    return plan.expectedItems
+        .where((item) => _selectedIds.contains(item.suggestion.id))
+        .fold<double>(0, (sum, item) => sum + item.suggestion.amount);
   }
 
-  Future<void> _saveBudget(BudgetDraft draft) async {
+  Future<void> _saveBudget(MonthlySmartPlan plan) async {
     if (_saving) return;
-    final total = _selectedTotal(draft) + _bufferAmount();
+    final total = _selectedExpectedTotal(plan) + _bufferAmount();
     if (!total.isFinite || total < 0) return;
 
     setState(() => _saving = true);
     try {
-      await ref.read(budgetProvider.notifier).setBudget(total, draft.targetMonth);
+      await ref
+          .read(budgetProvider.notifier)
+          .setBudget(total, plan.draft.targetMonth);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -82,7 +85,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
           SnackBar(
             behavior: SnackBarBehavior.floating,
             content: Text(
-              'Budget for ${DateFormat('MMMM yyyy').format(draft.targetMonth)} saved: Rs. ${total.toStringAsFixed(0)}',
+              'Budget for ${DateFormat('MMMM yyyy').format(plan.draft.targetMonth)} saved: Rs. ${total.toStringAsFixed(0)}',
             ),
           ),
         );
@@ -93,138 +96,162 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final draft = ref.watch(budgetDraftProvider(_targetMonth));
-    final existingBudget = ref
-        .watch(budgetProvider)
-        [DateFormat('yyyy-MM').format(_targetMonth)];
-    final primaryColor = Color(ref.watch(settingsProvider).profileColorValue);
-    _initializeDraft(draft);
+    final plan = ref.watch(monthlySmartPlanProvider(_targetMonth));
+    final existingBudget = ref.watch(budgetProvider)[
+        DateFormat('yyyy-MM').format(_targetMonth)];
+    final primaryColor =
+        Color(ref.watch(settingsProvider).profileColorValue);
+    _initializePlan(plan);
 
-    final selectedTotal = _selectedTotal(draft);
+    final selectedExpected = _selectedExpectedTotal(plan);
     final buffer = _bufferAmount();
-    final suggestedTotal = selectedTotal + buffer;
-    final remainingFromAllowance = draft.previousMonthIncome > 0
-        ? draft.previousMonthIncome - suggestedTotal
-        : null;
+    final suggestedBudget = selectedExpected + buffer;
+    final allowance = plan.allowanceContext;
+    final safeMargin =
+        allowance > 0 ? allowance - suggestedBudget : null;
 
     return ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
-        children: [
-          _MonthHeader(
-            month: draft.targetMonth,
-            sourceMonth: draft.sourceMonth,
-            onPrevious: () => _changeMonth(-1),
-            onNext: () => _changeMonth(1),
-          ),
-          const SizedBox(height: 14),
-          if (existingBudget != null)
-            _InfoCard(
-              icon: Icons.flag_outlined,
-              title: 'Current saved budget',
-              message: 'Rs. ${existingBudget.toStringAsFixed(0)}',
-              color: primaryColor,
-            ),
-          if (existingBudget != null) const SizedBox(height: 12),
-          if (draft.fixedObligations.isNotEmpty)
-            _SuggestionSection(
-              title: 'Upcoming Bills & Fees',
-              subtitle: 'Likely fixed obligations from last month',
-              items: draft.fixedObligations,
-              selectedIds: _selectedIds,
-              color: primaryColor,
-              onChanged: (id, selected) {
-                setState(() {
-                  selected ? _selectedIds.add(id) : _selectedIds.remove(id);
-                });
-              },
-            ),
-          if (draft.fixedObligations.isNotEmpty) const SizedBox(height: 14),
-          if (draft.routineHabits.isNotEmpty)
-            _SuggestionSection(
-              title: 'Routine Habits',
-              subtitle:
-                  'Frequent spending from ${DateFormat('MMMM').format(draft.sourceMonth)}',
-              items: draft.routineHabits,
-              selectedIds: _selectedIds,
-              color: primaryColor,
-              onChanged: (id, selected) {
-                setState(() {
-                  selected ? _selectedIds.add(id) : _selectedIds.remove(id);
-                });
-              },
-            ),
-          const SizedBox(height: 14),
-          _SurpriseBufferCard(
-            controller: _bufferController,
-            suggestedAmount: draft.surpriseBuffer,
-            historyMonths: draft.surpriseHistoryMonths,
-            color: primaryColor,
-            onChanged: () => setState(() {}),
-          ),
-          if (draft.fixedObligations.isEmpty &&
-              draft.routineHabits.isEmpty) ...[
-            const SizedBox(height: 14),
-            _InfoCard(
-              icon: Icons.history_rounded,
-              title: 'Not enough repeat history yet',
-              message:
-                  'Keep logging expenses. Likhlo will suggest bills and habits when a clear pattern appears.',
-              color: primaryColor,
-            ),
-          ],
-          const SizedBox(height: 18),
-          _SummaryCard(
-            selectedExpenses: selectedTotal,
-            surpriseBuffer: buffer,
-            total: suggestedTotal,
-            previousIncome: draft.previousMonthIncome,
-            remainingFromAllowance: remainingFromAllowance,
-            color: primaryColor,
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 54,
-            child: FilledButton.icon(
-              onPressed: _saving ? null : () => _saveBudget(draft),
-              style: FilledButton.styleFrom(
-                backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
-              icon: const Icon(Icons.check_rounded),
-              label: Text(
-                _saving
-                    ? 'Saving…'
-                    : 'Save Budget: Rs. ${suggestedTotal.toStringAsFixed(0)}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+      children: [
+        _MonthHeader(
+          month: plan.draft.targetMonth,
+          sourceMonth: plan.draft.sourceMonth,
+          handled: plan.handledCount,
+          total: plan.expectedItems.length,
+          onPrevious: () => _changeMonth(-1),
+          onNext: () => _changeMonth(1),
+        ),
+        const SizedBox(height: 16),
+        _SectionHeader(
+          title: 'Expected this month',
+          subtitle: plan.expectedItems.isEmpty
+              ? 'No reliable recurring items yet.'
+              : 'Likhlo matches these automatically as you log expenses.',
+        ),
+        const SizedBox(height: 8),
+        if (plan.expectedItems.isEmpty)
+          const _EmptyCard(
+            icon: Icons.event_note_outlined,
+            text:
+                'Keep logging expenses. Regular bills and habits will appear here when a pattern becomes clear.',
+          )
+        else
+          ...plan.expectedItems.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ExpectedItemCard(
+                item: item,
+                included: _selectedIds.contains(item.suggestion.id),
+                color: primaryColor,
+                onIncludedChanged: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedIds.add(item.suggestion.id);
+                    } else {
+                      _selectedIds.remove(item.suggestion.id);
+                    }
+                  });
+                },
               ),
             ),
           ),
-        ],
-      );
+        const SizedBox(height: 16),
+        _SectionHeader(
+          title: 'New / unplanned this month',
+          subtitle:
+              'These were not part of this month’s expected plan.',
+        ),
+        const SizedBox(height: 8),
+        if (plan.newExpenses.isEmpty)
+          const _EmptyCard(
+            icon: Icons.check_circle_outline_rounded,
+            text: 'No new unplanned expense has appeared yet.',
+          )
+        else
+          ...plan.newExpenses.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _NewExpenseCard(
+                item: item,
+                color: primaryColor,
+                onRememberChanged: (remembered) {
+                  ref
+                      .read(monthlyPlanMemoryProvider.notifier)
+                      .setRemembered(item.id, remembered);
+                },
+              ),
+            ),
+          ),
+        const SizedBox(height: 18),
+        _SafetyBufferCard(
+          controller: _bufferController,
+          suggestedAmount: plan.draft.surpriseBuffer,
+          historyMonths: plan.draft.surpriseHistoryMonths,
+          color: primaryColor,
+          onChanged: () => setState(() {}),
+        ),
+        const SizedBox(height: 18),
+        _MonthlyOverviewCard(
+          allowance: allowance,
+          expectedPlan: selectedExpected,
+          spentSoFar: plan.currentMonthSpent,
+          unplanned: plan.newExpenseTotal,
+          safeMargin: safeMargin,
+          existingBudget: existingBudget,
+          color: primaryColor,
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 52,
+          child: FilledButton.icon(
+            onPressed: _saving ? null : () => _saveBudget(plan),
+            style: FilledButton.styleFrom(
+              backgroundColor: primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: const Icon(Icons.save_outlined),
+            label: Text(
+              _saving
+                  ? 'Saving…'
+                  : 'Save monthly budget · Rs. ${suggestedBudget.toStringAsFixed(0)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
 class _MonthHeader extends StatelessWidget {
   final DateTime month;
   final DateTime sourceMonth;
+  final int handled;
+  final int total;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
 
   const _MonthHeader({
     required this.month,
     required this.sourceMonth,
+    required this.handled,
+    required this.total,
     required this.onPrevious,
     required this.onNext,
   });
 
   @override
   Widget build(BuildContext context) {
+    final progressText = total == 0
+        ? 'Learning from your spending history'
+        : '$handled of $total expected items handled';
+
     return Card(
       elevation: 0,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
         child: Row(
           children: [
             IconButton(
@@ -236,19 +263,34 @@ class _MonthHeader extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-                    DateFormat('MMMM yyyy').format(month),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    'Monthly Smart Plan',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Smart draft based on ${DateFormat('MMMM').format(sourceMonth)} history',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
+                    DateFormat('MMMM yyyy').format(month),
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    progressText,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Based on ${DateFormat('MMMM').format(sourceMonth)} and recent patterns',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
                   ),
                 ],
               ),
@@ -265,78 +307,224 @@ class _MonthHeader extends StatelessWidget {
   }
 }
 
-class _SuggestionSection extends StatelessWidget {
+class _SectionHeader extends StatelessWidget {
   final String title;
   final String subtitle;
-  final List<BudgetSuggestion> items;
-  final Set<String> selectedIds;
-  final Color color;
-  final void Function(String id, bool selected) onChanged;
 
-  const _SuggestionSection({
+  const _SectionHeader({
     required this.title,
     required this.subtitle,
-    required this.items,
-    required this.selectedIds,
-    required this.color,
-    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExpectedItemCard extends StatelessWidget {
+  final MonthlyPlanItem item;
+  final bool included;
+  final Color color;
+  final ValueChanged<bool> onIncludedChanged;
+
+  const _ExpectedItemCard({
+    required this.item,
+    required this.included,
+    required this.color,
+    required this.onIncludedChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestion = item.suggestion;
+
     return Card(
       elevation: 0,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
-        child: Column(
+        padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
+            Tooltip(
+              message: 'Include in monthly budget',
+              child: Checkbox(
+                value: included,
+                activeColor: color,
+                onChanged: (value) =>
+                    onIncludedChanged(value ?? false),
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(width: 2),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                subtitle,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              padding: const EdgeInsets.only(top: 4),
+              child: Icon(_statusIcon(item.status), size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    suggestion.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _statusText(item.status),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.status == MonthlyPlanItemStatus.upcoming
+                        ? suggestion.reason
+                        : _actualDetail(item),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '~Rs. ${suggestion.amount.toStringAsFixed(0)}',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _statusText(MonthlyPlanItemStatus status) {
+    switch (status) {
+      case MonthlyPlanItemStatus.upcoming:
+        return 'Upcoming';
+      case MonthlyPlanItemStatus.inProgress:
+        return 'In progress';
+      case MonthlyPlanItemStatus.handled:
+        return 'Handled this month';
+    }
+  }
+
+  IconData _statusIcon(MonthlyPlanItemStatus status) {
+    switch (status) {
+      case MonthlyPlanItemStatus.upcoming:
+        return Icons.radio_button_unchecked_rounded;
+      case MonthlyPlanItemStatus.inProgress:
+        return Icons.timelapse_rounded;
+      case MonthlyPlanItemStatus.handled:
+        return Icons.check_circle_rounded;
+    }
+  }
+
+  String _actualDetail(MonthlyPlanItem item) {
+    final logs = item.actualFrequency == 1
+        ? '1 log'
+        : '${item.actualFrequency} logs';
+    return '$logs · Rs. ${item.actualAmount.toStringAsFixed(0)} so far';
+  }
+}
+
+class _NewExpenseCard extends StatelessWidget {
+  final MonthlyNewExpense item;
+  final Color color;
+  final ValueChanged<bool> onRememberChanged;
+
+  const _NewExpenseCard({
+    required this.item,
+    required this.color,
+    required this.onRememberChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final logs =
+        item.frequency == 1 ? '1 log' : '${item.frequency} logs';
+
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.new_releases_outlined, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${item.category} · $logs',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  'Rs. ${item.amount.toStringAsFixed(0)}',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            ...items.map(
-              (item) => CheckboxListTile(
-                value: selectedIds.contains(item.id),
-                activeColor: color,
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                onChanged: (value) => onChanged(item.id, value ?? false),
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    Text(
-                      'Rs. ${item.amount.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () =>
+                    onRememberChanged(!item.rememberedForFuture),
+                icon: Icon(
+                  item.rememberedForFuture
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_add_outlined,
+                  size: 18,
                 ),
-                subtitle: Text(
-                  item.reason,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: Colors.grey.shade600,
-                  ),
+                label: Text(
+                  item.rememberedForFuture
+                      ? 'Remembered for next month'
+                      : 'Remember next month',
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: color,
                 ),
               ),
             ),
@@ -347,14 +535,14 @@ class _SuggestionSection extends StatelessWidget {
   }
 }
 
-class _SurpriseBufferCard extends StatelessWidget {
+class _SafetyBufferCard extends StatelessWidget {
   final TextEditingController controller;
   final double suggestedAmount;
   final int historyMonths;
   final Color color;
   final VoidCallback onChanged;
 
-  const _SurpriseBufferCard({
+  const _SafetyBufferCard({
     required this.controller,
     required this.suggestedAmount,
     required this.historyMonths,
@@ -366,107 +554,116 @@ class _SurpriseBufferCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.shield_outlined, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Surprise Expense Buffer',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              suggestedAmount > 0
-                  ? 'Estimated from unplanned non-shopping expenses across the last ${historyMonths} months.'
-                  : 'No reliable surprise-spending pattern yet. You can still add your own safety buffer.',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
-              onChanged: (_) => onChanged(),
-              decoration: InputDecoration(
-                labelText: 'Buffer amount',
-                prefixText: 'Rs. ',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: color, width: 1.5),
-                ),
+      child: ExpansionTile(
+        leading: const Icon(Icons.shield_outlined),
+        title: const Text(
+          'Safety buffer',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(
+          suggestedAmount > 0
+              ? 'Optional room for unexpected expenses'
+              : 'Add a small reserve if you want one',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          Text(
+            suggestedAmount > 0
+                ? 'Likhlo estimated this from unplanned spending in $historyMonths recent month${historyMonths == 1 ? '' : 's'}.'
+                : 'There is not enough surprise-spending history yet.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                RegExp(r'^\d*\.?\d{0,2}'),
+              ),
+            ],
+            onChanged: (_) => onChanged(),
+            decoration: InputDecoration(
+              labelText: 'Safety buffer',
+              prefixText: 'Rs. ',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: color, width: 1.5),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  final double selectedExpenses;
-  final double surpriseBuffer;
-  final double total;
-  final double previousIncome;
-  final double? remainingFromAllowance;
+class _MonthlyOverviewCard extends StatelessWidget {
+  final double allowance;
+  final double expectedPlan;
+  final double spentSoFar;
+  final double unplanned;
+  final double? safeMargin;
+  final double? existingBudget;
   final Color color;
 
-  const _SummaryCard({
-    required this.selectedExpenses,
-    required this.surpriseBuffer,
-    required this.total,
-    required this.previousIncome,
-    required this.remainingFromAllowance,
+  const _MonthlyOverviewCard({
+    required this.allowance,
+    required this.expectedPlan,
+    required this.spentSoFar,
+    required this.unplanned,
+    required this.safeMargin,
+    required this.existingBudget,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
+        color: color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.16)),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _row('Selected expenses', selectedExpenses),
-          const SizedBox(height: 8),
-          _row('Surprise buffer', surpriseBuffer),
-          const Divider(height: 22),
-          _row('Suggested budget', total, bold: true),
-          if (previousIncome > 0) ...[
-            const SizedBox(height: 12),
-            _row('Last month income / allowance', previousIncome),
-            if (remainingFromAllowance != null) ...[
-              const SizedBox(height: 6),
-              _row(
-                'Margin after this plan',
-                remainingFromAllowance!,
-                bold: true,
-              ),
-            ],
+          const Text(
+            'Monthly overview',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (allowance > 0) _line('Allowance / income context', allowance),
+          if (allowance > 0) const SizedBox(height: 7),
+          _line('Expected plan', expectedPlan),
+          const SizedBox(height: 7),
+          _line('Spent so far', spentSoFar),
+          if (unplanned > 0) ...[
+            const SizedBox(height: 7),
+            _line('New / unplanned', unplanned),
+          ],
+          if (safeMargin != null) ...[
+            const Divider(height: 22),
+            _line('Safe margin after plan', safeMargin!, bold: true),
+          ],
+          if (existingBudget != null) ...[
+            const SizedBox(height: 7),
+            _line('Current saved budget', existingBudget!),
           ],
         ],
       ),
     );
   }
 
-  Widget _row(String label, double amount, {bool bold = false}) {
+  Widget _line(String label, double amount, {bool bold = false}) {
     return Row(
       children: [
         Expanded(
@@ -489,48 +686,33 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
+class _EmptyCard extends StatelessWidget {
   final IconData icon;
-  final String title;
-  final String message;
-  final Color color;
+  final String text;
 
-  const _InfoCard({
+  const _EmptyCard({
     required this.icon,
-    required this.title,
-    required this.message,
-    required this.color,
+    required this.text,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  message,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-              ],
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
