@@ -14,6 +14,7 @@ import '../providers/settings_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../models/expense_model.dart';
+import '../models/debt_model.dart';
 import '../models/wallet_model.dart';
 import '../app/app_shell.dart';
 import '../app/app_navigation.dart';
