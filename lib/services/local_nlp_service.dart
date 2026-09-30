@@ -31,6 +31,9 @@ enum SmartEntryQueryMetric {
   net,
   transactionCount,
   summary,
+  udharSummary,
+  udharReceivable,
+  udharPayable,
 }
 
 enum SmartEntryTimeRange {
@@ -1249,6 +1252,25 @@ class LocalNlpService {
   }
 
   SmartEntryQueryMetric? _queryMetric(String input) {
+    final hasUdhar = RegExp(r'\b(udhar|udhaar|debt|loan)\b').hasMatch(input);
+    if (hasUdhar &&
+        RegExp(
+          r'\b(wapas\s+lena|to\s+receive|receivable|who\s+owes\s+me|mujhe\s+milna|lena\s+hai)\b',
+        ).hasMatch(input)) {
+      return SmartEntryQueryMetric.udharReceivable;
+    }
+    if (hasUdhar &&
+        RegExp(
+          r'\b(wapas\s+dena|to\s+pay|payable|i\s+owe|owe|dena\s+hai)\b',
+        ).hasMatch(input)) {
+      return SmartEntryQueryMetric.udharPayable;
+    }
+    if (hasUdhar &&
+        RegExp(
+          r'\b(summary|overview|hisaab|hisab|total|kitna|kitni|kitne)\b',
+        ).hasMatch(input)) {
+      return SmartEntryQueryMetric.udharSummary;
+    }
     if (RegExp(
       r'\b(summary|overview|hisaab|hisab)\b|\b(?:month|mahine|mahina)\b.{0,25}\btotal\b|\btotal\b.{0,25}\b(?:month|mahine|mahina)\b',
     ).hasMatch(input)) {
