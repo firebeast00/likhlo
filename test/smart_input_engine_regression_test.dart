@@ -166,6 +166,56 @@ void main() {
       expect(pay.parsed.queryMetric, SmartEntryQueryMetric.udharPayable);
     });
 
+    test('repairs live voice aliases and routes observed commands safely', () {
+      const accounts = [
+        SmartEntryAccount(
+          id: 'jazz',
+          name: 'JazzCash',
+          type: 'jazzcash',
+          availableBalance: 10000,
+        ),
+        SmartEntryAccount(
+          id: 'bank',
+          name: 'Bank Account',
+          type: 'custom',
+          availableBalance: 10000,
+        ),
+      ];
+
+      final transfer = engine.parse(
+        '5000 JSK se bank account mein transfer karo',
+        categories,
+        source: SmartInputSource.voice,
+        accounts: accounts,
+      );
+      final pdf = engine.parse('show monthly PDF', categories);
+      final monthlyList =
+          engine.parse('mahine ke kharcho ki list dikhao', categories);
+      final summaryPdf =
+          engine.parse('mahine ke kharcho ki samri PDF', categories);
+      final udhar =
+          engine.parse('Jawad ko 2000 Udhar Diye', categories);
+
+      expect(transfer.parsed.intent, SmartEntryIntent.transfer);
+      expect(transfer.normalizedText, contains('jazzcash'));
+      expect(transfer.command, isA<TransferCommand>());
+
+      expect(pdf.parsed.intent, SmartEntryIntent.navigate);
+      expect(pdf.parsed.navigationTarget, 'Settings');
+
+      expect(monthlyList.parsed.intent, SmartEntryIntent.searchEntries);
+      expect(monthlyList.parsed.timeRange, SmartEntryTimeRange.thisMonth);
+      expect(monthlyList.parsed.entryTypeFilter, 'expense');
+
+      expect(summaryPdf.parsed.intent, SmartEntryIntent.query);
+      expect(summaryPdf.parsed.queryMetric, SmartEntryQueryMetric.summary);
+      expect(summaryPdf.parsed.timeRange, SmartEntryTimeRange.thisMonth);
+
+      expect(udhar.parsed.intent, SmartEntryIntent.navigate);
+      expect(udhar.parsed.navigationTarget, 'Udhaar');
+      expect(udhar.command, isA<ReadOnlySmartCommand>());
+    });
+
     test('existing transaction and search commands keep their paths', () {
       final expense = engine.parse('500 petrol', categories);
       final deletion = engine.parse('delete burger', categories);
