@@ -66,6 +66,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         return wallet.id;
       }
     }
+    for (final wallet in wallets) {
+      if (!wallet.isBackup) return wallet.id;
+    }
     return wallets.first.id;
   }
 
@@ -1438,7 +1441,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     required Color primaryColor,
     required bool isDark,
   }) {
-    if (items.isEmpty) return const SizedBox.shrink();
+    if (items.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
     final total =
         items.fold<double>(0, (sum, entry) => sum + entry.amount);
 
