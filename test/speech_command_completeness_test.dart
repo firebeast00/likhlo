@@ -54,6 +54,16 @@ void main() {
     expect(light.reason, 'app_control');
   });
 
+  test('generic balance voice question is complete', () {
+    final balance = check('kitne paise hain');
+    final account = check('account mein kitne paise hain');
+
+    expect(balance.isComplete, isTrue);
+    expect(balance.reason, 'query_metric');
+    expect(account.isComplete, isTrue);
+    expect(account.reason, 'query_metric');
+  });
+
   test('expense waits for both amount and item', () {
     expect(check('add 500').isComplete, isFalse);
     expect(check('add shoes for 500').isComplete, isTrue);
