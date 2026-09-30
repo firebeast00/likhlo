@@ -25,7 +25,8 @@ class VoiceEntryController {
 
   static const pauseWindow = Duration(seconds: 5);
   static const stabilityWindow = Duration(seconds: 3);
+  static const readOnlyStabilityWindow = Duration(milliseconds: 1200);
   static const sessionLimit = Duration(seconds: 30);
-  static const startupGrace = Duration(milliseconds: 1200);
+  static const startupGrace = Duration(milliseconds: 2500);
   static const prematureStatusGuard = Duration(milliseconds: 600);
 }
