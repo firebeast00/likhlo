@@ -111,6 +111,9 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         case SmartEntryIntent.navigate:
           await _handleSmartEntryNavigation(command);
           return _smartInputCtrl.text.trim().isEmpty;
+        case SmartEntryIntent.appControl:
+          await _handleSmartEntryAppControl(command);
+          return _smartInputCtrl.text.trim().isEmpty;
         case SmartEntryIntent.unknown:
           title = 'Command not recognized';
           message = 'Try an expense or income command with an amount.';
