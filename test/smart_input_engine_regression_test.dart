@@ -122,6 +122,22 @@ void main() {
       expect(expenseEntry.parsed.amount, 500);
     });
 
+    test('understands generic spoken balance questions', () {
+      final generic = engine.parse('kitne paise hain', categories);
+      final account = engine.parse('account mein kitne paise hain', categories);
+      final spending =
+          engine.parse('aaj kitne paise kharch hue', categories);
+
+      expect(generic.parsed.intent, SmartEntryIntent.query);
+      expect(generic.parsed.queryMetric, SmartEntryQueryMetric.balance);
+
+      expect(account.parsed.intent, SmartEntryIntent.query);
+      expect(account.parsed.queryMetric, SmartEntryQueryMetric.balance);
+
+      expect(spending.parsed.intent, SmartEntryIntent.query);
+      expect(spending.parsed.queryMetric, SmartEntryQueryMetric.spending);
+    });
+
     test('understands wallet and category questions used daily', () {
       final wallet = engine.parse('cash me kitna hai', categories);
       final category =
