@@ -87,7 +87,83 @@ class MultiEntryParser {
         .replaceAll(',', '')
         .replaceAll(
           RegExp(
-            r'\s*(k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr)\s*$',
+            r'\s*(sau|hundred|k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr)\s*
+          ),
+          '',
+        )
+        .trim();
+
+    final number = double.tryParse(numeric);
+    final hasMoneyMarker = RegExp(
+      r'\b(rs\.?|pkr)\b|(?:\d)\s*(sau|hundred|k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr)\b',
+      caseSensitive: false,
+    ).hasMatch(value);
+
+    final before = input.substring(start > 18 ? start - 18 : 0, start);
+    final after = input.substring(end, end + 18 < input.length ? end + 18 : input.length);
+
+    if (RegExp(r'[/:-]\s*$').hasMatch(before) ||
+        RegExp(r'^\s*[/:-]').hasMatch(after)) {
+      return true;
+    }
+
+    if (number != null &&
+        number >= 1 &&
+        number <= 31 &&
+        RegExp(
+          r'^\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b',
+          caseSensitive: false,
+        ).hasMatch(after)) {
+      return true;
+    }
+
+    if (!hasMoneyMarker &&
+        number != null &&
+        number >= 1 &&
+        number <= 24 &&
+        (RegExp(r'\b(at|time)\s*$', caseSensitive: false).hasMatch(before) ||
+            RegExp(r'^\s*(am|pm)\b', caseSensitive: false).hasMatch(after))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  String _cleanSegment(String value) {
+    return value
+        .replaceAll(RegExp(r'^[,;:\s]+'), '')
+        .replaceAll(RegExp(r'[,;:\s]+$'), '')
+        .trim();
+  }
+
+  static final RegExp _numericAmountPattern = RegExp(
+    r'(?:(?:rs\.?|pkr)\s*)?(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*(?:sau|hundred|k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr))?',
+    caseSensitive: false,
+  );
+
+  static final RegExp _delimiterPattern = RegExp(
+    r'(?:[,;]|\b(?:and|aur|phir|then|plus|next)\b)',
+    caseSensitive: false,
+  );
+}
+
+class _AmountAnchor {
+  final int start;
+  final int end;
+
+  const _AmountAnchor({
+    required this.start,
+    required this.end,
+  });
+}
+
+class _DelimiterMatch {
+  final int start;
+  final int end;
+
+  const _DelimiterMatch(this.start, this.end);
+}
+,
           ),
           '',
         )
@@ -137,7 +213,7 @@ class MultiEntryParser {
   }
 
   static final RegExp _numericAmountPattern = RegExp(
-    r'(?:(?:rs\.?|pkr)\s*)?\d+(?:[,.]\d+)?(?:\s*(?:k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr))?',
+    r'(?:(?:rs\.?|pkr)\s*)?(?:\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*(?:sau|hundred|k|thousand|hazar|hazaar|lakh|lac|lak|million|crore|krore|cr))?',
     caseSensitive: false,
   );
 
