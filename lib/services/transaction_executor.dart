@@ -55,12 +55,12 @@ class CreateTransactionCommand extends LedgerCommand {
 
 class CreateBatchTransactionsCommand extends LedgerCommand {
   final List<Expense> entries;
-  final double detectedTotal;
+  final double? detectedTotal;
   final bool discrepancyConfirmed;
 
   const CreateBatchTransactionsCommand({
     required this.entries,
-    required this.detectedTotal,
+    this.detectedTotal,
     this.discrepancyConfirmed = false,
   }) : super(TransactionAction.batch);
 }
@@ -216,8 +216,9 @@ class TransactionExecutor {
         );
       case CreateBatchTransactionsCommand():
         if (command.entries.isEmpty ||
-            !command.detectedTotal.isFinite ||
-            command.detectedTotal < 0 ||
+            (command.detectedTotal != null &&
+                (!command.detectedTotal!.isFinite ||
+                    command.detectedTotal! < 0)) ||
             command.entries.any(
               (entry) => !entry.amount.isFinite || entry.amount <= 0,
             ) ||
@@ -233,11 +234,16 @@ class TransactionExecutor {
           0,
           (sum, entry) => sum + entry.amount,
         );
-        final discrepancy = (selectedTotal - command.detectedTotal).abs();
-        final discrepancyLimit = command.detectedTotal * 0.05 > 5
-            ? command.detectedTotal * 0.05
+        final detectedTotal = command.detectedTotal;
+        final discrepancy = detectedTotal == null
+            ? 0.0
+            : (selectedTotal - detectedTotal).abs();
+        final discrepancyLimit = detectedTotal != null &&
+                detectedTotal * 0.05 > 5
+            ? detectedTotal * 0.05
             : 5.0;
-        if (command.detectedTotal > 0 &&
+        if (detectedTotal != null &&
+            detectedTotal > 0 &&
             discrepancy > discrepancyLimit &&
             !command.discrepancyConfirmed) {
           return const TransactionResult(
