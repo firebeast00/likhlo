@@ -413,6 +413,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       _smartEntrySearchRange = command.timeRange;
       _smartEntrySearchAllHistory = true;
     });
+    _searchQueryNotifier.value = query;
     _primaryTabsController.select(PrimaryLedgerTab.main);
     _smartInputCtrl.clear();
     _showTransactionInfo(
