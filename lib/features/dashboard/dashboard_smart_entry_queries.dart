@@ -443,6 +443,14 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     }
     if (target == 'Udhaar' || target == 'Udhar') {
       _openPrimaryLedgerTab(PrimaryLedgerTab.udhar);
+      if (RegExp(r'\b(udhar|udhaar|debt|loan)\b')
+              .hasMatch(command.rawInput.toLowerCase()) &&
+          RegExp(r'\d').hasMatch(command.rawInput)) {
+        _showTransactionInfo(
+          'This was not saved as a normal expense. Use Quick Udhar here to review and save the debt entry.',
+          title: 'Udhar command detected',
+        );
+      }
       return;
     }
     final section = AppSection.fromLabel(target);
