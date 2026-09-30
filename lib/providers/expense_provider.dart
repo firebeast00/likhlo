@@ -792,6 +792,34 @@ final activeTransactionCountProvider = Provider<int>((ref) {
   );
 });
 
+final transactionByIdProvider =
+    Provider.family<Expense?, String>((ref, transactionId) {
+  return ref.watch(
+    expenseProvider.select((state) => state.index.byId[transactionId]),
+  );
+});
+
+final monthlyTransactionsProvider =
+    Provider.family<List<Expense>, DateTime>((ref, month) {
+  return ref.watch(
+    monthlyLedgerProvider(month).select((summary) => summary.transactions),
+  );
+});
+
+final monthlySpentProvider =
+    Provider.family<double, DateTime>((ref, month) {
+  return ref.watch(
+    monthlyLedgerProvider(month).select((summary) => summary.spent),
+  );
+});
+
+final monthlyIncomeProvider =
+    Provider.family<double, DateTime>((ref, month) {
+  return ref.watch(
+    monthlyLedgerProvider(month).select((summary) => summary.income),
+  );
+});
+
 final walletMovementProvider =
     Provider.family<double, String>((ref, walletId) {
   return ref.watch(
