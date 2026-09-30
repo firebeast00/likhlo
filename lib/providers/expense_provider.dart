@@ -68,13 +68,10 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     final active = <Expense>[];
     final deleted = <Expense>[];
     for (final entry in _box.values) {
-      final normalized = entry.workspaceId != 'personal'
-          ? entry.copyWith(workspaceId: 'personal')
-          : entry;
-      if (normalized.deletedAt == null) {
-        active.add(normalized);
+      if (entry.deletedAt == null) {
+        active.add(entry);
       } else {
-        deleted.add(normalized);
+        deleted.add(entry);
       }
     }
     state = ExpenseState(
