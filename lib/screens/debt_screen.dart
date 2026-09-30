@@ -654,159 +654,100 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
     final settings = ref.read(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 24,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            backgroundColor: Theme.of(context).cardColor,
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.handshake_rounded,
-                    color: primaryColor,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    "Udhaar Record",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.9,
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (sheetContext) => StatefulBuilder(
+          builder: (context, setModalState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final wallets = ref.read(walletProvider);
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+              ),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🌟 Sleek Segmented Control for Type
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.black26 : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(16),
+                    const Text(
+                      'Add Udhar',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setModalState(() => type = 'lent'),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: type == 'lent'
-                                      ? Colors.green
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    "I Gave (Lent)",
-                                    style: TextStyle(
-                                      color: type == 'lent'
-                                          ? Colors.white
-                                          : Colors.grey.shade500,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Record money you gave or received as a loan.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<String>(
+                        showSelectedIcon: false,
+                        segments: const [
+                          ButtonSegment(
+                            value: 'lent',
+                            label: Text('I Gave'),
+                            icon: Icon(Icons.arrow_upward_rounded),
                           ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () =>
-                                  setModalState(() => type = 'borrowed'),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: type == 'borrowed'
-                                      ? Colors.red
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    "I Took (Borrowed)",
-                                    style: TextStyle(
-                                      color: type == 'borrowed'
-                                          ? Colors.white
-                                          : Colors.grey.shade500,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                          ButtonSegment(
+                            value: 'borrowed',
+                            label: Text('I Took'),
+                            icon: Icon(Icons.arrow_downward_rounded),
                           ),
                         ],
+                        selected: {type},
+                        onSelectionChanged: (selection) {
+                          setModalState(() => type = selection.first);
+                        },
                       ),
                     ),
                     const SizedBox(height: 16),
                     _buildModernInput(
                       nameCtrl,
-                      "Person Name",
-                      Icons.person_rounded,
+                      'Person name',
+                      Icons.person_outline_rounded,
                       primaryColor,
                       isDark,
                     ),
                     const SizedBox(height: 12),
                     _buildModernInput(
                       amountCtrl,
-                      "Amount (Rs.)",
-                      Icons.attach_money_rounded,
+                      'Amount (Rs.)',
+                      Icons.payments_outlined,
                       primaryColor,
                       isDark,
                       isNumber: true,
                     ),
                     const SizedBox(height: 12),
-
                     DropdownButtonFormField<String>(
                       isExpanded: true,
-                      initialValue:
-                          ref
-                              .read(walletProvider)
-                              .any((wallet) => wallet.id == selectedWalletId)
+                      initialValue: wallets.any(
+                        (wallet) => wallet.id == selectedWalletId,
+                      )
                           ? selectedWalletId
                           : null,
                       decoration: InputDecoration(
                         labelText: type == 'lent'
-                            ? 'Paid from wallet'
-                            : 'Receiving wallet',
+                            ? 'Paid from'
+                            : 'Received in',
                         prefixIcon: const Icon(
                           Icons.account_balance_wallet_outlined,
                         ),
-                        border: const OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                      items: ref
-                          .read(walletProvider)
+                      items: wallets
                           .map(
                             (wallet) => DropdownMenuItem(
                               value: wallet.id,
@@ -816,142 +757,138 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                               ),
                             ),
                           )
-                          .toList(),
-                      onChanged: (id) =>
-                          setModalState(() => selectedWalletId = id),
+                          .toList(growable: false),
+                      onChanged: (id) {
+                        setModalState(() => selectedWalletId = id);
+                      },
                     ),
                     const SizedBox(height: 12),
-
-                    // DATE PICKER
-                    GestureDetector(
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
                       onTap: () async {
+                        final now = DateTime.now();
                         final date = await showDatePicker(
                           context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime(2030),
+                          initialDate: selectedDate ?? now,
+                          firstDate: now,
+                          lastDate: DateTime(now.year + 5, 12, 31),
                         );
                         if (date != null) {
                           setModalState(() => selectedDate = date);
                         }
                       },
                       child: Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 14,
+                          vertical: 15,
                         ),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.black26 : Colors.grey.shade50,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.055)
+                              : Colors.grey.shade50,
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outlineVariant,
+                          ),
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.calendar_today_rounded,
-                              color: Colors.grey.shade500,
+                            const Icon(
+                              Icons.calendar_today_outlined,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              selectedDate == null
-                                  ? "Set Due Date (Optional)"
-                                  : "Due: ${DateFormat.yMMMd().format(selectedDate!)}",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                                color: selectedDate == null
-                                    ? Colors.grey.shade500
-                                    : (isDark ? Colors.white : Colors.black87),
+                            Expanded(
+                              child: Text(
+                                selectedDate == null
+                                    ? 'Due date (optional)'
+                                    : 'Due ${DateFormat.yMMMd().format(selectedDate!)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                            const Spacer(),
-                            Icon(
-                              Icons.edit_calendar_rounded,
-                              size: 18,
-                              color: Colors.grey.shade400,
-                            ),
+                            if (selectedDate != null)
+                              IconButton(
+                                tooltip: 'Clear due date',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setModalState(() => selectedDate = null);
+                                },
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 18,
+                                ),
+                              ),
                           ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: primaryColor,
+                        ),
+                        onPressed: _savingDebt
+                            ? null
+                            : () async {
+                                final walletId = selectedWalletId;
+                                if (walletId == null) {
+                                  ScaffoldMessenger.of(sheetContext)
+                                      .showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                          Text('Choose a wallet first.'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                final saved = await _saveDebtRecord(
+                                  name: nameCtrl.text,
+                                  amount: double.tryParse(
+                                        amountCtrl.text.trim(),
+                                      ) ??
+                                      0,
+                                  type: type,
+                                  walletId: walletId,
+                                  dueDate: selectedDate,
+                                );
+                                if (saved) {
+                                  unawaited(
+                                    NotificationService()
+                                        .showManualLedgerResult(
+                                      'Udhaar saved',
+                                      '${nameCtrl.text.trim()} · Rs. ${amountCtrl.text.trim()}',
+                                    ),
+                                  );
+                                }
+                                if (saved && sheetContext.mounted) {
+                                  Navigator.pop(sheetContext);
+                                }
+                              },
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text(
+                          'Save record',
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            actions: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () async {
-                        final walletId = selectedWalletId;
-                        if (walletId == null) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(
-                              content: Text('Choose a wallet first.'),
-                            ),
-                          );
-                          return;
-                        }
-                      final saved = await _saveDebtRecord(
-                        name: nameCtrl.text,
-                          amount: double.tryParse(amountCtrl.text.trim()) ?? 0,
-                          type: type,
-                          walletId: walletId,
-                        dueDate: selectedDate,
-                      );
-                      if (saved) {
-                        unawaited(NotificationService().showManualLedgerResult(
-                          'Udhaar saved',
-                          '${nameCtrl.text.trim()} · Rs. ${amountCtrl.text.trim()}',
-                        ));
-                      }
-                      if (saved && ctx.mounted) Navigator.pop(ctx);
-                      },
-                      child: const Text(
-                        "Save Record",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
+            );
+          },
+        ),
+      ).whenComplete(() {
+        nameCtrl.dispose();
+        amountCtrl.dispose();
+      }),
     );
   }
 
