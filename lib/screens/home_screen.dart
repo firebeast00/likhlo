@@ -19,6 +19,7 @@ import '../app/app_shell.dart';
 import '../app/app_navigation.dart';
 import '../features/smart_entry/smart_entry_controller.dart';
 import '../features/smart_entry/smart_entry_batch_controller.dart';
+import '../features/smart_entry/transaction_batch_draft.dart';
 import 'batch_transaction_review_screen.dart';
 import '../features/voice/voice_entry_controller.dart';
 import '../features/feedback/feedback_coordinator.dart';
