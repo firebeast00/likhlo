@@ -192,6 +192,38 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     return sorted;
   }
 
+  List<Expense> _mergeNewest(
+    List<Expense> existing,
+    Iterable<Expense> additions,
+  ) {
+    final incoming = _sortByNewest(additions);
+    if (incoming.isEmpty) return existing;
+    if (existing.isEmpty) return incoming;
+
+    final result = <Expense>[];
+    var existingIndex = 0;
+    var incomingIndex = 0;
+    while (existingIndex < existing.length &&
+        incomingIndex < incoming.length) {
+      final current = existing[existingIndex];
+      final added = incoming[incomingIndex];
+      if (!added.date.isBefore(current.date)) {
+        result.add(added);
+        incomingIndex++;
+      } else {
+        result.add(current);
+        existingIndex++;
+      }
+    }
+    if (existingIndex < existing.length) {
+      result.addAll(existing.skip(existingIndex));
+    }
+    if (incomingIndex < incoming.length) {
+      result.addAll(incoming.skip(incomingIndex));
+    }
+    return result;
+  }
+
   ExpenseState _nextState({
     required List<Expense> allExpenses,
     List<Expense>? deletedExpenses,
@@ -246,24 +278,20 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     )) {
       return false;
     }
-    if (!keepsWalletBalancesNonNegative(
+    if (!keepsCachedWalletBalancesNonNegative(
       openingBalances: {
         for (final wallet in Hive.box<Wallet>('wallets').values)
           wallet.id: wallet.balance,
       },
-      existingEntries: state.allExpenses,
+      currentMovements: state.index.walletMovements,
       proposedEntries: additions,
     )) {
       return false;
     }
 
     await _box.putAll({for (final entry in additions) entry.id: entry});
-    final addedIds = additions.map((entry) => entry.id).toSet();
     state = _nextState(
-      allExpenses: _sortByNewest([
-        ...state.allExpenses.where((entry) => !addedIds.contains(entry.id)),
-        ...additions,
-      ]),
+      allExpenses: _mergeNewest(state.allExpenses, additions),
       deletedExpenses: state.deletedExpenses,
     );
     return true;
@@ -598,6 +626,50 @@ final expenseProvider =
     StateNotifierProvider<ExpenseNotifier, ExpenseState>((ref) {
   return ExpenseNotifier();
 });
+
+bool keepsCachedWalletBalancesNonNegative({
+  required Map<String, double> openingBalances,
+  required Map<String, double> currentMovements,
+  required Iterable<Expense> proposedEntries,
+}) {
+  final proposed = proposedEntries.toList(growable: false);
+  if (proposed.any(
+    (entry) =>
+        !openingBalances.containsKey(entry.walletId) ||
+        !entry.amount.isFinite ||
+        entry.amount <= 0,
+  )) {
+    return false;
+  }
+
+  final balances = <String, double>{
+    for (final item in openingBalances.entries)
+      item.key: item.value + (currentMovements[item.key] ?? 0.0),
+  };
+  final affectedWallets = proposed.map((entry) => entry.walletId).toSet();
+  final before = {
+    for (final walletId in affectedWallets) walletId: balances[walletId]!,
+  };
+
+  for (final entry in proposed) {
+    final delta = entry.type == 'income'
+        ? entry.amount
+        : entry.type == 'expense'
+            ? -entry.amount
+            : 0.0;
+    balances[entry.walletId] = balances[entry.walletId]! + delta;
+  }
+
+  const tolerance = 0.000001;
+  for (final walletId in affectedWallets) {
+    final previous = before[walletId]!;
+    final after = balances[walletId]!;
+    if (!after.isFinite) return false;
+    if (previous >= -tolerance && after < -tolerance) return false;
+    if (previous < -tolerance && after < previous - tolerance) return false;
+  }
+  return true;
+}
 
 bool keepsWalletBalancesNonNegative({
   required Map<String, double> openingBalances,
