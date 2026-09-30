@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,23 +45,21 @@ class AppDrawer extends ConsumerWidget {
             topRight: Radius.circular(28),
             bottomRight: Radius.circular(28),
           ),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colorScheme.surface.withValues(
-                  alpha: isDark ? 0.94 : 0.91,
-                ),
-                border: Border(
-                  right: BorderSide(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.10)
-                        : colorScheme.outlineVariant.withValues(alpha: 0.55),
-                  ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(
+                alpha: isDark ? 0.97 : 0.95,
+              ),
+              border: Border(
+                right: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.55),
                 ),
               ),
-              child: SafeArea(
-                child: Column(
+            ),
+            child: SafeArea(
+              child: Column(
                   children: [
                     _ProfileHeader(
                       displayName: displayName,
@@ -138,7 +134,6 @@ class AppDrawer extends ConsumerWidget {
                       isDark,
                     ),
                   ],
-                ),
               ),
             ),
           ),
