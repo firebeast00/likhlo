@@ -285,12 +285,11 @@ void main() {
       colorValue: 0,
       walletId: 'cash',
     );
-    final next = LedgerIndex.rebuild(
-      [october, september, august],
-      previous: previous,
-    );
+    final next = previous.withAdded([october]);
 
     expect(next.bucketFor(DateTime(2026, 8)), same(augustBucket));
+    expect(next.bucketFor(DateTime(2026, 10))?.spent, 300);
+    expect(next.walletMovements['cash'], -600);
   });
 
   test('cached add guard matches full-ledger overdraft behavior', () {
