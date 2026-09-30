@@ -410,6 +410,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       _smartEntrySearchAllHistory = true;
     });
     _searchQueryNotifier.value = query;
+    _categorySelectionNotifier.value = category;
     _primaryTabsController.select(PrimaryLedgerTab.main);
     _smartInputCtrl.clear();
     _showTransactionInfo(
