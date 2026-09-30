@@ -130,9 +130,10 @@ class BudgetSuggestionEngine {
         normalizedTarget.month - offset,
         1,
       );
-      final monthExpenses = eligible.where(
-        (entry) => _sameMonth(entry.date, month),
-      );
+      final monthExpenses = eligible
+          .where((entry) => _sameMonth(entry.date, month))
+          .toList(growable: false);
+      if (monthExpenses.isEmpty) continue;
       final groups = groupExpenses(monthExpenses);
       var unexpectedTotal = 0.0;
       for (final group in groups) {
@@ -237,8 +238,8 @@ class BudgetSuggestionEngine {
   String _canonicalTitle(String value) {
     final title = value
         .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9\\s]+'), ' ')
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
     const aliases = <String, String>{
@@ -257,7 +258,7 @@ class BudgetSuggestionEngine {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return 'Expense';
     return trimmed
-        .split(RegExp(r'\\s+'))
+        .split(RegExp(r'\s+'))
         .map(
           (word) => word.isEmpty
               ? word
