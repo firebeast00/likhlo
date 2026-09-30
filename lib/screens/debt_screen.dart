@@ -39,6 +39,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   bool _voiceFinalizing = false;
+  Timer? _udharVoiceStableTimer;
+  String _udharVoiceStableTranscript = '';
   bool _savingDebt = false;
   bool _scanningDebt = false;
   final SpeechSessionController _speechSession =
@@ -238,6 +240,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   @override
   void dispose() {
+    _udharVoiceStableTimer?.cancel();
     unawaited(_speech.cancel());
     _smartInputCtrl.dispose();
     super.dispose();
@@ -246,6 +249,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   void _listenForInput() async {
     if (_voiceFinalizing || _savingDebt) return;
     if (!_isListening) {
+      _udharVoiceStableTimer?.cancel();
+      _udharVoiceStableTranscript = '';
       _speechSession.start();
       bool available = await _speech.initialize(
         onStatus: (val) {
@@ -287,19 +292,30 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           onResult: (val) {
             if (!mounted || !_isListening) return;
             final words = val.recognizedWords.trim();
-            if (words.isNotEmpty) {
-              final decision = _speechSession.recordTranscript(
-                words,
-                isFinal: val.finalResult,
+            if (words.isEmpty) return;
+
+            final decision = _speechSession.recordTranscript(
+              words,
+              isFinal: val.finalResult,
+            );
+            _smartInputCtrl.value = TextEditingValue(
+              text: words,
+              selection: TextSelection.collapsed(offset: words.length),
+            );
+
+            if (decision.action == SpeechSessionAction.processFinal) {
+              _udharVoiceStableTimer?.cancel();
+              _udharVoiceStableTranscript = '';
+              unawaited(
+                _finishVoiceInput(
+                  finalResult: true,
+                  decision: decision,
+                ),
               );
-              _smartInputCtrl.value = TextEditingValue(
-                text: words,
-                selection: TextSelection.collapsed(offset: words.length),
-              );
-              if (decision.action == SpeechSessionAction.processFinal) {
-                unawaited(_finishVoiceInput(finalResult: true, decision: decision));
-              }
+              return;
             }
+
+            _scheduleFastUdharVoiceSave(words);
           },
         );
       } else {
@@ -336,11 +352,56 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     return null;
   }
 
+  void _scheduleFastUdharVoiceSave(String transcript) {
+    _udharVoiceStableTimer?.cancel();
+    _udharVoiceStableTranscript = '';
+
+    final wallets = ref.read(walletProvider);
+    final draft = const UdharInputService().parse(
+      transcript,
+      walletNames: wallets.map((wallet) => wallet.name),
+      accounts: _udharAccounts(),
+    );
+    final walletId = _walletForCommand(transcript);
+    if (draft == null || !draft.canSaveImmediately || walletId == null) {
+      return;
+    }
+
+    _udharVoiceStableTranscript = transcript;
+    _udharVoiceStableTimer = Timer(
+      const Duration(milliseconds: 850),
+      () {
+        if (!mounted ||
+            !_isListening ||
+            _voiceFinalizing ||
+            _savingDebt ||
+            _speechSession.latestDraft != _udharVoiceStableTranscript) {
+          return;
+        }
+
+        final decision = _speechSession.recordTranscript(
+          _udharVoiceStableTranscript,
+          isFinal: true,
+        );
+        if (decision.action == SpeechSessionAction.processFinal) {
+          unawaited(
+            _finishVoiceInput(
+              finalResult: true,
+              decision: decision,
+            ),
+          );
+        }
+      },
+    );
+  }
+
   Future<void> _finishVoiceInput({
     required bool finalResult,
     SpeechSessionDecision? decision,
   }) async {
     if (!_isListening || _voiceFinalizing) return;
+    _udharVoiceStableTimer?.cancel();
+    _udharVoiceStableTranscript = '';
     _voiceFinalizing = true;
     setState(() => _isListening = false);
     try {
