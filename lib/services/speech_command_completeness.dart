@@ -132,6 +132,12 @@ class SpeechCommandCompletenessEvaluator {
               : const SpeechCommandCompleteness.incomplete(
                   'search_subject_missing',
                 );
+        case SmartEntryIntent.appControl:
+          return parsed.appAction == null
+              ? const SpeechCommandCompleteness.incomplete(
+                  'app_control_missing',
+                )
+              : const SpeechCommandCompleteness.complete('app_control');
         case SmartEntryIntent.addExpense:
         case SmartEntryIntent.addIncome:
         case SmartEntryIntent.deleteEntry:
