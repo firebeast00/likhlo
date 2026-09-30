@@ -105,8 +105,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   String _quickWalletLabel(List<Wallet> wallets) {
-    if (_selectedWalletId == null) return 'Automatic';
-    return _walletLabel(wallets, _selectedWalletId);
+    final selected = _walletById(wallets, _selectedWalletId);
+    return selected?.name ?? 'Automatic';
   }
 
   IconData _walletIcon(Wallet wallet) {
@@ -1237,8 +1237,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     required String language,
   }) {
     final resolvedWallet = _walletById(wallets, _activeWalletId);
+    final selectedDefault = _walletById(wallets, _selectedWalletId);
     final quickLabel = _quickWalletLabel(wallets);
-    final subtitle = _selectedWalletId == null
+    final subtitle = selectedDefault == null
         ? resolvedWallet == null
             ? 'Automatic wallet'
             : 'Automatic · currently ${resolvedWallet.name}'
