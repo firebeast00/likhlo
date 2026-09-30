@@ -237,6 +237,22 @@ void main() {
     expect(store.entries.keys, containsAll(['tea', 'meal']));
   });
 
+  test('generic NLP batch saves atomically without a receipt total', () async {
+    final store = _FakeStore();
+    final executor = TransactionExecutor(store, enableAudio: false);
+    final items = [
+      _entry(id: 'petrol', type: 'expense', walletId: 'cash', amount: 500),
+      _entry(id: 'chai', type: 'expense', walletId: 'cash', amount: 200),
+    ];
+
+    final result = await executor.execute(
+      CreateBatchTransactionsCommand(entries: items),
+    );
+
+    expect(result.succeeded, isTrue);
+    expect(store.entries.keys, containsAll(['petrol', 'chai']));
+  });
+
   test('new entries always use Main without changing wallets', () async {
     final store = _FakeStore();
     final executor = TransactionExecutor(
