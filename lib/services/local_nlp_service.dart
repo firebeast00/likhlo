@@ -1277,7 +1277,7 @@ class LocalNlpService {
       return SmartEntryQueryMetric.summary;
     }
     if (RegExp(
-      r'\b(balance|available|bachay|bacha)\b|\bmere\s+paas\b.{0,30}\b(?:paisa|paise|rupay|rupees?)\b',
+      r'\b(balance|available|bachay|bacha)\b|\bmere\s+paas\b.{0,30}\b(?:paisa|paise|rupay|rupees?)\b|\b(?:cash|jazzcash|bank|wallet|account)\b.{0,25}\b(?:kitna|kitne|available)\b|\b(?:kitna|kitne)\b.{0,25}\b(?:cash|jazzcash|bank|wallet|account)\b',
     ).hasMatch(input)) {
       return SmartEntryQueryMetric.balance;
     }
@@ -1431,7 +1431,7 @@ class LocalNlpService {
       intent = SmartEntryIntent.unknown;
     }
     final isIncome = intent == SmartEntryIntent.addIncome;
-    final queryMetric =
+    var queryMetric =
         intent == SmartEntryIntent.query ? _queryMetric(lowerInput) : null;
     var timeRange = _timeRange(lowerInput);
     if (queryMetric == SmartEntryQueryMetric.summary &&
@@ -1577,6 +1577,12 @@ class LocalNlpService {
           break;
         }
       }
+    }
+
+    if (intent == SmartEntryIntent.query &&
+        queryMetric == null &&
+        categoryFound) {
+      queryMetric = SmartEntryQueryMetric.spending;
     }
 
     final titleSource = _stripConversationalContext(lowerInput, intent);
