@@ -39,6 +39,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   _learnedSmartEntryPreferences = {};
   Timer? _notificationUpdateTimer;
   Timer? _speechStabilityTimer;
+  String _speechStableTranscript = '';
+  String _speechStableReason = '';
   Timer? _speechDeadlineTimer;
   Timer? _speechStartupTimer;
   DateTime? _speechListenStartedAt;
