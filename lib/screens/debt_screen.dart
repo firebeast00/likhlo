@@ -929,405 +929,822 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    ref.watch(expenseProvider);
-    final debts = debtBox.values
-        .where((entry) => entry.deletedAt == null && entry.settledAt == null)
-        .toList();
-    final settings = ref.watch(settingsProvider);
-    final wallets = ref.watch(walletProvider);
-    final primaryColor = Color(settings.profileColorValue);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  bool _isDueSoon(DebtEntry debt) {
+    final due = debt.dueDate;
+    if (due == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    return !dueDay.isAfter(today.add(const Duration(days: 7)));
+  }
 
-    double iGave = debts
-        .where((e) => e.type == 'lent')
-        .fold(0.0, (sum, e) => sum + e.amount);
-    double iTook = debts
-        .where((e) => e.type == 'borrowed')
-        .fold(0.0, (sum, e) => sum + e.amount);
-    double balance = iGave - iTook;
+  String _dueLabel(DebtEntry debt) {
+    final due = debt.dueDate;
+    if (due == null) return 'No due date';
 
-    final body = Column(
-      children: [
-        // 1. 🌟 SUMMARY HERO CARD
-        Container(
-          width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(28),
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    final difference = dueDay.difference(today).inDays;
+
+    if (difference < 0) {
+      final days = difference.abs();
+      return '$days day${days == 1 ? '' : 's'} overdue';
+    }
+    if (difference == 0) return 'Due today';
+    if (difference == 1) return 'Due tomorrow';
+    if (difference <= 7) return 'Due in $difference days';
+    return 'Due ${DateFormat.MMMd().format(due)}';
+  }
+
+  Color _dueColor(BuildContext context, DebtEntry debt) {
+    final due = debt.dueDate;
+    if (due == null) return Theme.of(context).colorScheme.onSurfaceVariant;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    if (dueDay.isBefore(today)) return Colors.red;
+    if (dueDay.difference(today).inDays <= 1) return Colors.orange;
+    return Theme.of(context).colorScheme.primary;
+  }
+
+  List<DebtEntry> _visibleDebts(List<DebtEntry> debts) {
+    Iterable<DebtEntry> visible = debts;
+    switch (_udharFilter) {
+      case 'receive':
+        visible = visible.where((entry) => entry.type == 'lent');
+        break;
+      case 'owe':
+        visible = visible.where((entry) => entry.type == 'borrowed');
+        break;
+      case 'due':
+        visible = visible.where(_isDueSoon);
+        break;
+      case 'all':
+      default:
+        break;
+    }
+
+    final result = visible.toList(growable: false);
+    result.sort((a, b) {
+      final aDue = a.dueDate;
+      final bDue = b.dueDate;
+      if (aDue == null && bDue == null) return 0;
+      if (aDue == null) return 1;
+      if (bDue == null) return -1;
+      return aDue.compareTo(bDue);
+    });
+    return result;
+  }
+
+  String _walletLabelForDebt(List<Wallet> wallets, DebtEntry debt) {
+    final direct = _walletById(wallets, debt.walletId);
+    if (direct != null) return direct.name;
+
+    final original = ref.read(expenseProvider.notifier).findById(debt.id);
+    final fallback = _walletById(wallets, original?.walletId);
+    return fallback?.name ?? 'Legacy record';
+  }
+
+  Future<bool> _settleWithFeedback(DebtEntry debt) async {
+    final settled = await _settleDebtRecord(debt);
+    if (!settled || !mounted) return settled;
+
+    unawaited(
+      NotificationService().showManualLedgerResult(
+        'Udhaar settled',
+        '${debt.borrowerName} · Rs. ${debt.amount.toStringAsFixed(0)}',
+      ),
+    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Settled Udhaar with ${debt.borrowerName}',
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    return true;
+  }
+
+  void _showDebtDetails(DebtEntry debt, List<Wallet> wallets) {
+    final isLent = debt.type == 'lent';
+    final walletLabel = _walletLabelForDebt(wallets, debt);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  child: Icon(
+                    isLent
+                        ? Icons.arrow_upward_rounded
+                        : Icons.arrow_downward_rounded,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    debt.borrowerName,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Rs. ${debt.amount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.swap_horiz_rounded),
+              title: Text(isLent ? 'You will receive' : 'You owe'),
+              subtitle: Text(
+                isLent
+                    ? 'You gave money to this person'
+                    : 'You received money from this person',
+              ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: Text(isLent ? 'Paid from' : 'Received in'),
+              subtitle: Text(walletLabel),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.calendar_today_outlined),
+              title: const Text('Due'),
+              subtitle: Text(_dueLabel(debt)),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                onPressed: _savingDebt
+                    ? null
+                    : () async {
+                        final settled = await _settleWithFeedback(debt);
+                        if (settled && sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      },
+                icon: const Icon(Icons.check_circle_outline_rounded),
+                label: const Text('Mark settled'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverviewCard({
+    required Color primaryColor,
+    required double receive,
+    required double owe,
+  }) {
+    final net = receive - owe;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            primaryColor,
+            primaryColor.withValues(alpha: 0.78),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Net Balance",
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Icon(
-                    balance >= 0
-                        ? Icons.trending_up_rounded
-                        : Icons.trending_down_rounded,
-                    color: Colors.white.withValues(alpha: 0.8),
-                    size: 20,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    balance < 0 ? "-" : "",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  Text(
-                    "Rs. ${balance.abs().toStringAsFixed(0)}",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                balance >= 0 ? "Overall you will receive" : "Overall you owe",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.7),
+              Expanded(
+                child: _overviewMetric(
+                  'You will receive',
+                  receive,
+                  Icons.south_west_rounded,
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: _summaryBox("I Gave", iGave, Colors.greenAccent),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _summaryBox(
-                      "I Took",
-                      iTook,
-                      Colors.redAccent.shade100,
-                    ),
-                  ),
-                ],
+              Container(
+                width: 1,
+                height: 42,
+                color: Colors.white.withValues(alpha: 0.22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _overviewMetric(
+                  'You owe',
+                  owe,
+                  Icons.north_east_rounded,
+                ),
               ),
             ],
           ),
-        ),
-
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-          child: DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: wallets.any((wallet) => wallet.id == _activeWalletId)
-                ? _activeWalletId
-                : null,
-            decoration: const InputDecoration(
-              labelText: 'Udhaar wallet',
-              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
-              border: OutlineInputBorder(),
-              isDense: true,
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 9,
             ),
-            items: wallets
-                .map(
-                  (wallet) => DropdownMenuItem(
-                    value: wallet.id,
-                    child: Text(wallet.name, overflow: TextOverflow.ellipsis),
-                  ),
-                )
-                .toList(),
-            onChanged: (id) => setState(() => _selectedWalletId = id),
-          ),
-        ),
-
-        // 2. 🎙️ SMART VOICE & OCR INPUT BAR
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark
-                    ? primaryColor.withValues(alpha: 0.4)
-                    : Colors.grey.withValues(alpha: 0.2),
-                width: 1.2,
+              color: Colors.white.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              net >= 0
+                  ? 'Net receivable · Rs. ${net.toStringAsFixed(0)}'
+                  : 'Net payable · Rs. ${net.abs().toStringAsFixed(0)}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
               ),
             ),
-            child: Row(
-              children: [
-                IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    _isListening ? Icons.mic : Icons.mic_none_rounded,
-                    color: _isListening ? Colors.red : primaryColor,
-                    size: 20,
-                  ),
-                  onPressed: _listenForInput,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _overviewMetric(String label, double amount, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: Colors.white70, size: 17),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
-                Expanded(
-                  child: TextField(
-                    controller: _smartInputCtrl,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: _isListening
-                          ? 'Listening...'
-                          : 'Speak: "Borrowed 500 from Sara"',
-                      border: InputBorder.none,
-                      hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 12,
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 8,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          'Rs. ${amount.toStringAsFixed(0)}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickUdharCard({
+    required List<Wallet> wallets,
+    required Color primaryColor,
+    required bool isDark,
+    required String language,
+  }) {
+    final resolvedWallet = _walletById(wallets, _activeWalletId);
+    final quickLabel = _quickWalletLabel(wallets);
+    final subtitle = _selectedWalletId == null
+        ? resolvedWallet == null
+            ? 'Automatic wallet'
+            : 'Automatic · currently ${resolvedWallet.name}'
+        : 'Default for commands without a named wallet';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 2, 20, 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isListening
+              ? Colors.red.withValues(alpha: 0.65)
+              : primaryColor.withValues(alpha: isDark ? 0.28 : 0.12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Quick Udhar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                    onSubmitted: (val) => _processNLP(val),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isListening
+                          ? 'Listening now…'
+                          : 'Type or speak naturally · saves instantly when clear',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _isListening ? null : _showUdharWalletPicker,
+                icon: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 17,
+                ),
+                label: Text(
+                  quickLabel,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 52,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.055)
+                  : primaryColor.withValues(alpha: 0.045),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: TextField(
+              controller: _smartInputCtrl,
+              textInputAction: TextInputAction.done,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              onSubmitted: _processNLP,
+              decoration: InputDecoration(
+                hintText: _isListening
+                    ? 'Listening…'
+                    : language == 'romanUrdu'
+                        ? 'Misal: Ali ko 500 udhaar diya'
+                        : 'e.g. Borrowed 500 from Sara',
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 12,
+                ),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.fromLTRB(14, 16, 4, 16),
+                suffixIconConstraints:
+                    const BoxConstraints(minHeight: 40),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Voice input',
+                      visualDensity: VisualDensity.compact,
+                      constraints:
+                          const BoxConstraints.tightFor(width: 38, height: 40),
+                      onPressed: _listenForInput,
+                      icon: Icon(
+                        _isListening
+                            ? Icons.stop_circle_rounded
+                            : Icons.mic_none_rounded,
+                        color: _isListening ? Colors.red : primaryColor,
+                        size: 21,
+                      ),
+                    ),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      margin: const EdgeInsets.only(right: 5),
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        tooltip: 'Save Quick Udhar',
+                        padding: EdgeInsets.zero,
+                        onPressed: () =>
+                            _processNLP(_smartInputCtrl.text),
+                        icon: const Icon(
+                          Icons.arrow_upward_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _scanningDebt ? null : _startReceiptScan,
+              icon: _scanningDebt
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.document_scanner_outlined, size: 18),
+              label: const Text('Scan receipt'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChips(Color primaryColor) {
+    const filters = <String, String>{
+      'all': 'All',
+      'receive': 'Receive',
+      'owe': 'Owe',
+      'due': 'Due soon',
+    };
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        children: [
+          for (final filter in filters.entries) ...[
+            ChoiceChip(
+              label: Text(filter.value),
+              selected: _udharFilter == filter.key,
+              onSelected: (_) {
+                setState(() => _udharFilter = filter.key);
+              },
+              selectedColor: primaryColor.withValues(alpha: 0.14),
+              side: BorderSide(
+                color: _udharFilter == filter.key
+                    ? primaryColor.withValues(alpha: 0.35)
+                    : Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebtSection({
+    required String title,
+    required List<DebtEntry> items,
+    required List<Wallet> wallets,
+    required Color primaryColor,
+    required bool isDark,
+  }) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    final total =
+        items.fold<double>(0, (sum, entry) => sum + entry.amount);
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-                IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.document_scanner_rounded,
-                    color: Colors.blueAccent,
-                    size: 18,
-                  ),
-                  onPressed: _scanningDebt ? null : _startReceiptScan,
-                  tooltip: "Scan Receipt",
-                ),
-                IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(Icons.send_rounded, color: primaryColor, size: 18),
-                  onPressed: () => _processNLP(_smartInputCtrl.text),
+                Text(
+                  '${items.length} · Rs. ${total.toStringAsFixed(0)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ],
             ),
           ),
         ),
-
-        // 3. 📋 UDHAAR LIST
-        Expanded(
-          child: debts.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.handshake_rounded,
-                        size: 60,
-                        color: Colors.grey.withValues(alpha: 0.3),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        "No active records. You're all settled!",
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 4,
-                  ),
-                  itemCount: debts.length,
-                  itemBuilder: (ctx, i) {
-                    final item = debts[i];
-                    final isLent = item.type == 'lent';
-
-                    return Dismissible(
-                      key: Key(item.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Icon(
-                              Icons.check_circle_rounded,
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              "Mark Settled",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      confirmDismiss: (_) async {
-                        return _settleDebtRecord(item);
-                      },
-                      onDismissed: (_) {
-                        if (!mounted) return;
-                        unawaited(NotificationService().showManualLedgerResult(
-                          'Udhaar settled',
-                          '${item.borrowerName} · Rs. ${item.amount.toStringAsFixed(2)}',
-                        ));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "Settled Udhaar with ${item.borrowerName} 🤝",
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      },
-                      child: Card(
-                        elevation: 0,
-                        color: Theme.of(context).cardColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(
-                            color: isDark
-                                ? primaryColor.withValues(alpha: 0.2)
-                                : Colors.grey.withValues(alpha: 0.12),
-                            width: 1.2,
-                          ),
-                        ),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: isLent
-                                      ? Colors.green.withValues(alpha: 0.15)
-                                      : Colors.red.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  isLent
-                                      ? Icons.arrow_upward_rounded
-                                      : Icons.arrow_downward_rounded,
-                                  color: isLent ? Colors.green : Colors.red,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      item.borrowerName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          item.dueDate != null
-                                              ? Icons.calendar_month_rounded
-                                              : Icons.info_outline_rounded,
-                                          size: 11,
-                                          color: Colors.grey.shade500,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          item.dueDate != null
-                                              ? "Due: ${DateFormat.MMMEd().format(item.dueDate!)}"
-                                              : (isLent
-                                                    ? "You gave them"
-                                                    : "They gave you"),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade500,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                "Rs. ${item.amount.toStringAsFixed(0)}",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                  color: isLent ? Colors.green : Colors.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+        SliverList.builder(
+          itemCount: items.length,
+          itemBuilder: (context, index) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              0,
+              20,
+              index == items.length - 1 ? 4 : 10,
+            ),
+            child: _buildDebtCard(
+              items[index],
+              wallets,
+              primaryColor,
+              isDark,
+            ),
+          ),
         ),
       ],
     );
+  }
+
+  Widget _buildDebtCard(
+    DebtEntry item,
+    List<Wallet> wallets,
+    Color primaryColor,
+    bool isDark,
+  ) {
+    final isLent = item.type == 'lent';
+    final dueColor = _dueColor(context, item);
+    final walletLabel = _walletLabelForDebt(wallets, item);
+
+    return Dismissible(
+      key: ValueKey(item.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.green,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white),
+            SizedBox(width: 8),
+            Text(
+              'Mark settled',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+      confirmDismiss: (_) => _settleWithFeedback(item),
+      child: Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: isDark
+                ? primaryColor.withValues(alpha: 0.2)
+                : Colors.grey.withValues(alpha: 0.12),
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _showDebtDetails(item, wallets),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 10),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: (isLent ? Colors.green : Colors.red)
+                            .withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isLent
+                            ? Icons.south_west_rounded
+                            : Icons.north_east_rounded,
+                        color: isLent ? Colors.green : Colors.red,
+                        size: 19,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.borrowerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '$walletLabel · ${_dueLabel(item)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Rs. ${item.amount.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: isLent ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: dueColor.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _dueLabel(item),
+                        style: TextStyle(
+                          color: dueColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _savingDebt
+                          ? null
+                          : () => _settleWithFeedback(item),
+                      icon: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 17,
+                      ),
+                      label: const Text('Settle'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.watch(expenseProvider);
+    final debts = debtBox.values
+        .where(
+          (entry) =>
+              entry.deletedAt == null && entry.settledAt == null,
+        )
+        .toList(growable: false);
+    final settings = ref.watch(settingsProvider);
+    final wallets = ref.watch(walletProvider);
+    final primaryColor = Color(settings.profileColorValue);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final iGave = debts
+        .where((entry) => entry.type == 'lent')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+    final iTook = debts
+        .where((entry) => entry.type == 'borrowed')
+        .fold<double>(0, (sum, entry) => sum + entry.amount);
+
+    final visible = _visibleDebts(debts);
+    final receive =
+        visible.where((entry) => entry.type == 'lent').toList();
+    final owe =
+        visible.where((entry) => entry.type == 'borrowed').toList();
+
+    final body = CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: _buildOverviewCard(
+            primaryColor: primaryColor,
+            receive: iGave,
+            owe: iTook,
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: _buildQuickUdharCard(
+            wallets: wallets,
+            primaryColor: primaryColor,
+            isDark: isDark,
+            language: settings.smartEntryLanguage,
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: _buildFilterChips(primaryColor),
+        ),
+        if (visible.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 90),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      debts.isEmpty
+                          ? Icons.handshake_outlined
+                          : Icons.filter_alt_off_outlined,
+                      size: 48,
+                      color: Colors.grey.withValues(alpha: 0.35),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      debts.isEmpty
+                          ? 'No active Udhar. You are all settled.'
+                          : 'No Udhar records match this filter.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else ...[
+          _buildDebtSection(
+            title: 'You will receive',
+            items: receive,
+            wallets: wallets,
+            primaryColor: primaryColor,
+            isDark: isDark,
+          ),
+          _buildDebtSection(
+            title: 'You owe',
+            items: owe,
+            wallets: wallets,
+            primaryColor: primaryColor,
+            isDark: isDark,
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 90)),
+        ],
+      ],
+    );
+
     final addButton = FloatingActionButton.extended(
       icon: const Icon(Icons.add_rounded),
-      label: const Text("Add Record"),
+      label: const Text('Add Udhar'),
       backgroundColor: primaryColor,
       foregroundColor: Colors.white,
-      elevation: 4,
+      elevation: 3,
       onPressed: _showAddDialog,
     );
+
     if (widget.embedded) {
       return Stack(
         children: [
@@ -1336,6 +1753,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         ],
       );
     }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: body,
@@ -1343,35 +1761,4 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     );
   }
 
-  Widget _summaryBox(String title, double amount, Color textColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            amount.toStringAsFixed(0),
-            style: TextStyle(
-              color: textColor,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
