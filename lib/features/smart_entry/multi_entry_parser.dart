@@ -21,28 +21,20 @@ class MultiEntryParser {
     if (anchors.length < 2) return null;
 
     final segments = <String>[];
-    var segmentStart = 0;
 
-    for (var index = 0; index < anchors.length - 1; index++) {
-      final current = anchors[index];
-      final next = anchors[index + 1];
-      final between = input.substring(current.end, next.start);
-      final delimiter = _lastDelimiter(between);
-      if (delimiter == null) return null;
+    for (var index = 0; index < anchors.length; index++) {
+      final start = index == 0 ? 0 : anchors[index].start;
+      final end = index + 1 < anchors.length
+          ? anchors[index + 1].start
+          : input.length;
 
-      final delimiterStart = current.end + delimiter.start;
-      final delimiterEnd = current.end + delimiter.end;
-      final segment = input.substring(segmentStart, delimiterStart).trim();
-      if (segment.isEmpty || _amountAnchors(segment).length != 1) {
+      final rawSegment = input.substring(start, end);
+      final cleaned = _cleanSegment(rawSegment);
+      if (cleaned.isEmpty || _amountAnchors(cleaned).length != 1) {
         return null;
       }
-      segments.add(_cleanSegment(segment));
-      segmentStart = delimiterEnd;
+      segments.add(cleaned);
     }
-
-    final tail = input.substring(segmentStart).trim();
-    if (tail.isEmpty || _amountAnchors(tail).length != 1) return null;
-    segments.add(_cleanSegment(tail));
 
     return segments.length > 1 ? segments : null;
   }
@@ -65,14 +57,6 @@ class MultiEntryParser {
       );
     }
     return anchors;
-  }
-
-  _DelimiterMatch? _lastDelimiter(String between) {
-    _DelimiterMatch? result;
-    for (final match in _delimiterPattern.allMatches(between)) {
-      result = _DelimiterMatch(match.start, match.end);
-    }
-    return result;
   }
 
   bool _looksLikeDateOrTime(
@@ -133,10 +117,10 @@ class MultiEntryParser {
   }
 
   String _cleanSegment(String value) {
-    return value
-        .replaceAll(RegExp(r'^[,;:\s]+'), '')
-        .replaceAll(RegExp(r'[,;:\s]+$'), '')
-        .trim();
+    var cleaned = value.trim();
+    cleaned = cleaned.replaceAll(_leadingNoisePattern, '').trim();
+    cleaned = cleaned.replaceAll(_trailingNoisePattern, '').trim();
+    return cleaned;
   }
 
   static final RegExp _numericAmountPattern = RegExp(
@@ -144,8 +128,13 @@ class MultiEntryParser {
     caseSensitive: false,
   );
 
-  static final RegExp _delimiterPattern = RegExp(
-    r'(?:[,;]|\b(?:and|aur|phir|then|plus|next)\b)',
+  static final RegExp _leadingNoisePattern = RegExp(
+    r'^(?:(?:,|;|:)\s*|\b(?:and|aur|phir|then|plus|next)\b\s*)+',
+    caseSensitive: false,
+  );
+
+  static final RegExp _trailingNoisePattern = RegExp(
+    r'(?:(?:,|;|:)\s*|\s*\b(?:and|aur|phir|then|plus|next)\b\s*)+$',
     caseSensitive: false,
   );
 }
@@ -158,11 +147,4 @@ class _AmountAnchor {
     required this.start,
     required this.end,
   });
-}
-
-class _DelimiterMatch {
-  final int start;
-  final int end;
-
-  const _DelimiterMatch(this.start, this.end);
 }
