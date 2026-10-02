@@ -88,7 +88,7 @@ class _PrimaryLedgerTabsState extends State<PrimaryLedgerTabs> {
   @override
   Widget build(BuildContext context) {
     final selected = widget.controller.selected;
-    final primary = Theme.of(context).colorScheme.primary;
+    final colors = Theme.of(context).colorScheme;
     return Column(
       children: [
         Padding(
@@ -113,8 +113,20 @@ class _PrimaryLedgerTabsState extends State<PrimaryLedgerTabs> {
               visualDensity: VisualDensity.compact,
               foregroundColor: WidgetStateProperty.resolveWith(
                 (states) => states.contains(WidgetState.selected)
-                    ? primary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ? colors.onPrimaryContainer
+                    : colors.onSurfaceVariant,
+              ),
+              backgroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? colors.primaryContainer
+                    : colors.surfaceContainerHighest,
+              ),
+              side: WidgetStateProperty.resolveWith(
+                (states) => BorderSide(
+                  color: states.contains(WidgetState.selected)
+                      ? colors.primary.withValues(alpha: 0.45)
+                      : colors.outlineVariant.withValues(alpha: 0.55),
+                ),
               ),
             ),
           ),
