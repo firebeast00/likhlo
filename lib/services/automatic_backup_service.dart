@@ -16,6 +16,7 @@ class AutomaticBackupService with WidgetsBindingObserver {
   static final AutomaticBackupService instance = AutomaticBackupService._();
   static const channel = MethodChannel('com.likhlo/automatic_backup');
   static const lastSuccessKey = 'automatic_backup_last_success_v1';
+  static const lastFingerprintKey = 'automatic_backup_last_fingerprint_v1';
   static const interval = Duration(hours: 24);
 
   Timer? _timer;
@@ -40,7 +41,12 @@ class AutomaticBackupService with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) unawaited(updateIfDue());
   }
 
-  Future<bool> saveNew(Uint8List bytes, String password, String name) async {
+  Future<bool> saveNew(
+    Uint8List bytes,
+    String password,
+    String name, {
+    String? fingerprint,
+  }) async {
     if (defaultTargetPlatform != TargetPlatform.android) return false;
     final saved = await channel.invokeMethod<bool>('create', {
       'bytes': bytes,
@@ -48,8 +54,14 @@ class AutomaticBackupService with WidgetsBindingObserver {
       'name': name,
     });
     if (saved == true && Hive.isBoxOpen('preferences')) {
-      await Hive.box('preferences')
-          .put(lastSuccessKey, DateTime.now().toUtc().toIso8601String());
+      final box = Hive.box('preferences');
+      await box.put(
+        lastSuccessKey,
+        DateTime.now().toUtc().toIso8601String(),
+      );
+      if (fingerprint != null && fingerprint.isNotEmpty) {
+        await box.put(lastFingerprintKey, fingerprint);
+      }
     }
     return saved == true;
   }
@@ -73,16 +85,29 @@ class AutomaticBackupService with WidgetsBindingObserver {
       );
       final password = config?['password'];
       if (password == null || password.isEmpty) return;
-      final bytes = await BackupCodec().encrypt(
-        await BackupService().createPayload(),
-        password,
-      );
+      final payload = await BackupService().createPayload();
+      final fingerprint = BackupService.contentFingerprint(payload);
+      final previousFingerprint = box.get(lastFingerprintKey);
+      if (previousFingerprint is String &&
+          previousFingerprint == fingerprint) {
+        await box.put(
+          lastSuccessKey,
+          DateTime.now().toUtc().toIso8601String(),
+        );
+        return;
+      }
+
+      final bytes = await BackupCodec().encrypt(payload, password);
       if (bytes.length > BackupService.maxBackupBytes) return;
       final updated = await channel.invokeMethod<bool>('overwrite', {
         'bytes': bytes,
       });
       if (updated == true) {
-        await box.put(lastSuccessKey, DateTime.now().toUtc().toIso8601String());
+        await box.put(
+          lastSuccessKey,
+          DateTime.now().toUtc().toIso8601String(),
+        );
+        await box.put(lastFingerprintKey, fingerprint);
       }
     } catch (error) {
       // Preserve the last successful timestamp for a retry next launch/resume.
