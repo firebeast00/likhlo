@@ -16,7 +16,7 @@ Future<DateTime?> showMonthYearPickerDialog(
   int minimumYear = 2000,
 }) async {
   final maximum = normalizeMonth(maxMonth ?? DateTime.now());
-  var selectedYear = initialMonth.year.clamp(minimumYear, maximum.year);
+  var selectedYear = initialMonth.year.clamp(minimumYear, maximum.year).toInt();
   var selectedMonth = initialMonth.month;
   if (selectedYear == maximum.year && selectedMonth > maximum.month) {
     selectedMonth = maximum.month;
