@@ -79,10 +79,26 @@ class BackupService {
         'settings': _entriesToJson(boxes.settings),
         'preferences': _entriesToJson(
           boxes.preferences,
-          excludedKeys: const {'selected_workspace_id_v1'},
+          excludedKeys: {
+            'selected_workspace_id_v1',
+            'automatic_backup_last_success_v1',
+            'automatic_backup_last_fingerprint_v1',
+            BiometricService.preferenceKey,
+          },
         ),
       },
     };
+  }
+
+  static String contentFingerprint(Map<String, dynamic> payload) {
+    final data = payload['data'];
+    final encoded = jsonEncode(data);
+    var hash = 0xcbf29ce484222325;
+    for (final unit in encoded.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(16, '0');
   }
 
   ValidatedBackup validate(Map<String, dynamic> payload) {
