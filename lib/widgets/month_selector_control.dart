@@ -124,6 +124,8 @@ class MonthSelectorControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = normalizeMonth(selectedMonth);
     final maximum = normalizeMonth(maxMonth ?? DateTime.now());
+    final minimum = DateTime(2000, 1);
+    final canGoPrevious = isMonthAfter(selected, minimum);
     final canGoNext = !isMonthAfter(
       DateTime(selected.year, selected.month + 1),
       maximum,
@@ -142,9 +144,11 @@ class MonthSelectorControl extends StatelessWidget {
       children: [
         IconButton(
           tooltip: 'Previous month',
-          onPressed: () => onChanged(
-            DateTime(selected.year, selected.month - 1),
-          ),
+          onPressed: canGoPrevious
+              ? () => onChanged(
+                    DateTime(selected.year, selected.month - 1),
+                  )
+              : null,
           icon: const Icon(Icons.chevron_left_rounded),
         ),
         Expanded(
