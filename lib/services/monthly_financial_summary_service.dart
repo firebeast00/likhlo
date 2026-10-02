@@ -72,6 +72,7 @@ MonthlyFinancialSummary buildMonthlyFinancialSummary({
   Set<String> linkedUdharIds = const <String>{},
 }) {
   final normalizedMonth = DateTime(month.year, month.month);
+  final walletList = wallets.toList(growable: false);
   final raw = transactions
       .where((entry) => isSameFinancialMonth(entry.date, normalizedMonth))
       .toList(growable: false)
@@ -110,7 +111,7 @@ MonthlyFinancialSummary buildMonthlyFinancialSummary({
   }
 
   final walletActivity = <WalletActivitySummary>[];
-  for (final wallet in wallets) {
+  for (final wallet in walletList) {
     final entries = entriesByWallet[wallet.id] ?? const <Expense>[];
     var walletIncome = 0.0;
     var walletExpense = 0.0;
@@ -164,7 +165,7 @@ MonthlyFinancialSummary buildMonthlyFinancialSummary({
 
   // Preserve entries whose wallet was removed from an old backup/legacy state.
   for (final item in entriesByWallet.entries) {
-    if (wallets.any((wallet) => wallet.id == item.key)) continue;
+    if (walletList.any((wallet) => wallet.id == item.key)) continue;
     var walletIncome = 0.0;
     var walletExpense = 0.0;
     var transferIn = 0.0;
