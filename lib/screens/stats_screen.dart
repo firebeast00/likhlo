@@ -685,7 +685,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          '${DateFormat('dd MMM').format(entry.date)} · ${entry.category}',
+                          "${DateFormat('dd MMM').format(entry.date)} · ${entry.category}",
                         ),
                         trailing: Text(
                           '${isIncome ? '+' : '-'}Rs. ${entry.amount.toStringAsFixed(0)}',
