@@ -1264,7 +1264,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  'Likhlo Financial Statement',
+                  'Likhlo Monthly Summary',
                   style: const pw.TextStyle(fontSize: 7.5, color: mutedText),
                 ),
                 pw.Text(
@@ -1300,7 +1300,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         pw.SizedBox(height: 3),
                         pw.Text(
-                          'Financial Statement',
+                          'Monthly Financial Summary',
                           style: const pw.TextStyle(
                             fontSize: 13,
                             color: pageText,
@@ -1346,13 +1346,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               pw.SizedBox(height: 14),
               pw.Row(
                 children: [
-                  amountCard('Total amount', totalAmount, pdfPrimaryColor),
+                  amountCard('Income', totalIncome, incomeColor),
                   pw.SizedBox(width: 7),
                   amountCard('Expenses', totalSpent, expenseColor),
                   pw.SizedBox(width: 7),
-                  amountCard('Income', totalIncome, incomeColor),
+                  amountCard(
+                    'Net flow',
+                    netFlow,
+                    netFlow >= 0 ? incomeColor : expenseColor,
+                  ),
                   pw.SizedBox(width: 7),
-                  amountCard('Remaining', remaining, incomeColor),
+                  metricCard(
+                    'Entries',
+                    '${summary.transactionCount}',
+                    pdfPrimaryColor,
+                  ),
                 ],
               ),
               if (categories.isNotEmpty) ...[
@@ -1489,7 +1497,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                             pw.SizedBox(height: 2),
                             pw.Text(
-                              'Tracked separately from normal spending so debt movements are not counted twice.',
+                              'Udhar activity linked to this month. Status reflects the current debt state.',
                               style: const pw.TextStyle(
                                 fontSize: 8,
                                 color: mutedText,
@@ -1546,7 +1554,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final bytes = await pdf.save();
       await Printing.layoutPdf(
         onLayout: (format) async => bytes,
-        name: 'Likhlo_Statement_$dateStr.pdf',
+        name: 'Likhlo_Monthly_Summary_${DateFormat('yyyy-MM').format(selectedMonth)}.pdf',
       );
     } catch (error) {
       debugPrint('PDF export failed: $error');
