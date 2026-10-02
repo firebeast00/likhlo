@@ -13,8 +13,10 @@ import '../providers/wallet_provider.dart';
 import '../models/debt_model.dart';
 import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
+import '../services/monthly_financial_summary_service.dart';
 import '../services/voice_privacy_service.dart';
 import '../services/udhar_ledger_link_service.dart';
+import '../widgets/month_selector_control.dart';
 import 'backup_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -26,11 +28,14 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late Box _prefBox;
+  late DateTime _selectedPdfMonth;
 
   @override
   void initState() {
     super.initState();
     _prefBox = Hive.box('preferences');
+    final now = DateTime.now();
+    _selectedPdfMonth = DateTime(now.year, now.month);
   }
 
   Future<void> _setPersistentQuickLog(bool enabled) async {
@@ -604,8 +609,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 title: const Text("Export Monthly PDF",
                     style:
                         TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text("Generate a professional statement",
-                    style: TextStyle(fontSize: 13, color: Colors.grey)),
+                subtitle: Text(
+                    '${DateFormat.yMMMM().format(_selectedPdfMonth)} · choose month and export',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 trailing: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -614,7 +620,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Icon(Icons.download_rounded,
                       size: 20, color: Colors.red.shade400),
                 ),
-                onTap: () => _generatePdf(context, ref),
+                onTap: () => _choosePdfMonthAndGenerate(context, ref),
               ),
             ],
           ),
@@ -679,8 +685,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _choosePdfMonthAndGenerate(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final picked = await showMonthYearPickerDialog(
+      context,
+      initialMonth: _selectedPdfMonth,
+      maxMonth: DateTime.now(),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _selectedPdfMonth = DateTime(picked.year, picked.month));
+    await _generatePdf(context, ref, _selectedPdfMonth);
+  }
+
   // --- PROFESSIONAL PDF GENERATOR ---
-  Future<void> _generatePdf(BuildContext context, WidgetRef ref) async {
+  Future<void> _generatePdf(
+    BuildContext context,
+    WidgetRef ref,
+    DateTime selectedMonth,
+  ) async {
     try {
       if (!Hive.isBoxOpen('debts')) {
         await Hive.openBox<DebtEntry>('debts');
