@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../models/expense_model.dart';
 import '../services/monthly_financial_summary_service.dart';
 import '../services/udhar_ledger_link_service.dart';
 import 'expense_provider.dart';
@@ -76,7 +77,7 @@ final statsProvider = Provider.family<ExpenseStats, DateTime>((ref, month) {
   final summary = buildMonthlyFinancialSummary(
     month: selectedMonth,
     transactions:
-        selectedBucket?.transactions ?? const <dynamic>[],
+        selectedBucket?.transactions ?? const <Expense>[],
     wallets: wallets,
     linkedUdharIds: linkedUdharIds,
   );
