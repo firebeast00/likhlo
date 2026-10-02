@@ -39,11 +39,13 @@ extension _DashboardOcrMethods on _HomeScreenState {
       if (source == null) return;
 
       final picker = ImagePicker();
-      final image = await picker.pickImage(
-        source: source,
-        imageQuality: 85,
-        maxWidth: 1800,
-        maxHeight: 1800,
+      final image = await AppLockActivityGuard.protectExternalActivity(
+        () => picker.pickImage(
+          source: source,
+          imageQuality: 85,
+          maxWidth: 1800,
+          maxHeight: 1800,
+        ),
       );
       if (!mounted || image == null) return;
 
