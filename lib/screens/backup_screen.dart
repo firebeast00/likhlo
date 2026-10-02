@@ -299,7 +299,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'Manual backups are permanent snapshots. On Android, the selected automatic backup file is checked every 24 hours and rewritten only when financial data or portable settings changed.',
+                      'On Android, the backup file you select becomes the rolling automatic backup target. It is checked every 24 hours and rewritten only when financial data or portable settings changed.',
                       style: TextStyle(fontSize: 12, height: 1.4),
                     ),
                     SizedBox(height: 6),
