@@ -18,9 +18,9 @@ class AudioFeedbackService {
   final FlutterTts _tts;
   final DeterministicFeedbackService _messages;
   static final FlutterTts _sharedTts = FlutterTts();
-  static Future<void> _previousSpeech = Future<void>.value();
   static int _latestRequest = 0;
   static FlutterTts? _configuredTts;
+  static Future<void>? _configurationTask;
 
   AudioFeedbackService({
     FlutterTts? tts,
@@ -29,24 +29,29 @@ class AudioFeedbackService {
   }) : _tts = tts ?? _sharedTts,
        _messages = messages;
 
+  Future<void> prepare() async {
+    if (!Hive.isBoxOpen('preferences')) return;
+    final privacy = VoicePrivacySettings.read(Hive.box('preferences'));
+    if (!privacy.spokenFeedbackEnabled) return;
+    try {
+      await _configureOnce();
+    } catch (error) {
+      debugPrint('Spoken confirmation warm-up unavailable: $error');
+    }
+  }
+
   Future<void> announce({
     required FinancialFeedbackAction action,
     required Expense entry,
     Expense? pairedEntry,
   }) async {
     final request = ++_latestRequest;
-    final next = _previousSpeech.then(
-      (_) => _announceLatest(
-        request: request,
-        action: action,
-        entry: entry,
-        pairedEntry: pairedEntry,
-      ),
+    await _announceLatest(
+      request: request,
+      action: action,
+      entry: entry,
+      pairedEntry: pairedEntry,
     );
-    _previousSpeech = next.catchError((Object error) {
-      debugPrint('Spoken confirmation unavailable: $error');
-    });
-    await next;
   }
 
   Future<void> _announceLatest({
@@ -55,20 +60,28 @@ class AudioFeedbackService {
     required Expense entry,
     Expense? pairedEntry,
   }) async {
+    final stopwatch = Stopwatch()..start();
     try {
       if (request != _latestRequest) return;
       if (!Hive.isBoxOpen('preferences')) return;
       final privacy = VoicePrivacySettings.read(Hive.box('preferences'));
       if (!privacy.spokenFeedbackEnabled) return;
-      final silentMode = defaultTargetPlatform == TargetPlatform.android
-          ? await _deviceAudioChannel.invokeMethod<bool>('isDeviceSilent') ??
-                false
-          : false;
-      if (silentMode) return;
 
-      await _configureOnce();
+      // Run the lightweight device-audio check while TTS configuration is
+      // completing. Home pre-warms configuration after its first frame, so
+      // normal saves usually reach speak() without any setup work.
+      final silentModeFuture = defaultTargetPlatform == TargetPlatform.android
+          ? _deviceAudioChannel
+              .invokeMethod<bool>('isDeviceSilent')
+              .then((value) => value ?? false)
+          : Future<bool>.value(false);
+      final configurationFuture = _configureOnce();
+
+      final silentMode = await silentModeFuture;
+      if (silentMode || request != _latestRequest) return;
+      await configurationFuture;
       if (request != _latestRequest) return;
-      await _tts.stop();
+
       final message = _messages.message(
         FinancialFeedbackData(
           action: action,
@@ -89,6 +102,13 @@ class AudioFeedbackService {
             'Jazz Cash',
           ),
         );
+        assert(() {
+          debugPrint(
+            '[Audio feedback] speak_invoked_ms=${stopwatch.elapsedMilliseconds} '
+            'action=$action',
+          );
+          return true;
+        }());
       }
     } catch (error) {
       debugPrint('Spoken confirmation unavailable: $error');
@@ -97,6 +117,24 @@ class AudioFeedbackService {
 
   Future<void> _configureOnce() async {
     if (identical(_configuredTts, _tts)) return;
+    final inFlight = _configurationTask;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final task = _configureTts();
+    _configurationTask = task;
+    try {
+      await task;
+    } finally {
+      if (identical(_configurationTask, task)) {
+        _configurationTask = null;
+      }
+    }
+  }
+
+  Future<void> _configureTts() async {
     // Prefer a familiar accent for Roman Urdu and English code switching.
     await _tts.setLanguage('en-IN');
     await _tts.setSpeechRate(0.56);
