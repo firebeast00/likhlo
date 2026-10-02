@@ -106,6 +106,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     NotificationService().onActionTriggered = _handleNotificationAction;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(AudioFeedbackService().prepare());
+
       final pendingAction = NotificationService().takePendingAction();
       if (pendingAction != null) _handleNotificationAction(pendingAction);
 
