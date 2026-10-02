@@ -1,85 +1,97 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'expense_provider.dart';
-import '../services/udhar_ledger_link_service.dart';
 
-// A clean data model to hold the pre-calculated stats
+import '../services/monthly_financial_summary_service.dart';
+import '../services/udhar_ledger_link_service.dart';
+import 'expense_provider.dart';
+import 'wallet_provider.dart';
+
 class ExpenseStats {
+  final DateTime selectedMonth;
   final List<double> monthlyTotals;
   final List<String> monthLabels;
   final double maxMonthTotal;
-  final double totalSpentThisMonth;
+  final double totalSpent;
+  final double totalIncome;
+  final double netFlow;
   final List<MapEntry<String, double>> sortedCategories;
+  final List<WalletActivitySummary> walletActivity;
 
-  ExpenseStats({
+  const ExpenseStats({
+    required this.selectedMonth,
     required this.monthlyTotals,
     required this.monthLabels,
     required this.maxMonthTotal,
-    required this.totalSpentThisMonth,
+    required this.totalSpent,
+    required this.totalIncome,
+    required this.netFlow,
     required this.sortedCategories,
+    required this.walletActivity,
   });
 }
 
-// Watches only the six month buckets used by this screen. Transactions added
-// outside this window no longer invalidate the Stats calculations.
-final statsProvider = Provider<ExpenseStats>((ref) {
-  final linkedUdhaarIds = linkedUdharLedgerIds();
-  final now = DateTime.now();
+/// Selected-month statistics plus the six-month spending trend ending at that
+/// month. Only the six cached month buckets and wallet metadata are watched.
+final statsProvider = Provider.family<ExpenseStats, DateTime>((ref, month) {
+  final selectedMonth = DateTime(month.year, month.month);
+  final linkedUdharIds = linkedUdharLedgerIds();
+  final wallets = ref.watch(walletProvider);
 
   final months = List<DateTime>.generate(
     6,
-    (i) => DateTime(now.year, now.month - 5 + i, 1),
+    (i) => DateTime(
+      selectedMonth.year,
+      selectedMonth.month - 5 + i,
+      1,
+    ),
   );
+
   final buckets = <LedgerMonthBucket?>[
-    for (final month in months)
+    for (final item in months)
       ref.watch(
         expenseProvider.select(
-          (state) => state.index.byMonth[LedgerIndex.monthKey(month)],
+          (state) => state.index.byMonth[LedgerIndex.monthKey(item)],
         ),
       ),
   ];
 
   final monthlyTotals = List<double>.filled(6, 0);
-  final monthLabels = [
-    for (final month in months) DateFormat.MMM().format(month),
-  ];
-  final categoryTotals = <String, double>{};
-  var totalSpentThisMonth = 0.0;
   var maxMonthTotal = 0.0;
-
   for (var i = 0; i < buckets.length; i++) {
     final bucket = buckets[i];
     if (bucket == null) continue;
+    var spent = 0.0;
     for (final entry in bucket.transactions) {
-      if (entry.type != 'expense' ||
-          entry.category == 'Transfer' ||
-          linkedUdhaarIds.contains(entry.id)) {
-        continue;
-      }
-      monthlyTotals[i] += entry.amount;
-      if (i == buckets.length - 1) {
-        categoryTotals.update(
-          entry.category,
-          (value) => value + entry.amount,
-          ifAbsent: () => entry.amount,
-        );
-        totalSpentThisMonth += entry.amount;
+      if (entry.type == 'expense' &&
+          entry.category != 'Transfer' &&
+          !linkedUdharIds.contains(entry.id)) {
+        spent += entry.amount;
       }
     }
+    monthlyTotals[i] = spent;
+    if (spent > maxMonthTotal) maxMonthTotal = spent;
   }
 
-  for (final total in monthlyTotals) {
-    if (total > maxMonthTotal) maxMonthTotal = total;
-  }
-
-  final sortedCategories = categoryTotals.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
+  final selectedBucket = buckets.isEmpty ? null : buckets.last;
+  final summary = buildMonthlyFinancialSummary(
+    month: selectedMonth,
+    transactions:
+        selectedBucket?.transactions ?? const <dynamic>[],
+    wallets: wallets,
+    linkedUdharIds: linkedUdharIds,
+  );
 
   return ExpenseStats(
+    selectedMonth: selectedMonth,
     monthlyTotals: monthlyTotals,
-    monthLabels: monthLabels,
+    monthLabels: [
+      for (final item in months) DateFormat.MMM().format(item),
+    ],
     maxMonthTotal: maxMonthTotal,
-    totalSpentThisMonth: totalSpentThisMonth,
-    sortedCategories: sortedCategories,
+    totalSpent: summary.spent,
+    totalIncome: summary.income,
+    netFlow: summary.netFlow,
+    sortedCategories: summary.categories,
+    walletActivity: summary.walletActivity,
   );
 });
