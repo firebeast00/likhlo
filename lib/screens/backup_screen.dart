@@ -45,6 +45,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     if (password == null || !mounted) return;
     await _runBusy(() async {
       final payload = await _service.createPayload();
+      final fingerprint = BackupService.contentFingerprint(payload);
       final bytes = await _codec.encrypt(payload, password);
       if (bytes.length > BackupService.maxBackupBytes) {
         throw const BackupException('This backup exceeds the 25 MB limit.');
@@ -53,10 +54,15 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       if (defaultTargetPlatform == TargetPlatform.android &&
           await AutomaticBackupService.instance.supported) {
         final saved = await AutomaticBackupService.instance.saveNew(
-          bytes, password, 'Likhlo_Backup_$timestamp.likhlo',
+          bytes,
+          password,
+          'Likhlo_Backup_$timestamp.likhlo',
+          fingerprint: fingerprint,
         );
         if (saved && mounted) {
-          _showMessage('Encrypted backup saved. It refreshes after 24 hours when Likhlo runs.');
+          _showMessage(
+            'Encrypted backup saved. Automatic refresh runs daily only when your data changed.',
+          );
         }
         return;
       }
@@ -274,6 +280,36 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Smart backup',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Manual backups are permanent snapshots. On Android, the selected automatic backup file is checked every 24 hours and rewritten only when financial data or portable settings changed.',
+                      style: TextStyle(fontSize: 12, height: 1.4),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Device biometrics, the automatic-backup timestamp, and temporary recovery metadata stay on this phone and are intentionally not imported to another device.',
+                      style: TextStyle(fontSize: 12, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 20),
               Card(
                 child: Column(
@@ -282,7 +318,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       leading: const Icon(Icons.backup_rounded),
                       title: const Text('Create encrypted backup'),
                       subtitle: const Text(
-                        'Wallets, transactions, categories, settings and Udhar',
+                        'Transactions + Trash, wallets, categories, settings, preferences and Udhar',
                       ),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: _busy ? null : _createBackup,
