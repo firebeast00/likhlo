@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:student_expense_manager/services/biometric_service.dart';
+import 'package:student_expense_manager/services/app_lock_activity_guard.dart';
 import 'package:student_expense_manager/widgets/app_lock_gate.dart';
 
 class _FakeAuthenticator implements DeviceAuthenticator {
@@ -54,6 +55,42 @@ void main() {
 
     expect(find.text('Private finance data'), findsOneWidget);
     expect(find.text('Likhlo is locked'), findsNothing);
+  });
+
+  testWidgets(
+      'trusted external camera activity does not relock the app',
+      (tester) async {
+    final authenticator = _FakeAuthenticator([
+      () async => const DeviceAuthResult.success(),
+      () async => const DeviceAuthResult.success(),
+    ]);
+
+    await tester.pumpWidget(_testApp(authenticator));
+    await tester.pumpAndSettle();
+    expect(find.text('Private finance data'), findsOneWidget);
+    expect(authenticator.calls, 1);
+
+    AppLockActivityGuard.beginExternalActivity();
+    try {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Private finance data'), findsOneWidget);
+      expect(find.text('Likhlo is locked'), findsNothing);
+      expect(authenticator.calls, 1);
+    } finally {
+      AppLockActivityGuard.endExternalActivity();
+    }
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Private finance data'), findsOneWidget);
+    expect(authenticator.calls, 2);
   });
 
   testWidgets('keeps content hidden after failure and supports retry',
