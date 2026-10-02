@@ -1,6 +1,8 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
+import 'app_lock_activity_guard.dart';
+
 class ReceiptItem {
   final String name;
   final double price;
@@ -65,11 +67,13 @@ class OcrScannerService {
     ImageSource source = ImageSource.camera,
     bool enhanceForHandwriting = true,
   }) async {
-    final image = await _picker.pickImage(
-      source: source,
-      maxWidth: 1800,
-      maxHeight: 1800,
-      imageQuality: 85,
+    final image = await AppLockActivityGuard.protectExternalActivity(
+      () => _picker.pickImage(
+        source: source,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
+      ),
     );
     if (image == null) return null;
     return _readReceiptImage(image);
