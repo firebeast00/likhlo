@@ -710,21 +710,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         await Hive.openBox<DebtEntry>('debts');
       }
 
-      final records = ref
+      final allRecords = ref
           .read(expenseProvider)
           .allExpenses
           .toList(growable: false);
       final wallets = ref.read(walletProvider);
       final settings = ref.read(settingsProvider);
+      final linkedUdhaarIds = linkedUdharLedgerIds();
+      final summary = buildMonthlyFinancialSummary(
+        month: selectedMonth,
+        transactions: allRecords,
+        wallets: wallets,
+        linkedUdharIds: linkedUdhaarIds,
+      );
+      final records = summary.rawTransactions;
+      final expenses = summary.reportTransactions;
+      final totalSpent = summary.spent;
+      final totalIncome = summary.income;
+      final netFlow = summary.netFlow;
+      final categories = summary.categories;
+
       final debtBox = Hive.box<DebtEntry>('debts');
+      final monthLedgerIds = records.map((entry) => entry.id).toSet();
       final udharEntries = debtBox.values
           .where((entry) => entry.deletedAt == null)
-          .toList(growable: false);
-
-      final linkedUdhaarIds = linkedUdharLedgerIds();
-      final expenses = visibleTransactions(records)
-          .where((entry) => !linkedUdhaarIds.contains(entry.id))
-          .toList(growable: false);
+          .where(
+            (entry) =>
+                monthLedgerIds.contains(entry.id) ||
+                monthLedgerIds.contains(
+                  UdharLedgerLinkService.settlementId(entry.id),
+                ),
+          )
+          .toList(growable: true);
 
       final regularFont = pw.Font.ttf(
         await rootBundle.load('assets/fonts/DejaVuSans.ttf'),
@@ -736,47 +753,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
       );
 
-      final totalSpent = records
-          .where(
-            (entry) =>
-                entry.type == 'expense' &&
-                entry.category != 'Transfer' &&
-                !linkedUdhaarIds.contains(entry.id),
-          )
-          .fold<double>(0, (sum, item) => sum + item.amount);
-      final totalIncome = records
-          .where(
-            (entry) =>
-                entry.type == 'income' &&
-                entry.category != 'Transfer' &&
-                !linkedUdhaarIds.contains(entry.id),
-          )
-          .fold<double>(0, (sum, item) => sum + item.amount);
-      final remaining = wallets.fold<double>(
-        0,
-        (sum, wallet) =>
-            sum + ref.read(walletProvider.notifier).getBalanceForWallet(wallet.id),
-      );
-      // Preserve the existing report definition so historical exports reconcile.
-      final totalAmount = remaining + totalSpent;
-
-      final byCategory = <String, double>{};
-      for (final entry in records.where(
-        (entry) =>
-            entry.type == 'expense' &&
-            entry.category != 'Transfer' &&
-            !linkedUdhaarIds.contains(entry.id),
-      )) {
-        byCategory.update(
-          entry.category,
-          (sum) => sum + entry.amount,
-          ifAbsent: () => entry.amount,
-        );
-      }
-      final categories = byCategory.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-
-      final recordsById = {for (final entry in records) entry.id: entry};
+      final recordsById = {
+        for (final entry in allRecords) entry.id: entry,
+      };
       final walletNames = {for (final wallet in wallets) wallet.id: wallet.name};
       final activeUdhar =
           udharEntries.where((entry) => entry.settledAt == null).toList();
@@ -799,7 +778,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return a.borrowerName.compareTo(b.borrowerName);
       });
 
-      final dateStr = DateFormat.yMMMM().format(DateTime.now());
+      final dateStr = DateFormat.yMMMM().format(selectedMonth);
 
       const pdfPrimaryColor = PdfColor.fromInt(0xFF1E3A8A);
       const pageText = PdfColor.fromInt(0xFF0F172A);
