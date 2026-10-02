@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../services/biometric_service.dart';
+import '../services/app_lock_activity_guard.dart';
 
 class AppLockGate extends StatefulWidget {
   final Widget child;
@@ -59,7 +60,8 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
     if ((state == AppLifecycleState.paused ||
             state == AppLifecycleState.detached) &&
         _isEnabled() &&
-        !_authenticating) {
+        !_authenticating &&
+        !AppLockActivityGuard.isExternalActivityActive) {
       _backgrounded = true;
       if (mounted && !_locked) {
         setState(() {
