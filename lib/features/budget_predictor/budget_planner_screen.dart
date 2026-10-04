@@ -1470,7 +1470,7 @@ class _InsightCard extends StatelessWidget {
         color = colors.error;
         break;
       case BudgetCoachInsightKind.upcoming:
-        icon = Icons.event_upcoming_outlined;
+        icon = Icons.event_outlined;
         color = colors.primary;
         break;
       case BudgetCoachInsightKind.neutral:
