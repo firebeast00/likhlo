@@ -235,9 +235,11 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
         if (target == null) {
           return 'I could not match that one-time item.';
         }
-        await ref
-            .read(monthlyPlanMemoryProvider.notifier)
-            .setRemembered(target.id, false);
+        if (target.isNewExpense) {
+          await ref
+              .read(monthlyPlanMemoryProvider.notifier)
+              .setRemembered(target.id, false);
+        }
         await ref
             .read(budgetPlanPreferencesProvider.notifier)
             .setOneTime(target.id, true);
@@ -614,9 +616,6 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                 leading: const Icon(Icons.looks_one_outlined),
                 title: const Text('Treat as one-time'),
                 onTap: () async {
-                  await ref
-                      .read(monthlyPlanMemoryProvider.notifier)
-                      .setRemembered(suggestion.id, false);
                   await ref
                       .read(budgetPlanPreferencesProvider.notifier)
                       .setOneTime(suggestion.id, true);
