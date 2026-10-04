@@ -223,7 +223,19 @@ class BudgetIntentParser {
   }
 
   double? _amount(String input) {
-    final parsed = nlp.parseCommand(input, const <String>[]);
+    final parsed = nlp.parseCommand(
+      input,
+      const <String>[
+        'Food',
+        'Transport',
+        'Shopping',
+        'Bills',
+        'Education',
+        'Hostel',
+        'Health',
+        'General',
+      ],
+    );
     if (parsed.amount.isFinite && parsed.amount > 0) return parsed.amount;
 
     final match = RegExp(
