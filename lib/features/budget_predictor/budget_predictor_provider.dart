@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../../models/expense_model.dart';
 import '../../providers/expense_provider.dart';
 import '../../services/udhar_ledger_link_service.dart';
+import 'budget_plan_preferences.dart';
 import 'budget_prediction_models.dart';
 import 'budget_suggestion_engine.dart';
 import 'monthly_smart_plan_service.dart';
@@ -39,16 +41,50 @@ final budgetSuggestionEngineProvider = Provider<BudgetSuggestionEngine>((ref) {
   return BudgetSuggestionEngine();
 });
 
+final budgetHistoryTransactionsProvider =
+    Provider.family<List<Expense>, DateTime>((ref, month) {
+  final normalized = DateTime(month.year, month.month);
+  final entries = <Expense>[];
+  for (var offset = 1; offset <= 6; offset++) {
+    final historyMonth = DateTime(
+      normalized.year,
+      normalized.month - offset,
+    );
+    final bucket = ref.watch(
+      expenseProvider.select(
+        (state) =>
+            state.index.byMonth[LedgerIndex.monthKey(historyMonth)],
+      ),
+    );
+    if (bucket != null) entries.addAll(bucket.transactions);
+  }
+  return List<Expense>.unmodifiable(entries);
+});
+
+final budgetTargetTransactionsProvider =
+    Provider.family<List<Expense>, DateTime>((ref, month) {
+  final normalized = DateTime(month.year, month.month);
+  return ref.watch(
+    expenseProvider.select(
+      (state) =>
+          state.index.byMonth[LedgerIndex.monthKey(normalized)]?.transactions ??
+          const <Expense>[],
+    ),
+  );
+});
+
 final budgetDraftProvider = Provider.family<BudgetDraft, DateTime>((ref, month) {
-  final transactions = ref.watch(expenseProvider).allExpenses;
+  final history = ref.watch(budgetHistoryTransactionsProvider(month));
   final engine = ref.watch(budgetSuggestionEngineProvider);
   final remembered = ref.watch(monthlyPlanMemoryProvider);
+  final preferences = ref.watch(budgetPlanPreferencesProvider);
 
   return engine.buildDraft(
     targetMonth: month,
-    allTransactions: transactions,
+    allTransactions: history,
     excludedTransactionIds: linkedUdharLedgerIds(),
     rememberedPatternKeys: remembered,
+    ignoredPatternKeys: preferences.oneTimePatterns,
   );
 });
 
@@ -60,14 +96,14 @@ final monthlySmartPlanServiceProvider = Provider<MonthlySmartPlanService>((ref) 
 
 final monthlySmartPlanProvider =
     Provider.family<MonthlySmartPlan, DateTime>((ref, month) {
-  final transactions = ref.watch(expenseProvider).allExpenses;
+  final targetTransactions = ref.watch(budgetTargetTransactionsProvider(month));
   final remembered = ref.watch(monthlyPlanMemoryProvider);
   final draft = ref.watch(budgetDraftProvider(month));
   final service = ref.watch(monthlySmartPlanServiceProvider);
 
   return service.build(
     draft: draft,
-    allTransactions: transactions,
+    allTransactions: targetTransactions,
     excludedTransactionIds: linkedUdharLedgerIds(),
     rememberedPatternKeys: remembered,
   );
