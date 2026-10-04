@@ -800,7 +800,6 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
         ),
         const SizedBox(height: 14),
         _PlanHeroCard(
-          month: _targetMonth,
           recommendedBudget: recommended,
           expectedIncome: allowance,
           expectedSpending: expectedTotal,
@@ -893,7 +892,6 @@ class _BudgetTarget {
 }
 
 class _PlanHeroCard extends StatelessWidget {
-  final DateTime month;
   final double recommendedBudget;
   final double expectedIncome;
   final double expectedSpending;
@@ -907,7 +905,6 @@ class _PlanHeroCard extends StatelessWidget {
   final VoidCallback onSavingsTap;
 
   const _PlanHeroCard({
-    required this.month,
     required this.recommendedBudget,
     required this.expectedIncome,
     required this.expectedSpending,
