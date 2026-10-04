@@ -7,6 +7,12 @@ enum ExpenseIntent {
   uncertain,
 }
 
+enum BudgetConfidenceTier {
+  high,
+  medium,
+  low,
+}
+
 class BudgetExpenseGroup {
   final String canonicalTitle;
   final String category;
@@ -43,6 +49,7 @@ class BudgetSuggestion {
   final double confidence;
   final String reason;
   final bool selectedByDefault;
+  final int? expectedDay;
 
   const BudgetSuggestion({
     required this.id,
@@ -54,7 +61,17 @@ class BudgetSuggestion {
     required this.confidence,
     required this.reason,
     required this.selectedByDefault,
+    this.expectedDay,
   });
+
+  BudgetConfidenceTier get confidenceTier {
+    if (confidence >= 0.85) return BudgetConfidenceTier.high;
+    if (confidence >= 0.72) return BudgetConfidenceTier.medium;
+    return BudgetConfidenceTier.low;
+  }
+
+  bool get isAutoIncluded =>
+      selectedByDefault && confidenceTier != BudgetConfidenceTier.low;
 }
 
 class BudgetDraft {
