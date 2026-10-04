@@ -58,7 +58,8 @@ class BudgetSuggestionEngine {
     required Iterable<Expense> allTransactions,
     Set<String> excludedTransactionIds = const {},
     Set<String> rememberedPatternKeys = const {},
-    int surpriseLookbackMonths = 3,
+    Set<String> ignoredPatternKeys = const {},
+    int surpriseLookbackMonths = 6,
   }) {
     final normalizedTarget = DateTime(targetMonth.year, targetMonth.month, 1);
     final sourceMonth = DateTime(
@@ -87,16 +88,23 @@ class BudgetSuggestionEngine {
 
     for (final group in sourceGroups) {
       final key = suggestionKey(group.canonicalTitle, group.category);
+      if (ignoredPatternKeys.contains(key)) continue;
       final remembered = rememberedPatternKeys.contains(key);
       final recentTotals = _recentPatternTotals(
         eligible,
         key,
         sourceMonth,
-        months: 3,
+        months: 6,
       );
       final recurringAcrossMonths =
           recentTotals.length >= 2 &&
           !evaluator.isDiscretionaryCategory(group.category);
+      final expectedDay = _expectedDay(
+        eligible,
+        key,
+        sourceMonth,
+        months: 6,
+      );
       final intent = remembered || recurringAcrossMonths
           ? ExpenseIntent.frequentHabit
           : evaluator.evaluateIntent(group);
@@ -112,30 +120,34 @@ class BudgetSuggestionEngine {
                   ? 'Paid last month and looks like a recurring obligation'
                   : 'Repeated last month and looks like a recurring obligation',
               selectedByDefault: true,
+              expectedDay: expectedDay,
             ),
           );
           break;
         case ExpenseIntent.frequentHabit:
-          final recurringAverage = recentTotals.isEmpty
+          final recurringEstimate = recentTotals.isEmpty
               ? group.totalAmount
-              : recentTotals.fold<double>(0, (sum, value) => sum + value) /
-                  recentTotals.length;
+              : _median(recentTotals);
           habits.add(
             _suggestionFor(
               group,
               intent,
               amount: recurringAcrossMonths
-                  ? recurringAverage
+                  ? recurringEstimate
                   : group.totalAmount,
               confidence: recurringAcrossMonths
-                  ? math.max(_habitConfidence(group), 0.8)
+                  ? math.min(
+                      0.95,
+                      math.max(_habitConfidence(group), 0.72 + recentTotals.length * 0.04),
+                    )
                   : _habitConfidence(group),
               reason: remembered
-                  ? 'Remembered from your plan · Rs. ${group.totalAmount.toStringAsFixed(0)} last month'
+                  ? 'Remembered from your plan'
                   : recurringAcrossMonths
-                      ? 'Seen in ${recentTotals.length} of the last 3 months · around Rs. ${recurringAverage.toStringAsFixed(0)} monthly'
-                      : 'Logged ${group.frequency} times last month · Rs. ${group.totalAmount.toStringAsFixed(0)} total',
+                      ? 'Seen in ${recentTotals.length} recent months · usually around Rs. ${recurringEstimate.toStringAsFixed(0)}'
+                      : 'Repeated last month',
               selectedByDefault: true,
+              expectedDay: expectedDay,
             ),
           );
           break;
@@ -220,6 +232,7 @@ class BudgetSuggestionEngine {
     required double confidence,
     required String reason,
     required bool selectedByDefault,
+    int? expectedDay,
   }) {
     return BudgetSuggestion(
       id: suggestionKey(group.canonicalTitle, group.category),
@@ -231,6 +244,7 @@ class BudgetSuggestionEngine {
       confidence: confidence.clamp(0, 1).toDouble(),
       reason: reason,
       selectedByDefault: selectedByDefault,
+      expectedDay: expectedDay,
     );
   }
 
@@ -272,6 +286,44 @@ class BudgetSuggestionEngine {
     return totals;
   }
 
+  double _median(List<double> values) {
+    if (values.isEmpty) return 0;
+    final sorted = [...values]..sort();
+    final middle = sorted.length ~/ 2;
+    return sorted.length.isOdd
+        ? sorted[middle]
+        : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+
+  int? _expectedDay(
+    List<Expense> eligible,
+    String key,
+    DateTime sourceMonth, {
+    required int months,
+  }) {
+    final days = <int>[];
+    for (var offset = 0; offset < months; offset++) {
+      final month = DateTime(
+        sourceMonth.year,
+        sourceMonth.month - offset,
+        1,
+      );
+      final matches = eligible
+          .where(
+            (entry) =>
+                _sameMonth(entry.date, month) &&
+                suggestionKey(entry.title, entry.category) == key,
+          )
+          .toList(growable: false);
+      if (matches.isEmpty) continue;
+      matches.sort((a, b) => a.date.compareTo(b.date));
+      days.add(matches.first.date.day);
+    }
+    if (days.isEmpty) return null;
+    days.sort();
+    return days[days.length ~/ 2].clamp(1, 28);
+  }
+
   double _surpriseBuffer(List<double> monthlyTotals) {
     if (monthlyTotals.isEmpty) return 0;
     final sorted = [...monthlyTotals]..sort();
@@ -299,12 +351,25 @@ class BudgetSuggestionEngine {
       'fuel': 'petrol',
       'petrol bike': 'petrol',
       'bike petrol': 'petrol',
+      'bike fuel': 'petrol',
+      'fuel bike': 'petrol',
+      'petrol refill': 'petrol',
+      'bike ka petrol': 'petrol',
       'jazz cash': 'jazzcash',
       'zong pkg': 'zong package',
+      'zong recharge': 'zong package',
       'mobile pkg': 'mobile package',
+      'mobile recharge': 'mobile package',
       'internet pkg': 'internet package',
+      'wifi recharge': 'wifi bill',
+      'hostel fees': 'hostel fee',
     };
-    return aliases[title] ?? title;
+    if (aliases.containsKey(title)) return aliases[title]!;
+    if (RegExp(r'\b(petrol|fuel)\b').hasMatch(title) &&
+        RegExp(r'\b(bike|refill)\b').hasMatch(title)) {
+      return 'petrol';
+    }
+    return title;
   }
 
   String _displayTitle(String value) {
