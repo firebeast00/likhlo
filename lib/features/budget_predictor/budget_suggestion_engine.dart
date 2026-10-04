@@ -82,11 +82,27 @@ class BudgetSuggestionEngine {
       (entry) => _sameMonth(entry.date, sourceMonth),
     );
 
-    final sourceGroups = groupExpenses(sourceExpenses);
+    final candidateGroups = <String, BudgetExpenseGroup>{
+      for (final group in groupExpenses(sourceExpenses))
+        suggestionKey(group.canonicalTitle, group.category): group,
+    };
+    for (final group in groupExpenses(eligible)) {
+      final key = suggestionKey(group.canonicalTitle, group.category);
+      final recentTotals = _recentPatternTotals(
+        eligible,
+        key,
+        sourceMonth,
+        months: 6,
+      );
+      if (rememberedPatternKeys.contains(key) || recentTotals.length >= 2) {
+        candidateGroups.putIfAbsent(key, () => group);
+      }
+    }
+
     final fixed = <BudgetSuggestion>[];
     final habits = <BudgetSuggestion>[];
 
-    for (final group in sourceGroups) {
+    for (final group in candidateGroups.values) {
       final key = suggestionKey(group.canonicalTitle, group.category);
       if (ignoredPatternKeys.contains(key)) continue;
       final remembered = rememberedPatternKeys.contains(key);
@@ -105,9 +121,12 @@ class BudgetSuggestionEngine {
         sourceMonth,
         months: 6,
       );
+      final baseIntent = evaluator.evaluateIntent(group);
       final intent = remembered || recurringAcrossMonths
-          ? ExpenseIntent.frequentHabit
-          : evaluator.evaluateIntent(group);
+          ? baseIntent == ExpenseIntent.fixedBill
+              ? ExpenseIntent.fixedBill
+              : ExpenseIntent.frequentHabit
+          : baseIntent;
       switch (intent) {
         case ExpenseIntent.fixedBill:
           fixed.add(
@@ -321,7 +340,7 @@ class BudgetSuggestionEngine {
     }
     if (days.isEmpty) return null;
     days.sort();
-    return days[days.length ~/ 2].clamp(1, 28);
+    return days[days.length ~/ 2].clamp(1, 28).toInt();
   }
 
   double _surpriseBuffer(List<double> monthlyTotals) {
