@@ -66,7 +66,7 @@ class BudgetSuggestion {
 
   BudgetConfidenceTier get confidenceTier {
     if (confidence >= 0.85) return BudgetConfidenceTier.high;
-    if (confidence >= 0.72) return BudgetConfidenceTier.medium;
+    if (confidence >= 0.65) return BudgetConfidenceTier.medium;
     return BudgetConfidenceTier.low;
   }
 
