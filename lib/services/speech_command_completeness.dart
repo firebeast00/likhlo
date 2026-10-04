@@ -145,6 +145,7 @@ class SpeechCommandCompletenessEvaluator {
         case SmartEntryIntent.transfer:
         case SmartEntryIntent.repeatEntry:
         case SmartEntryIntent.unknown:
+        case SmartEntryIntent.appControl: // 🚀 ADDED THIS LINE
           break;
       }
     }
