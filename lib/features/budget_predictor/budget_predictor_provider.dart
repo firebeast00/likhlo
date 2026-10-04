@@ -79,13 +79,15 @@ final budgetDraftProvider = Provider.family<BudgetDraft, DateTime>((ref, month) 
   final history = ref.watch(budgetHistoryTransactionsProvider(month));
   final engine = ref.watch(budgetSuggestionEngineProvider);
   final remembered = ref.watch(monthlyPlanMemoryProvider);
-  final preferences = ref.watch(budgetPlanPreferencesProvider);
+  final oneTimePatterns = ref.watch(
+    budgetPlanPreferencesProvider.select((state) => state.oneTimePatterns),
+  );
 
   final now = DateTime.now();
   final target = DateTime(month.year, month.month);
   final current = DateTime(now.year, now.month);
   final ignoredForFuture =
-      target.isAfter(current) ? preferences.oneTimePatterns : const <String>{};
+      target.isAfter(current) ? oneTimePatterns : const <String>{};
 
   return engine.buildDraft(
     targetMonth: month,
