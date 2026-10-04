@@ -101,7 +101,7 @@ class BudgetDraft {
   double get defaultSuggestedTotal =>
       suggestions
           .where((item) => item.selectedByDefault)
-          .fold(0, (sum, item) => sum + item.amount) +
+          .fold<double>(0.0, (sum, item) => sum + item.amount) +
       surpriseBuffer;
 }
 
