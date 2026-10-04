@@ -4,6 +4,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../models/expense_model.dart';
 import '../../providers/expense_provider.dart';
 import '../../services/udhar_ledger_link_service.dart';
+import 'budget_coach_engine.dart';
+import 'budget_intent_parser.dart';
 import 'budget_plan_preferences.dart';
 import 'budget_prediction_models.dart';
 import 'budget_suggestion_engine.dart';
@@ -107,4 +109,13 @@ final monthlySmartPlanProvider =
     excludedTransactionIds: linkedUdharLedgerIds(),
     rememberedPatternKeys: remembered,
   );
+});
+
+
+final budgetIntentParserProvider = Provider<BudgetIntentParser>((ref) {
+  return BudgetIntentParser();
+});
+
+final budgetCoachEngineProvider = Provider<BudgetCoachEngine>((ref) {
+  return BudgetCoachEngine();
 });
