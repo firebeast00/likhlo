@@ -339,7 +339,7 @@ class ReceiptOcrParser {
       final withoutAmount = row.replaceAll(_amountToken, ' ');
       final cleaned = withoutAmount
           .replaceAll(_currency, ' ')
-          .replaceAll(RegExp(r'[^A-Za-z0-9&.\-\' ]'), ' ')
+          .replaceAll(RegExp(r"[^A-Za-z0-9&.\-' ]"), ' ')
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
       if (cleaned.length >= 2 && cleaned.length <= 60) {
@@ -443,7 +443,7 @@ class ReceiptOcrParser {
         .replaceAll(RegExp(r'\b(?:qty|quantity|rate|price|amount)\b', caseSensitive: false), ' ')
         .replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\b'), ' ')
         .replaceAll(RegExp(r'\b(?:x|@)\b', caseSensitive: false), ' ')
-        .replaceAll(RegExp(r'[^A-Za-z0-9&\-\' ]'), ' ')
+        .replaceAll(RegExp(r"[^A-Za-z0-9&\-' ]"), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
