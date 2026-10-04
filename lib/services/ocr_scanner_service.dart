@@ -171,7 +171,9 @@ class ReceiptOcrParser {
     final digits = text.replaceAll(RegExp(r'\D'), '');
 
     if (_isTotalLine(lower)) return true;
-    if (_subtotal.hasMatch(lower)) return false;
+    if (_subtotal.hasMatch(lower) || _nonPurchaseAmount.hasMatch(lower)) {
+      return false;
+    }
     if (_metadata.hasMatch(lower) &&
         !_currency.hasMatch(lower) &&
         !_explicitTotal.hasMatch(lower)) {
