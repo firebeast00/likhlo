@@ -204,7 +204,8 @@ void main() {
         (item) => item.title == 'Laundry',
       );
       expect(laundry.amount, 750);
-      expect(laundry.reason, contains('last 3 months'));
+      expect(laundry.reason, contains('recent months'));
+      expect(laundry.expectedDay, 5);
     });
 
     test('remembered one-off becomes a next-month expected item', () {
@@ -229,6 +230,63 @@ void main() {
       );
       expect(repair.amount, 1800);
       expect(repair.reason, contains('Remembered'));
+    });
+
+    test('uses six-month recurrence and median amount to resist spikes', () {
+      final engine = BudgetSuggestionEngine();
+      final draft = engine.buildDraft(
+        targetMonth: DateTime(2026, 10),
+        allTransactions: [
+          tx(
+            id: 'jul',
+            title: 'Bike Fuel',
+            amount: 4000,
+            date: DateTime(2026, 7, 8),
+            category: 'Transport',
+          ),
+          tx(
+            id: 'aug',
+            title: 'Petrol Refill',
+            amount: 9000,
+            date: DateTime(2026, 8, 9),
+            category: 'Transport',
+          ),
+          tx(
+            id: 'sep',
+            title: 'Petrol',
+            amount: 4200,
+            date: DateTime(2026, 9, 7),
+            category: 'Transport',
+          ),
+        ],
+      );
+
+      final petrol = draft.routineHabits.singleWhere(
+        (item) => item.title == 'Petrol',
+      );
+      expect(petrol.amount, 4200);
+      expect(petrol.expectedDay, 8);
+      expect(petrol.confidenceTier, isNot(BudgetConfidenceTier.low));
+    });
+
+    test('ignored one-time pattern is not suggested for a future draft', () {
+      final engine = BudgetSuggestionEngine();
+      final key = engine.suggestionKey('Bike Repair', 'General');
+      final draft = engine.buildDraft(
+        targetMonth: DateTime(2026, 10),
+        ignoredPatternKeys: {key},
+        allTransactions: [
+          tx(
+            id: 'repair',
+            title: 'Bike Repair',
+            amount: 1800,
+            date: DateTime(2026, 9, 15),
+            category: 'General',
+          ),
+        ],
+      );
+
+      expect(draft.suggestions, isEmpty);
     });
 
     test('intent evaluator detects a one-time bill by title', () {
