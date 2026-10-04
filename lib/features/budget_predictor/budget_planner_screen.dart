@@ -712,41 +712,30 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                 subtitle: Text(
                   '${item.category} · ${item.frequency} log${item.frequency == 1 ? '' : 's'}',
                 ),
-                trailing: SizedBox(
-                  width: 148,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () async {
-                          await ref
-                              .read(monthlyPlanMemoryProvider.notifier)
-                              .setRemembered(item.id, false);
-                          await ref
-                              .read(budgetPlanPreferencesProvider.notifier)
-                              .setOneTime(item.id, true);
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext);
-                          }
-                        },
-                        child: const Text('One time'),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          await ref
-                              .read(monthlyPlanMemoryProvider.notifier)
-                              .setRemembered(item.id, true);
-                          await ref
-                              .read(budgetPlanPreferencesProvider.notifier)
-                              .setOneTime(item.id, false);
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext);
-                          }
-                        },
-                        child: const Text('Recurring'),
-                      ),
-                    ],
-                  ),
+                trailing: PopupMenuButton<String>(
+                  tooltip: 'Set future behavior',
+                  onSelected: (value) async {
+                    final recurring = value == 'recurring';
+                    await ref
+                        .read(monthlyPlanMemoryProvider.notifier)
+                        .setRemembered(item.id, recurring);
+                    await ref
+                        .read(budgetPlanPreferencesProvider.notifier)
+                        .setOneTime(item.id, !recurring);
+                    if (sheetContext.mounted) {
+                      Navigator.pop(sheetContext);
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'one_time',
+                      child: Text('One time'),
+                    ),
+                    PopupMenuItem(
+                      value: 'recurring',
+                      child: Text('Recurring'),
+                    ),
+                  ],
                 ),
               );
             },
