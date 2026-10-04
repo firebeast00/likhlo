@@ -31,6 +31,14 @@ extension _DashboardOcrMethods on _HomeScreenState {
                 title: const Text('Choose from Gallery'),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: Text(
+                  'For best results, keep the full receipt flat, fill the frame, avoid shadows, and make sure prices are sharp.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
             ],
           ),
         ),
@@ -42,9 +50,9 @@ extension _DashboardOcrMethods on _HomeScreenState {
       final image = await AppLockActivityGuard.protectExternalActivity(
         () => picker.pickImage(
           source: source,
-          imageQuality: 85,
-          maxWidth: 1800,
-          maxHeight: 1800,
+          imageQuality: 95,
+          maxWidth: 2400,
+          maxHeight: 2400,
         ),
       );
       if (!mounted || image == null) return;
