@@ -38,21 +38,21 @@ void main() {
     }
   });
 
-  test('app action channel delivers and consumes one PDF request', () {
+  test('app action channel delivers and consumes supported requests', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
     expect(container.read(appActionProvider), isNull);
-    container
-        .read(appActionProvider.notifier)
-        .request(AppActionType.openMonthlyPdf);
 
-    final request = container.read(appActionProvider);
-    expect(request, isNotNull);
-    expect(request!.action, AppActionType.openMonthlyPdf);
+    for (final action in AppActionType.values) {
+      container.read(appActionProvider.notifier).request(action);
+      final request = container.read(appActionProvider);
+      expect(request, isNotNull);
+      expect(request!.action, action);
 
-    container.read(appActionProvider.notifier).consume(request.id);
-    expect(container.read(appActionProvider), isNull);
+      container.read(appActionProvider.notifier).consume(request.id);
+      expect(container.read(appActionProvider), isNull);
+    }
   });
 
 }
