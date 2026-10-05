@@ -45,14 +45,23 @@ void main() {
   });
 
   test('app controls complete once the action is recognized', () {
-    final dark = check('turn on dark mode');
-    final light = check('dark mode band karo');
-    final pdf = check('show monthly PDF');
-    final receipt = check('scan receipt');
+    final inputs = [
+      'turn on dark mode',
+      'dark mode band karo',
+      'show monthly PDF',
+      'scan receipt',
+      'open backup',
+      'persistent quick entry on',
+      'daily reminders band karo',
+      'spoken confirmations on',
+      'English language mode',
+      'app lock on',
+    ];
 
-    for (final result in [dark, light, pdf, receipt]) {
-      expect(result.isComplete, isTrue);
-      expect(result.reason, 'app_control');
+    for (final input in inputs) {
+      final result = check(input);
+      expect(result.isComplete, isTrue, reason: input);
+      expect(result.reason, 'app_control', reason: input);
     }
   });
 
