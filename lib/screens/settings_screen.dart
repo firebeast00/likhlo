@@ -109,42 +109,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       case AppActionType.persistentQuickEntryOn:
       case AppActionType.persistentQuickEntryOff:
-        final enabled =
+        final persistentEnabled =
             request.action == AppActionType.persistentQuickEntryOn;
-        final current =
+        final persistentCurrent =
             _prefBox.get('persistent_bar_enabled', defaultValue: true) == true;
-        if (current != enabled) await _setPersistentQuickLog(enabled);
+        if (persistentCurrent != persistentEnabled) {
+          await _setPersistentQuickLog(persistentEnabled);
+        }
         _showNlpSettingsResult(
-          enabled
+          persistentEnabled
               ? 'Persistent Quick Entry is enabled.'
               : 'Persistent Quick Entry is disabled.',
         );
         return;
       case AppActionType.smartRemindersOn:
       case AppActionType.smartRemindersOff:
-        final enabled = request.action == AppActionType.smartRemindersOn;
-        final current =
+        final remindersEnabled =
+            request.action == AppActionType.smartRemindersOn;
+        final remindersCurrent =
             _prefBox.get('daily_reminder_enabled', defaultValue: true) == true;
-        if (current != enabled) await _setSmartReminders(enabled);
+        if (remindersCurrent != remindersEnabled) {
+          await _setSmartReminders(remindersEnabled);
+        }
         _showNlpSettingsResult(
-          enabled
+          remindersEnabled
               ? 'Smart Entry reminders are enabled.'
               : 'Smart Entry reminders are disabled.',
         );
         return;
       case AppActionType.spokenConfirmationsOn:
       case AppActionType.spokenConfirmationsOff:
-        final enabled =
+        final spokenEnabled =
             request.action == AppActionType.spokenConfirmationsOn;
-        final current = VoicePrivacySettings.read(_prefBox).spokenFeedbackEnabled;
-        if (current != enabled) {
+        final spokenCurrent =
+            VoicePrivacySettings.read(_prefBox).spokenFeedbackEnabled;
+        if (spokenCurrent != spokenEnabled) {
           await _setVoicePreference(
             VoicePrivacySettings.spokenFeedbackKey,
-            enabled,
+            spokenEnabled,
           );
         }
         _showNlpSettingsResult(
-          enabled
+          spokenEnabled
               ? 'Spoken confirmations are enabled.'
               : 'Spoken confirmations are disabled.',
         );
@@ -168,17 +174,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       case AppActionType.appLockOn:
       case AppActionType.appLockOff:
-        final enabled = request.action == AppActionType.appLockOn;
-        final current = _prefBox.get(
+        final lockEnabled = request.action == AppActionType.appLockOn;
+        final lockCurrent = _prefBox.get(
               BiometricService.preferenceKey,
               defaultValue: false,
             ) ==
             true;
-        if (current != enabled) {
-          await _setAppLock(enabled);
+        if (lockCurrent != lockEnabled) {
+          await _setAppLock(lockEnabled);
         } else {
           _showNlpSettingsResult(
-            enabled
+            lockEnabled
                 ? 'Likhlo App Lock is already enabled.'
                 : 'Likhlo App Lock is already disabled.',
           );
