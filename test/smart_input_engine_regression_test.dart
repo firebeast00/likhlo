@@ -139,6 +139,38 @@ void main() {
       }
     });
 
+    test('routes main NLP budget controls to Monthly Smart Plan', () {
+      final cases = [
+        'budget 40k rakho',
+        '5 hazar save karni hai',
+        'petrol max 4000',
+        'hostel har month',
+        'daily kitna kharch kar sakta hun',
+        'can I spend 5000 on shopping',
+      ];
+
+      for (final input in cases) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl, reason: input);
+        expect(
+          plan.parsed.appAction,
+          SmartEntryAppAction.runMonthlyPlanCommand,
+          reason: input,
+        );
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: input);
+      }
+    });
+
+    test('month-qualified destinations stay navigation commands', () {
+      final stats = engine.parse('September stats', categories);
+      final plan = engine.parse('November monthly plan', categories);
+
+      expect(stats.parsed.intent, SmartEntryIntent.navigate);
+      expect(stats.parsed.navigationTarget, 'Stats');
+      expect(plan.parsed.intent, SmartEntryIntent.navigate);
+      expect(plan.parsed.navigationTarget, 'Monthly Plan');
+    });
+
     test('bare app lock text does not trigger authentication control', () {
       final plan = engine.parse('app lock', categories);
       expect(plan.parsed.appAction, isNull);
