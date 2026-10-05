@@ -2,6 +2,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum AppActionType {
   openMonthlyPdf,
+  openBackup,
+  persistentQuickEntryOn,
+  persistentQuickEntryOff,
+  smartRemindersOn,
+  smartRemindersOff,
+  spokenConfirmationsOn,
+  spokenConfirmationsOff,
+  smartEntryLanguageRomanUrdu,
+  smartEntryLanguageEnglish,
+  appLockOn,
+  appLockOff,
 }
 
 class AppActionRequest {
