@@ -101,7 +101,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
     DeviceAuthResult result;
     try {
       result = await _authenticator.authenticate(
-        reason: 'Unlock Likhlo to access your financial records.',
+        reason: AppStrings.current.display('Unlock Likhlo to access your financial records.'),
         biometricOnly: false,
       );
     } catch (error) {

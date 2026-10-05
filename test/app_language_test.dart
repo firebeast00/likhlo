@@ -98,7 +98,7 @@ void main() {
     Widget app(AppLanguage language) => MaterialApp(
       locale: language.locale,
       supportedLocales: AppStrings.supportedLocales,
-      localizationsDelegates: const [AppStrings.delegate, AppMaterialDelegate(), AppWidgetsDelegate()],
+      localizationsDelegates: const [AppStrings.delegate, AppMaterialDelegate(), AppCupertinoDelegate(), AppWidgetsDelegate()],
       home: const _LanguageView(),
     );
     await tester.pumpWidget(app(AppLanguage.english));

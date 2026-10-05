@@ -93,9 +93,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _setAppLock(bool enabled, {bool spokenFeedback = false}) async {
     final result = await BiometricService().authenticate(
-      reason: enabled
+      reason: AppStrings.current.display(enabled
           ? 'Confirm your identity to enable Likhlo App Lock.'
-          : 'Confirm your identity to disable Likhlo App Lock.',
+          : 'Confirm your identity to disable Likhlo App Lock.'),
       biometricOnly: false,
     );
     if (!mounted) return;
@@ -1336,7 +1336,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
               children: [
-                bodyCell(DateFormat('dd MMM yy').format(entry.date)),
+                bodyCell(AppStrings.current.dateLabel(DateFormat('dd MMM yy').format(entry.date))),
                 bodyCell(shortTitle(entry.title, max: 30), bold: true),
                 pw.Padding(
                   padding:
@@ -1450,7 +1450,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: pill(direction, directionColor, directionBg),
                 ),
                 bodyCell(shortTitle(udharWallet(entry), max: 18)),
-                bodyCell(dueLabel(entry)),
+                bodyCell(AppStrings.current.dateLabel(AppStrings.current.display(dueLabel(entry)))),
                 pw.Padding(
                   padding:
                       const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 6),

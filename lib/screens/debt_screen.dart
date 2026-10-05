@@ -104,12 +104,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   String _walletLabel(List<Wallet> wallets, String? id) {
-    return _walletById(wallets, id)?.name ?? 'Wallet unavailable';
+    return _walletById(wallets, id)?.name ?? AppStrings.current.display('Wallet unavailable');
   }
 
   String _quickWalletLabel(List<Wallet> wallets) {
     final selected = _walletById(wallets, _selectedWalletId);
-    return selected?.name ?? 'Automatic';
+    return selected?.name ?? AppStrings.current.display('Automatic');
   }
 
   IconData _walletIcon(Wallet wallet) {
@@ -1368,7 +1368,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   size: 17,
                 ),
                 label: Text(
-                  AppStrings.current.display(quickLabel),
+                  quickLabel,
                   overflow: TextOverflow.ellipsis,
                 ),
                 style: OutlinedButton.styleFrom(
@@ -1660,7 +1660,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '$walletLabel · ${_dueLabel(item)}',
+                            '$walletLabel · ${AppStrings.current.dateLabel(AppStrings.current.display(_dueLabel(item)))}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style:
@@ -1693,7 +1693,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        _dueLabel(item),
+                        AppStrings.current.dateLabel(AppStrings.current.display(_dueLabel(item))),
                         style: TextStyle(
                           color: dueColor,
                           fontSize: 11,

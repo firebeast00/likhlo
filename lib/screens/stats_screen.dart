@@ -688,7 +688,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          '${activity.walletName} · ${DateFormat.yMMMM().format(_selectedMonth)}',
+                          '${activity.walletName} · ${AppStrings.current.dateLabel(DateFormat.yMMMM().format(_selectedMonth))}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
@@ -731,7 +731,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          "${DateFormat('dd MMM').format(entry.date)} · ${entry.category}",
+                          "${AppStrings.current.dateLabel(DateFormat('dd MMM').format(entry.date))} · ${AppStrings.current.display(entry.category)}",
                         ),
                         trailing: Text(
                           AppStrings.current.text('rs_d8aea4', {'p0': isIncome ? '+' : '-', 'p1': entry.amount.toStringAsFixed(0)}),

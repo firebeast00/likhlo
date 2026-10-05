@@ -1502,5 +1502,11 @@
   "the_transfer_no_longer_exists_293da4": "Transfer ab maujood nahi.",
   "the_transaction_cannot_be_restored_to_its_origin_70f124": "Transaction asal wallet mein wapas nahi aa sakti.",
   "both_transfer_wallets_are_required_before_restor_2f0258": "Restore se pehle transfer ke dono wallets chahiye.",
-  "the_trash_entry_no_longer_exists_4ab2da": "Trash ki entry ab maujood nahi."
+  "the_trash_entry_no_longer_exists_4ab2da": "Trash ki entry ab maujood nahi.",
+  "difference_b16f1f": "Farq",
+  "transactions_1e3281": "Transactions",
+  "categories_6ccb60": "Categories",
+  "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "Batch save nahi ho saka. Koi item add nahi hua.",
+  "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "Receipt save nahi ho saki. Koi item add nahi hua.",
+  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Yeh entry delete karne se wallet ka balance negative ho jayega."
 }

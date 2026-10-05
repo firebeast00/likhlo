@@ -1104,7 +1104,7 @@ class _MetricChip extends StatelessWidget {
           TextSpan(
             children: [
               TextSpan(
-                text: '$label  ',
+                text: '${AppStrings.current.display(label)}  ',
                 style: TextStyle(
                   color: emphasis
                       ? colors.onErrorContainer
@@ -1348,7 +1348,7 @@ class _ExpectedRow extends StatelessWidget {
             ? AppStrings.current.text('handled_rs_6f90cf', {'p0': item.actualAmount.toStringAsFixed(0)})
             : item.status == MonthlyPlanItemStatus.inProgress
                 ? AppStrings.current.text('rs_so_far_a82197', {'p0': item.actualAmount.toStringAsFixed(0)})
-                : timing ?? _confidenceLabel(suggestion.confidenceTier),
+                : AppStrings.current.display(timing ?? _confidenceLabel(suggestion.confidenceTier)),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

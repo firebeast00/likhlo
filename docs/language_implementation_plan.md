@@ -27,6 +27,7 @@ The app language changes presentation only. Accounting, parsing, validation deci
 - Compare accounting, NLP, query, transfer, title policy and backup codec files with the starting commit. Any change beyond explicit background language-storage initialization must be investigated.
 - Preference migration/persistence tests, user-value preservation, notification-title/body parameters, English fallback, Urdu voice switching and cancellation races.
 - Run the existing ledger/query/NLP/transfer/backup tests and new language tests on Flutter. If Flutter is unavailable, record that limitation explicitly; syntax/static checks cannot substitute for execution.
+- CI runs the entire suite on both the pre-language commit `0b7849e` and this branch with the same Flutter SDK. It reports existing failures separately and fails for newly failing tests or incomplete reports. Uploaded JSON reports preserve both full results; this check does not claim that the baseline suite is green.
 - Phone checks: restart, rapid language changes, open forms, offline voice availability, silent mode, background quick entry, reminder content and narrow screens.
 
 Deliver changes as a separate draft branch based on the existing voice-feedback fixes. Do not merge automatically.

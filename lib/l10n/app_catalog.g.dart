@@ -807,6 +807,12 @@ const englishMessages = <String, String>{
   "the_transaction_cannot_be_restored_to_its_origin_70f124": "The transaction cannot be restored to its original wallet.",
   "both_transfer_wallets_are_required_before_restor_2f0258": "Both transfer wallets are required before restoring.",
   "the_trash_entry_no_longer_exists_4ab2da": "The Trash entry no longer exists.",
+  "difference_b16f1f": "Difference",
+  "transactions_1e3281": "Transactions",
+  "categories_6ccb60": "Categories",
+  "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "The batch could not be saved. No items were added.",
+  "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "The receipt could not be saved. No items were added.",
+  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Deleting this entry would make a wallet balance negative.",
 };
 
 const romanUrduMessages = <String, String>{
@@ -1617,6 +1623,12 @@ const romanUrduMessages = <String, String>{
   "the_transaction_cannot_be_restored_to_its_origin_70f124": "Transaction asal wallet mein wapas nahi aa sakti.",
   "both_transfer_wallets_are_required_before_restor_2f0258": "Restore se pehle transfer ke dono wallets chahiye.",
   "the_trash_entry_no_longer_exists_4ab2da": "Trash ki entry ab maujood nahi.",
+  "difference_b16f1f": "Farq",
+  "transactions_1e3281": "Transactions",
+  "categories_6ccb60": "Categories",
+  "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "Batch save nahi ho saka. Koi item add nahi hua.",
+  "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "Receipt save nahi ho saki. Koi item add nahi hua.",
+  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Yeh entry delete karne se wallet ka balance negative ho jayega.",
 };
 
 const urduSpeechMessages = <String, String>{
@@ -2075,5 +2087,11 @@ const urduSpeechMessages = <String, String>{
   "the_transaction_cannot_be_restored_to_its_origin_70f124": "ٹرانزیکشن اصل والٹ میں واپس نہیں آسکتی۔",
   "both_transfer_wallets_are_required_before_restor_2f0258": "بحالی سے پہلے ٹرانسفر کے دونوں والٹس چاہیے۔",
   "the_trash_entry_no_longer_exists_4ab2da": "ٹریش کی انٹری اب موجود نہیں۔",
+  "difference_b16f1f": "فرق",
+  "transactions_1e3281": "ٹرانزیکشنز",
+  "categories_6ccb60": "کیٹیگریز",
+  "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "بیچ محفوظ نہیں ہو سکا۔ کوئی آئٹم شامل نہیں ہوا۔",
+  "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "رسید محفوظ نہیں ہو سکی۔ کوئی آئٹم شامل نہیں ہوا۔",
+  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "یہ اندراج حذف کرنے سے والیٹ کا بیلنس منفی ہو جائے گا۔",
 };
 

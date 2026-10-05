@@ -121,6 +121,7 @@ class LikhloApp extends ConsumerWidget {
       localizationsDelegates: const [
         AppStrings.delegate,
         AppMaterialDelegate(),
+        AppCupertinoDelegate(),
         AppWidgetsDelegate(),
       ],
       scrollBehavior: const _LikhloScrollBehavior(),

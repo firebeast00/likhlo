@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'app_strings.dart';
@@ -27,6 +28,41 @@ class AppWidgetsDelegate extends LocalizationsDelegate<WidgetsLocalizations> {
       SynchronousFuture<WidgetsLocalizations>(const DefaultWidgetsLocalizations());
   @override
   bool shouldReload(AppWidgetsDelegate old) => false;
+}
+
+class AppCupertinoDelegate extends LocalizationsDelegate<CupertinoLocalizations> {
+  const AppCupertinoDelegate();
+  @override
+  bool isSupported(Locale locale) => AppStrings.delegate.isSupported(locale);
+  @override
+  Future<CupertinoLocalizations> load(Locale locale) =>
+      SynchronousFuture<CupertinoLocalizations>(locale.languageCode == 'ur'
+          ? const RomanUrduCupertinoStrings()
+          : const DefaultCupertinoLocalizations());
+  @override
+  bool shouldReload(AppCupertinoDelegate old) => false;
+}
+
+class RomanUrduCupertinoStrings extends DefaultCupertinoLocalizations {
+  const RomanUrduCupertinoStrings();
+  @override
+  String get backButtonLabel => 'Wapas';
+  @override
+  String get cancelButtonLabel => 'Cancel';
+  @override
+  String get selectAllButtonLabel => 'Sab chunen';
+  @override
+  String get searchWebButtonLabel => 'Web par talash';
+  @override
+  String get searchTextFieldPlaceholderLabel => 'Talash karen';
+  @override
+  String get clearButtonLabel => 'Saaf karen';
+  @override
+  String get todayLabel => 'Aaj';
+  @override
+  String get modalBarrierDismissLabel => 'Band karen';
+  @override
+  String get menuDismissLabel => 'Menu band karen';
 }
 
 class RomanUrduMaterialStrings extends DefaultMaterialLocalizations {
