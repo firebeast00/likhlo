@@ -282,7 +282,11 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                     .execute(RestoreTransactionCommand(e.id));
             if (!mounted) return;
             if (restored.succeeded) {
-              _showTransactionInfo('The entry was restored.', title: 'Restored');
+              _showTransactionInfo(
+                'The entry was restored.',
+                title: 'Restored',
+                announce: false,
+              );
             }
           },
         );

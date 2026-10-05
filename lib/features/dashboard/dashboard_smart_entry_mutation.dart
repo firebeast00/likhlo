@@ -179,6 +179,7 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
             _showTransactionInfo(
               'The deleted entry was restored.',
               title: 'Deletion undone',
+              announce: false,
             );
           } else {
             _showTransactionError(
@@ -249,6 +250,7 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
     _showTransactionSuccess(
       '${updatedEntry.title} · Rs. ${updatedEntry.amount.toStringAsFixed(0)} · ${updatedEntry.category}',
       title: 'Entry updated',
+      announce: false,
       actionLabel: 'Undo',
       onAction: () async {
         final restoreResult = await ref
@@ -262,6 +264,7 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
           _showTransactionInfo(
             'The previous amount was restored.',
             title: 'Edit undone',
+            announce: false,
           );
         } else {
           _showTransactionError(

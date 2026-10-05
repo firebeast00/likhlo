@@ -1,6 +1,11 @@
 part of '../../screens/home_screen.dart';
 
 extension _DashboardFeedbackMethods on _HomeScreenState {
+  void _announceVoiceMessage(String message) {
+    if (!mounted || !_isProcessingVoiceCommand) return;
+    unawaited(AudioFeedbackService().announceMessage(message));
+  }
+
   void _showTransactionError(
       String message, {
         String title = 'Unable to continue',
@@ -17,6 +22,7 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
         String title = 'Completed',
         String? actionLabel,
         Future<void> Function()? onAction,
+        bool announce = true,
       }) {
     _showTopMessage(
       title: title,
@@ -24,17 +30,20 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
       tone: TransactionMessageTone.success,
       actionLabel: actionLabel,
       onAction: onAction,
+      announce: announce,
     );
   }
 
   void _showTransactionInfo(
       String message, {
         String title = 'Information',
+        bool announce = true,
       }) {
     _showTopMessage(
       title: title,
       message: message,
       tone: TransactionMessageTone.info,
+      announce: announce,
     );
   }
 
@@ -90,6 +99,7 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
     required TransactionMessageTone tone,
     String? actionLabel,
     Future<void> Function()? onAction,
+    bool announce = true,
   }) {
     if (!mounted) return;
     _feedback.show(
@@ -100,6 +110,17 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
       actionLabel: actionLabel,
       onAction: onAction,
     );
+    // Saved ledger entries already announce through TransactionExecutor.
+    if (announce &&
+        tone != TransactionMessageTone.expense &&
+        tone != TransactionMessageTone.income &&
+        tone != TransactionMessageTone.transfer &&
+        tone != TransactionMessageTone.deletion) {
+      unawaited(AudioFeedbackService().announceNotification(
+        title: title,
+        message: message,
+      ));
+    }
   }
 
 

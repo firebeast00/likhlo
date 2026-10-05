@@ -178,10 +178,36 @@ class PakistaniLanguageNormalizer {
       'lakhs': 'lakh', 'lacs': 'lac', 'crores': 'crore',
       'dairh': 'derh', 'deirh': 'derh',
       'octouber': 'october', 'octuber': 'october',
+      'kitny': 'kitne', 'kitnay': 'kitne',
+      'mahiny': 'mahine', 'mahinay': 'mahine',
+      'huwy': 'hue', 'huwey': 'hue',
     };
     for (final entry in romanAliases.entries) {
       value = _replace(value, RegExp('\\b${entry.key}\\b'),
           entry.value, applied, 'roman_urdu_alias');
+    }
+    value = _replace(
+      value,
+      RegExp(r'\bes\s+(?=mahine\b|hafte\b|haftay\b)'),
+      'is ',
+      applied,
+      'roman_urdu_time_reference',
+    );
+    if (enableContextualAsrRepairs) {
+      value = _replace(
+        value,
+        RegExp(r'\b(is|iss|es)\s+hasty\b(?=.{0,35}\bkharch\b)'),
+        'is haftay',
+        applied,
+        'weekly_query_asr_context',
+      );
+      value = _replace(
+        value,
+        RegExp(r'\b(is|iss)\s+(hafte|haftay)\s+ki\s+be\s+(?=kharch\b)'),
+        'is haftay kitne ',
+        applied,
+        'weekly_query_asr_context',
+      );
     }
     value = _replace(
       value,

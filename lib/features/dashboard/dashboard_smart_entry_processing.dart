@@ -69,6 +69,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           _showTransactionSuccess(
             'The reviewed entries were saved together.',
             title: 'Entries saved',
+            announce: false,
           );
           unawaited(HapticFeedback.lightImpact());
           return true;
@@ -264,6 +265,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
             _showTransactionInfo(
               'The instant Smart Entry was removed.',
               title: 'Entry undone',
+              announce: false,
             );
           }
         },
