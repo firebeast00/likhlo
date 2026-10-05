@@ -224,6 +224,27 @@ void main() {
     expect(tts.spoken, isEmpty);
   });
 
+  test('voice warm-up cannot change a pending English fallback to Urdu', () async {
+    final settings = await Hive.openBox('settings');
+    await settings.put('appLanguage', 'romanUrdu');
+    tts.supportsUrdu = true;
+    final started = Completer<void>();
+    final audioCheck = Completer<bool>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(audioChannel, (_) {
+      started.complete();
+      return audioCheck.future;
+    });
+    final pending = service.announceMessage('App response.');
+    await started.future;
+    await service.prepare();
+    expect(tts.languages.last, 'ur-PK');
+    audioCheck.complete(false);
+    await pending;
+    expect(tts.languages.last, 'en-IN');
+    expect(tts.spoken, ['App response.']);
+  });
+
   test('device TTS errors remain best effort', () async {
     tts.failSpeech = true;
     await expectLater(service.announceMessage('Opening Wallets.'), completes);

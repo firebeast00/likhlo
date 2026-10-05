@@ -126,6 +126,12 @@ class AudioFeedbackService {
       ]);
       final silentMode = readiness.first == true;
       if (silentMode || request != _latestRequest || AppLanguage.read() != language) return;
+      // A concurrent warm-up can reconfigure the shared engine while the
+      // silent-mode check is pending. Restore this message's voice immediately
+      // before speaking, including English fallback for unknown templates.
+      await _configureOnce(canSpeakUrdu ? language : AppLanguage.english);
+      if (request != _latestRequest || AppLanguage.read() != language) return;
+      final useUrdu = _configuredUrdu;
       // The setting may have changed while the device was preparing speech.
       if (!Hive.isBoxOpen('preferences') ||
           !VoicePrivacySettings.read(Hive.box('preferences'))
@@ -135,16 +141,16 @@ class AudioFeedbackService {
       if (request == _latestRequest) {
         await _tts.speak(
           messages.map((message) => message.render(
-            _configuredUrdu ? AppLanguage.romanUrdu : AppLanguage.english,
+            useUrdu ? AppLanguage.romanUrdu : AppLanguage.english,
             spoken: true,
           ).trim()).join('. ')
               .replaceAll(' · ', ', ')
               .replaceAllMapped(
                 RegExp(r'\bRs\.?\s*([0-9,]+(?:\.[0-9]+)?)', caseSensitive: false),
-                (match) => '${match.group(1)} ${_configuredUrdu ? 'روپے' : 'rupees'}',
+                (match) => '${match.group(1)} ${useUrdu ? 'روپے' : 'rupees'}',
               )
               .replaceAll(RegExp('jazzcash', caseSensitive: false),
-                _configuredUrdu ? 'جاز کیش' : 'Jazz Cash'),
+                useUrdu ? 'جاز کیش' : 'Jazz Cash'),
         );
         assert(() {
           debugPrint(
