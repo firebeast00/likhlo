@@ -16,6 +16,8 @@ enum RoutedSmartAppAction {
   darkModeOn,
   darkModeOff,
   darkModeToggle,
+  openMonthlyPdf,
+  scanReceipt,
 }
 
 class PrimaryIntentRoute {
@@ -68,6 +70,7 @@ class PrimaryIntentRouter {
     final hasStrongNavigationTrigger = has(
       r'\b(open|goto|go\s+to|take\s+me\s+to|khol|kholo|jao|le\s+chalo)\b',
     );
+    final isBareNavigationCommand = _isBareNavigationCommand(text);
     final hasShowMeTrigger = has(
       r'\b(show\s+me|show|mujhe\s+dikhao|dikhao|dikhado|dikhaye)\b',
     );
@@ -78,6 +81,7 @@ class PrimaryIntentRouter {
         !hasFinancialSubject || navigationTarget == 'Trash';
     if (navigationTarget != null &&
         (hasStrongNavigationTrigger ||
+            isBareNavigationCommand ||
             (hasShowMeTrigger && showCanNavigate))) {
       return PrimaryIntentRoute(
         intent: RoutedSmartIntent.navigate,
@@ -345,24 +349,45 @@ class PrimaryIntentRouter {
 
   RoutedSmartAppAction? _appAction(String input) {
     if (RegExp(
-      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme)\b',
+      r'\b(?:monthly\s+pdf|pdf\s+(?:report|statement|summary)|monthly\s+report|financial\s+statement|mahine\s+(?:ki|ka)\s+pdf|is\s+mahine\s+(?:ki|ka)\s+pdf)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.openMonthlyPdf;
+    }
+
+    if (RegExp(
+      r'\b(?:scan\s+(?:a\s+)?receipt|receipt\s+scan|scan\s+bill|bill\s+scan|receipt\s+(?:camera|photo)|camera\s+receipt|receipt\s+karo|receipt\s+scan\s+karo)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.scanReceipt;
+    }
+
+    if (RegExp(
+      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme|change\s+theme|theme\s+change\s+karo|theme\s+badlo|mode\s+badlo)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeToggle;
     }
     if (RegExp(
-      r'\b(?:dark\s*(?:mode|theme)\s*(?:off|band)|(?:turn\s+off|disable)\s+dark\s*(?:mode|theme)|light\s*(?:mode|theme)(?:\s+(?:on|karo|lagao|laga\s+do))?|normal\s+mode\s+karo)\b',
+      r'\b(?:dark\s*(?:mode|theme)\s*(?:off|band)|(?:turn\s+off|disable)\s+dark\s*(?:mode|theme)|light\s*(?:mode|theme)(?:\s+(?:on|karo|kar\s+do|lagao|laga\s+do))?|normal\s+mode\s+karo|light\s+karo|light\s+kar\s+do|day\s+mode)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeOff;
     }
     if (RegExp(
-      r'\b(?:dark\s*(?:mode|theme)(?:\s+(?:on|karo|lagao|laga\s+do|chalao))?|(?:turn\s+on|enable)\s+dark\s*(?:mode|theme)|theme\s+dark\s+karo)\b',
+      r'\b(?:dark\s*(?:mode|theme)(?:\s+(?:on|karo|kar\s+do|lagao|laga\s+do|chalao))?|(?:turn\s+on|enable)\s+dark\s*(?:mode|theme)|theme\s+dark\s+karo|dark\s+karo|dark\s+kar\s+do|night\s+mode)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeOn;
     }
     return null;
+  }
+
+  bool _isBareNavigationCommand(String input) {
+    return RegExp(
+      r'^(?:home|dashboard|main|main\s+screen|main\s+page|wallet|wallets|accounts|income\s+accounts|udhar|udhaar|debt|loan|monthly\s+plan|smart\s+plan|budget\s+plan|budget|stats|statistics|analytics|spending\s+trends|settings|setting|preferences|trash|deleted\s+(?:entries|transactions|items)|about|about\s+app)$',
+      caseSensitive: false,
+    ).hasMatch(input.trim());
   }
 
   String? _navigationTarget(String input) {
