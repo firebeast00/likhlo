@@ -47,11 +47,13 @@ void main() {
   test('app controls complete once the action is recognized', () {
     final dark = check('turn on dark mode');
     final light = check('dark mode band karo');
+    final pdf = check('show monthly PDF');
+    final receipt = check('scan receipt');
 
-    expect(dark.isComplete, isTrue);
-    expect(dark.reason, 'app_control');
-    expect(light.isComplete, isTrue);
-    expect(light.reason, 'app_control');
+    for (final result in [dark, light, pdf, receipt]) {
+      expect(result.isComplete, isTrue);
+      expect(result.reason, 'app_control');
+    }
   });
 
   test('generic balance voice question is complete', () {
