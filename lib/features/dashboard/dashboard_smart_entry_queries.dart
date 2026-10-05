@@ -249,7 +249,12 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         break;
     }
     if (delegatedAction != null) {
-      ref.read(appActionProvider.notifier).request(delegatedAction);
+      ref.read(appActionProvider.notifier).request(
+        delegatedAction,
+        targetMonth: delegatedAction == AppActionType.openMonthlyPdf
+            ? resolveMonthlyPdfTargetMonth(command.rawInput)
+            : null,
+      );
       _changeSection(AppSection.settings);
       return;
     }
