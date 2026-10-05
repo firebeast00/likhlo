@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 
+import '../app/app_action.dart';
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/wallet_provider.dart';
@@ -29,6 +32,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late Box _prefBox;
   late DateTime _selectedPdfMonth;
+  int? _handledAppActionId;
 
   @override
   void initState() {
@@ -88,6 +92,132 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _setVoicePreference(String key, bool enabled) async {
     await _prefBox.put(key, enabled);
     if (mounted) setState(() {});
+  }
+
+  Future<void> _handlePendingAppAction(AppActionRequest request) async {
+    ref.read(appActionProvider.notifier).consume(request.id);
+    if (!mounted) return;
+
+    switch (request.action) {
+      case AppActionType.openMonthlyPdf:
+        final requestedMonth = request.month;
+        if (requestedMonth == null) {
+          await _choosePdfMonthAndGenerate(context, ref);
+          return;
+        }
+        _selectedPdfMonth = DateTime(
+          requestedMonth.year,
+          requestedMonth.month,
+        );
+        if (mounted) setState(() {});
+        await _generatePdf(context, ref, _selectedPdfMonth);
+        return;
+      case AppActionType.openBackup:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const BackupScreen()),
+        );
+        return;
+      case AppActionType.openStatsMonth:
+      case AppActionType.openMonthlyPlan:
+      case AppActionType.runMonthlyPlanCommand:
+        // These actions are handled by their destination screens.
+        return;
+      case AppActionType.persistentQuickEntryOn:
+      case AppActionType.persistentQuickEntryOff:
+        final persistentEnabled =
+            request.action == AppActionType.persistentQuickEntryOn;
+        final persistentCurrent =
+            _prefBox.get('persistent_bar_enabled', defaultValue: true) == true;
+        if (persistentCurrent != persistentEnabled) {
+          await _setPersistentQuickLog(persistentEnabled);
+        }
+        _showNlpSettingsResult(
+          persistentEnabled
+              ? 'Persistent Quick Entry is enabled.'
+              : 'Persistent Quick Entry is disabled.',
+        );
+        return;
+      case AppActionType.smartRemindersOn:
+      case AppActionType.smartRemindersOff:
+        final remindersEnabled =
+            request.action == AppActionType.smartRemindersOn;
+        final remindersCurrent =
+            _prefBox.get('daily_reminder_enabled', defaultValue: true) == true;
+        if (remindersCurrent != remindersEnabled) {
+          await _setSmartReminders(remindersEnabled);
+        }
+        _showNlpSettingsResult(
+          remindersEnabled
+              ? 'Smart Entry reminders are enabled.'
+              : 'Smart Entry reminders are disabled.',
+        );
+        return;
+      case AppActionType.spokenConfirmationsOn:
+      case AppActionType.spokenConfirmationsOff:
+        final spokenEnabled =
+            request.action == AppActionType.spokenConfirmationsOn;
+        final spokenCurrent =
+            VoicePrivacySettings.read(_prefBox).spokenFeedbackEnabled;
+        if (spokenCurrent != spokenEnabled) {
+          await _setVoicePreference(
+            VoicePrivacySettings.spokenFeedbackKey,
+            spokenEnabled,
+          );
+        }
+        _showNlpSettingsResult(
+          spokenEnabled
+              ? 'Spoken confirmations are enabled.'
+              : 'Spoken confirmations are disabled.',
+        );
+        return;
+      case AppActionType.smartEntryLanguageRomanUrdu:
+      case AppActionType.smartEntryLanguageEnglish:
+        final language =
+            request.action == AppActionType.smartEntryLanguageRomanUrdu
+                ? 'romanUrdu'
+                : 'english';
+        if (ref.read(settingsProvider).smartEntryLanguage != language) {
+          await ref
+              .read(settingsProvider.notifier)
+              .updateSmartEntryLanguage(language);
+        }
+        _showNlpSettingsResult(
+          language == 'romanUrdu'
+              ? 'Smart Entry language is now Roman Urdu.'
+              : 'Smart Entry language is now English.',
+        );
+        return;
+      case AppActionType.appLockOn:
+      case AppActionType.appLockOff:
+        final lockEnabled = request.action == AppActionType.appLockOn;
+        final lockCurrent = _prefBox.get(
+              BiometricService.preferenceKey,
+              defaultValue: false,
+            ) ==
+            true;
+        if (lockCurrent != lockEnabled) {
+          await _setAppLock(lockEnabled);
+        } else {
+          _showNlpSettingsResult(
+            lockEnabled
+                ? 'Likhlo App Lock is already enabled.'
+                : 'Likhlo App Lock is already disabled.',
+          );
+        }
+        return;
+    }
+  }
+
+  void _showNlpSettingsResult(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+        ),
+      );
   }
 
   // --- PROFILE EDIT DIALOG ---
@@ -237,6 +367,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final pendingAction = ref.watch(appActionProvider);
+    if (pendingAction != null && _handledAppActionId != pendingAction.id) {
+      _handledAppActionId = pendingAction.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(_handlePendingAppAction(pendingAction));
+      });
+    }
+
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

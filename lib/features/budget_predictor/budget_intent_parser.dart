@@ -273,7 +273,7 @@ class BudgetIntentParser {
         )
         .replaceAll(
           RegExp(
-            r'\b(budget|save|saving|savings|bachat|buffer|safety|reserve|emergency|max|maximum|limit|rakho|rakhna|set|target|kam|reduce|lower|less|zyada|increase|raise|more|one time|one-time|sirf|is|iss|month|dobara|nahi|recurring|repeat|har|mahina|monthly|yaad|rakh|remember|karo|karni|karna|hai|me|main|can|i|kya|spend|kharch|please)\b',
+            r'\b(budget|save|saving|savings|bachat|buffer|safety|reserve|emergency|max|maximum|limit|rakho|rakhna|set|target|kam|reduce|lower|less|zyada|increase|raise|more|one time|one-time|sirf|is|iss|month|dobara|nahi|recurring|repeat|har|mahina|monthly|yaad|rakh|remember|karo|karni|karna|hai|me|main|can|i|kya|spend|kharch|please|this|current|last|previous|next|pichla|pichlay|pichle|agla|aglay|agle|january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec|20\d{2})\b',
           ),
           ' ',
         )

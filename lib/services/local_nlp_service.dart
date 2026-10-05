@@ -22,6 +22,21 @@ enum SmartEntryAppAction {
   darkModeOn,
   darkModeOff,
   darkModeToggle,
+  openMonthlyPdf,
+  scanReceipt,
+  openBackup,
+  persistentQuickEntryOn,
+  persistentQuickEntryOff,
+  smartRemindersOn,
+  smartRemindersOff,
+  spokenConfirmationsOn,
+  spokenConfirmationsOff,
+  smartEntryLanguageRomanUrdu,
+  smartEntryLanguageEnglish,
+  appLockOn,
+  appLockOff,
+  runMonthlyPlanCommand,
+  clearSearchFilters,
 }
 
 enum SmartEntryQueryMetric {
@@ -1381,6 +1396,36 @@ class LocalNlpService {
         return SmartEntryAppAction.darkModeOff;
       case RoutedSmartAppAction.darkModeToggle:
         return SmartEntryAppAction.darkModeToggle;
+      case RoutedSmartAppAction.openMonthlyPdf:
+        return SmartEntryAppAction.openMonthlyPdf;
+      case RoutedSmartAppAction.scanReceipt:
+        return SmartEntryAppAction.scanReceipt;
+      case RoutedSmartAppAction.openBackup:
+        return SmartEntryAppAction.openBackup;
+      case RoutedSmartAppAction.persistentQuickEntryOn:
+        return SmartEntryAppAction.persistentQuickEntryOn;
+      case RoutedSmartAppAction.persistentQuickEntryOff:
+        return SmartEntryAppAction.persistentQuickEntryOff;
+      case RoutedSmartAppAction.smartRemindersOn:
+        return SmartEntryAppAction.smartRemindersOn;
+      case RoutedSmartAppAction.smartRemindersOff:
+        return SmartEntryAppAction.smartRemindersOff;
+      case RoutedSmartAppAction.spokenConfirmationsOn:
+        return SmartEntryAppAction.spokenConfirmationsOn;
+      case RoutedSmartAppAction.spokenConfirmationsOff:
+        return SmartEntryAppAction.spokenConfirmationsOff;
+      case RoutedSmartAppAction.smartEntryLanguageRomanUrdu:
+        return SmartEntryAppAction.smartEntryLanguageRomanUrdu;
+      case RoutedSmartAppAction.smartEntryLanguageEnglish:
+        return SmartEntryAppAction.smartEntryLanguageEnglish;
+      case RoutedSmartAppAction.appLockOn:
+        return SmartEntryAppAction.appLockOn;
+      case RoutedSmartAppAction.appLockOff:
+        return SmartEntryAppAction.appLockOff;
+      case RoutedSmartAppAction.runMonthlyPlanCommand:
+        return SmartEntryAppAction.runMonthlyPlanCommand;
+      case RoutedSmartAppAction.clearSearchFilters:
+        return SmartEntryAppAction.clearSearchFilters;
       case null:
         return null;
     }

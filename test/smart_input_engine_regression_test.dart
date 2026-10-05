@@ -52,11 +52,12 @@ void main() {
   });
 
   group('daily read-only commands', () {
-    test('routes dark mode controls without creating transactions', () {
+    test('routes theme controls without creating transactions', () {
       final on = engine.parse('dark mode on', categories);
       final off = engine.parse('dark mode band krdo', categories);
       final light = engine.parse('light mode karo', categories);
       final toggle = engine.parse('toggle dark mode', categories);
+      final romanToggle = engine.parse('theme badlo', categories);
 
       expect(on.parsed.intent, SmartEntryIntent.appControl);
       expect(on.parsed.appAction, SmartEntryAppAction.darkModeOn);
@@ -71,6 +72,130 @@ void main() {
       expect(light.parsed.appAction, SmartEntryAppAction.darkModeOff);
       expect(toggle.parsed.intent, SmartEntryIntent.appControl);
       expect(toggle.parsed.appAction, SmartEntryAppAction.darkModeToggle);
+      expect(romanToggle.parsed.intent, SmartEntryIntent.appControl);
+      expect(romanToggle.parsed.appAction, SmartEntryAppAction.darkModeToggle);
+    });
+
+    test('routes monthly PDF and receipt scan as direct app controls', () {
+      for (final input in [
+        'show monthly PDF',
+        'mahine ki pdf dikhao',
+        'open pdf',
+        'last month PDF',
+        'September PDF',
+        'September 2026 PDF',
+      ]) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl, reason: input);
+        expect(
+          plan.parsed.appAction,
+          SmartEntryAppAction.openMonthlyPdf,
+          reason: input,
+        );
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: input);
+        expect(plan.parsed.amount, 0, reason: input);
+      }
+
+      for (final input in [
+        'scan receipt',
+        'receipt scan karo',
+        'scan bill',
+      ]) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl);
+        expect(plan.parsed.appAction, SmartEntryAppAction.scanReceipt);
+        expect(plan.command, isA<ReadOnlySmartCommand>());
+        expect(plan.parsed.amount, 0);
+      }
+    });
+
+    test('clears transaction search filters as a read-only control', () {
+      for (final input in [
+        'clear search',
+        'reset filters',
+        'show all entries',
+        'search band karo',
+      ]) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl, reason: input);
+        expect(
+          plan.parsed.appAction,
+          SmartEntryAppAction.clearSearchFilters,
+          reason: input,
+        );
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: input);
+        expect(plan.parsed.amount, 0, reason: input);
+      }
+    });
+
+    test('routes daily settings controls without creating transactions', () {
+      final cases = <String, SmartEntryAppAction>{
+        'open backup': SmartEntryAppAction.openBackup,
+        'persistent quick entry on': SmartEntryAppAction.persistentQuickEntryOn,
+        'status bar entry band karo':
+            SmartEntryAppAction.persistentQuickEntryOff,
+        'smart entry reminders on': SmartEntryAppAction.smartRemindersOn,
+        'daily reminders band karo': SmartEntryAppAction.smartRemindersOff,
+        'spoken confirmations on':
+            SmartEntryAppAction.spokenConfirmationsOn,
+        'voice feedback band karo':
+            SmartEntryAppAction.spokenConfirmationsOff,
+        'smart entry language Roman Urdu':
+            SmartEntryAppAction.smartEntryLanguageRomanUrdu,
+        'English language mode':
+            SmartEntryAppAction.smartEntryLanguageEnglish,
+        'app lock on': SmartEntryAppAction.appLockOn,
+        'app lock band karo': SmartEntryAppAction.appLockOff,
+      };
+
+      for (final entry in cases.entries) {
+        final plan = engine.parse(entry.key, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl,
+            reason: entry.key);
+        expect(plan.parsed.appAction, entry.value, reason: entry.key);
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: entry.key);
+        expect(plan.parsed.amount, 0, reason: entry.key);
+      }
+    });
+
+    test('routes main NLP budget controls to Monthly Smart Plan', () {
+      final cases = [
+        'budget 40k rakho',
+        '5 hazar save karni hai',
+        'save 5k',
+        'petrol max 4000',
+        'shopping kam karo',
+        'hostel har month',
+        'daily kitna kharch kar sakta hun',
+        'can I spend 5000 on shopping',
+      ];
+
+      for (final input in cases) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl, reason: input);
+        expect(
+          plan.parsed.appAction,
+          SmartEntryAppAction.runMonthlyPlanCommand,
+          reason: input,
+        );
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: input);
+      }
+    });
+
+    test('month-qualified destinations stay navigation commands', () {
+      final stats = engine.parse('September stats', categories);
+      final plan = engine.parse('November monthly plan', categories);
+
+      expect(stats.parsed.intent, SmartEntryIntent.navigate);
+      expect(stats.parsed.navigationTarget, 'Stats');
+      expect(plan.parsed.intent, SmartEntryIntent.navigate);
+      expect(plan.parsed.navigationTarget, 'Monthly Plan');
+    });
+
+    test('bare app lock text does not trigger authentication control', () {
+      final plan = engine.parse('app lock', categories);
+      expect(plan.parsed.appAction, isNull);
+      expect(plan.parsed.intent, isNot(SmartEntryIntent.appControl));
     });
 
     test('understands monthly and daily summary phrases', () {
@@ -152,6 +277,26 @@ void main() {
       expect(category.parsed.timeRange, SmartEntryTimeRange.lastMonth);
     });
 
+    test('opens daily destinations from bare commands', () {
+      final cases = <String, String>{
+        'stats': 'Stats',
+        'wallets': 'Wallets',
+        'udhar': 'Udhaar',
+        'monthly plan': 'Monthly Plan',
+        'settings': 'Settings',
+        'trash': 'Trash',
+        'about': 'About',
+        'home': 'Dashboard',
+      };
+
+      for (final entry in cases.entries) {
+        final plan = engine.parse(entry.key, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.navigate);
+        expect(plan.parsed.navigationTarget, entry.value);
+        expect(plan.command, isA<ReadOnlySmartCommand>());
+      }
+    });
+
     test('opens new navigation targets with Roman Urdu aliases', () {
       final plan =
           engine.parse('mahine ka plan dikhado', categories);
@@ -216,8 +361,8 @@ void main() {
       expect(transfer.normalizedText, contains('jazzcash'));
       expect(transfer.command, isA<TransferCommand>());
 
-      expect(pdf.parsed.intent, SmartEntryIntent.navigate);
-      expect(pdf.parsed.navigationTarget, 'Settings');
+      expect(pdf.parsed.intent, SmartEntryIntent.appControl);
+      expect(pdf.parsed.appAction, SmartEntryAppAction.openMonthlyPdf);
 
       expect(monthlyList.parsed.intent, SmartEntryIntent.searchEntries);
       expect(monthlyList.parsed.timeRange, SmartEntryTimeRange.thisMonth);
@@ -234,11 +379,14 @@ void main() {
 
     test('existing transaction and search commands keep their paths', () {
       final expense = engine.parse('500 petrol', categories);
+      final savedExpense = engine.parse('save 500 burger', categories);
       final deletion = engine.parse('delete burger', categories);
       final search = engine.parse('petrol wali entries dikhao', categories);
 
       expect(expense.parsed.intent, SmartEntryIntent.addExpense);
       expect(expense.command, isA<AddSmartTransactionCommand>());
+      expect(savedExpense.parsed.intent, SmartEntryIntent.addExpense);
+      expect(savedExpense.command, isA<AddSmartTransactionCommand>());
       expect(deletion.parsed.intent, SmartEntryIntent.deleteEntry);
       expect(search.parsed.intent, SmartEntryIntent.searchEntries);
     });

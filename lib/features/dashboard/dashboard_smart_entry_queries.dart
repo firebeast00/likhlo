@@ -190,9 +190,110 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final action = command.appAction;
     if (action == null) {
       _showTransactionInfo(
-        'Try dark mode on, dark mode off, or toggle dark mode.',
+        'Try dark mode, monthly PDF, scan receipt, reminders, spoken confirmations, backup, language, or app lock.',
         title: 'App control not recognized',
       );
+      return;
+    }
+
+    _smartInputCtrl.clear();
+
+    if (action == SmartEntryAppAction.scanReceipt) {
+      await _scanReceiptIntoInput();
+      return;
+    }
+
+    if (action == SmartEntryAppAction.clearSearchFilters) {
+      final hadFilters = _isSearching ||
+          _searchQuery.isNotEmpty ||
+          _selectedCategoryTab != 'All' ||
+          _smartEntryTypeFilter != null ||
+          _smartEntrySearchRange != null ||
+          _smartEntrySearchAllHistory;
+      setState(() {
+        _isSearching = false;
+        _searchQuery = '';
+        _selectedCategoryTab = 'All';
+        _smartEntryTypeFilter = null;
+        _smartEntrySearchRange = null;
+        _smartEntrySearchAllHistory = false;
+      });
+      _searchQueryNotifier.value = '';
+      _categorySelectionNotifier.value = 'All';
+      _showTransactionInfo(
+        hadFilters
+            ? 'Search and transaction filters were cleared.'
+            : 'No transaction filters are active.',
+        title: hadFilters ? 'Filters cleared' : 'Nothing to clear',
+      );
+      return;
+    }
+
+    if (action == SmartEntryAppAction.runMonthlyPlanCommand) {
+      ref.read(appActionProvider.notifier).request(
+        AppActionType.runMonthlyPlanCommand,
+        month: parseReferencedMonth(command.rawInput),
+        text: command.rawInput,
+      );
+      _changeSection(AppSection.budget);
+      return;
+    }
+
+    AppActionType? delegatedAction;
+    switch (action) {
+      case SmartEntryAppAction.openMonthlyPdf:
+        delegatedAction = AppActionType.openMonthlyPdf;
+        break;
+      case SmartEntryAppAction.openBackup:
+        delegatedAction = AppActionType.openBackup;
+        break;
+      case SmartEntryAppAction.persistentQuickEntryOn:
+        delegatedAction = AppActionType.persistentQuickEntryOn;
+        break;
+      case SmartEntryAppAction.persistentQuickEntryOff:
+        delegatedAction = AppActionType.persistentQuickEntryOff;
+        break;
+      case SmartEntryAppAction.smartRemindersOn:
+        delegatedAction = AppActionType.smartRemindersOn;
+        break;
+      case SmartEntryAppAction.smartRemindersOff:
+        delegatedAction = AppActionType.smartRemindersOff;
+        break;
+      case SmartEntryAppAction.spokenConfirmationsOn:
+        delegatedAction = AppActionType.spokenConfirmationsOn;
+        break;
+      case SmartEntryAppAction.spokenConfirmationsOff:
+        delegatedAction = AppActionType.spokenConfirmationsOff;
+        break;
+      case SmartEntryAppAction.smartEntryLanguageRomanUrdu:
+        delegatedAction = AppActionType.smartEntryLanguageRomanUrdu;
+        break;
+      case SmartEntryAppAction.smartEntryLanguageEnglish:
+        delegatedAction = AppActionType.smartEntryLanguageEnglish;
+        break;
+      case SmartEntryAppAction.appLockOn:
+        delegatedAction = AppActionType.appLockOn;
+        break;
+      case SmartEntryAppAction.appLockOff:
+        delegatedAction = AppActionType.appLockOff;
+        break;
+      case SmartEntryAppAction.darkModeOn:
+      case SmartEntryAppAction.darkModeOff:
+      case SmartEntryAppAction.darkModeToggle:
+      case SmartEntryAppAction.scanReceipt:
+      case SmartEntryAppAction.runMonthlyPlanCommand:
+      case SmartEntryAppAction.clearSearchFilters:
+        delegatedAction = null;
+        break;
+    }
+    if (delegatedAction != null) {
+      ref.read(appActionProvider.notifier).request(
+        delegatedAction,
+        month: delegatedAction == AppActionType.openMonthlyPdf
+            ? resolveMonthlyPdfTargetMonth(command.rawInput)
+            : null,
+      );
+      _changeSection(AppSection.settings);
       return;
     }
 
@@ -211,9 +312,24 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.darkModeToggle:
         enableDark = !currentlyDark;
         break;
+      case SmartEntryAppAction.openMonthlyPdf:
+      case SmartEntryAppAction.scanReceipt:
+      case SmartEntryAppAction.openBackup:
+      case SmartEntryAppAction.persistentQuickEntryOn:
+      case SmartEntryAppAction.persistentQuickEntryOff:
+      case SmartEntryAppAction.smartRemindersOn:
+      case SmartEntryAppAction.smartRemindersOff:
+      case SmartEntryAppAction.spokenConfirmationsOn:
+      case SmartEntryAppAction.spokenConfirmationsOff:
+      case SmartEntryAppAction.smartEntryLanguageRomanUrdu:
+      case SmartEntryAppAction.smartEntryLanguageEnglish:
+      case SmartEntryAppAction.appLockOn:
+      case SmartEntryAppAction.appLockOff:
+      case SmartEntryAppAction.runMonthlyPlanCommand:
+      case SmartEntryAppAction.clearSearchFilters:
+        return;
     }
 
-    _smartInputCtrl.clear();
     if (currentlyDark != enableDark) {
       notifier.updateThemeMode(enableDark ? 'dark' : 'light');
     }
@@ -453,6 +569,18 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     }
     final section = AppSection.fromLabel(target);
     if (section != null) {
+      final requestedMonth = parseReferencedMonth(command.rawInput);
+      if (section == AppSection.stats && requestedMonth != null) {
+        ref.read(appActionProvider.notifier).request(
+          AppActionType.openStatsMonth,
+          month: requestedMonth,
+        );
+      } else if (section == AppSection.budget && requestedMonth != null) {
+        ref.read(appActionProvider.notifier).request(
+          AppActionType.openMonthlyPlan,
+          month: requestedMonth,
+        );
+      }
       _changeSection(section);
       return;
     }

@@ -16,6 +16,21 @@ enum RoutedSmartAppAction {
   darkModeOn,
   darkModeOff,
   darkModeToggle,
+  openMonthlyPdf,
+  scanReceipt,
+  openBackup,
+  persistentQuickEntryOn,
+  persistentQuickEntryOff,
+  smartRemindersOn,
+  smartRemindersOff,
+  spokenConfirmationsOn,
+  spokenConfirmationsOff,
+  smartEntryLanguageRomanUrdu,
+  smartEntryLanguageEnglish,
+  appLockOn,
+  appLockOff,
+  runMonthlyPlanCommand,
+  clearSearchFilters,
 }
 
 class PrimaryIntentRoute {
@@ -68,6 +83,7 @@ class PrimaryIntentRouter {
     final hasStrongNavigationTrigger = has(
       r'\b(open|goto|go\s+to|take\s+me\s+to|khol|kholo|jao|le\s+chalo)\b',
     );
+    final isBareNavigationCommand = _isBareNavigationCommand(text);
     final hasShowMeTrigger = has(
       r'\b(show\s+me|show|mujhe\s+dikhao|dikhao|dikhado|dikhaye)\b',
     );
@@ -76,8 +92,11 @@ class PrimaryIntentRouter {
     );
     final showCanNavigate =
         !hasFinancialSubject || navigationTarget == 'Trash';
+    final hasMonthReference = _hasMonthReference(text);
     if (navigationTarget != null &&
         (hasStrongNavigationTrigger ||
+            isBareNavigationCommand ||
+            hasMonthReference ||
             (hasShowMeTrigger && showCanNavigate))) {
       return PrimaryIntentRoute(
         intent: RoutedSmartIntent.navigate,
@@ -345,24 +364,188 @@ class PrimaryIntentRouter {
 
   RoutedSmartAppAction? _appAction(String input) {
     if (RegExp(
-      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme)\b',
+      r'\b(?:clear\s+(?:search|filters?)|reset\s+(?:search|filters?)|remove\s+filters?|show\s+all\s+(?:entries|transactions)|search\s+(?:off|band)|filters?\s+(?:off|band))\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.clearSearchFilters;
+    }
+
+    if (_isBudgetPlannerControl(input)) {
+      return RoutedSmartAppAction.runMonthlyPlanCommand;
+    }
+
+    if (RegExp(
+      r'\b(?:open|show|kholo|dikhao)\s+(?:backup|backup\s+restore)|(?:backup|backup\s+restore)\s+(?:open|show|kholo|dikhao)|restore\s+backup\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.openBackup;
+    }
+
+    if (RegExp(
+      r'\b(?:app\s+lock|likhlo\s+lock)\b.{0,24}\b(?:on|enable|karo|kar\s+do|lagao|laga\s+do)\b|\block\s+(?:the\s+)?app\b',
+      caseSensitive: false,
+    ).hasMatch(input) &&
+        !RegExp(
+          r'\b(?:off|disable|band|band\s+karo|hatao|remove)\b',
+          caseSensitive: false,
+        ).hasMatch(input)) {
+      return RoutedSmartAppAction.appLockOn;
+    }
+    if (RegExp(
+      r'\b(?:app\s+lock|likhlo\s+lock|lock\s+app)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao|remove)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:app\s+lock|likhlo\s+lock)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.appLockOff;
+    }
+
+    if (RegExp(
+      r'\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar\s+(?:entry|notification)|persistent\s+notification)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.persistentQuickEntryOff;
+    }
+    if (RegExp(
+      r'\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar\s+(?:entry|notification)|persistent\s+notification)\b.{0,24}\b(?:on|enable|chalu|chalao|karo|kar\s+do)\b|\b(?:enable|on|chalu)\b.{0,24}\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.persistentQuickEntryOn;
+    }
+
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartRemindersOff;
+    }
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b.{0,24}\b(?:on|enable|chalu|chalao|karo|kar\s+do)\b|\b(?:enable|on|chalu)\b.{0,24}\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartRemindersOn;
+    }
+
+    if (RegExp(
+      r'\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.spokenConfirmationsOff;
+    }
+    if (RegExp(
+      r'\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b.{0,24}\b(?:on|enable|chalu|chalao|karo|kar\s+do)\b|\b(?:enable|on|chalu)\b.{0,24}\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.spokenConfirmationsOn;
+    }
+
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+language|entry\s+language|language)\b.{0,20}\b(?:roman\s+urdu|roman)\b|\b(?:roman\s+urdu|roman)\b.{0,20}\b(?:language|mode)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartEntryLanguageRomanUrdu;
+    }
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+language|entry\s+language|language)\b.{0,20}\benglish\b|\benglish\b.{0,20}\b(?:language|mode)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartEntryLanguageEnglish;
+    }
+
+    if (RegExp(
+      r'\b(?:monthly\s+pdf|(?:this|current|last|previous)\s+month\s+pdf|(?:pichlay|pichle)\s+mahine\s+(?:ki\s+)?pdf|pdf\s+(?:report|statement|summary|dikhao|dikhado|kholo|open|show)|(?:open|show|view|dikhao|dikhado|kholo)\s+(?:monthly\s+)?pdf|monthly\s+report|financial\s+statement|mahine\s+(?:ki|ka)\s+pdf|is\s+mahine\s+(?:ki|ka)\s+pdf|(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)(?:\s+20\d{2})?\s+pdf)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.openMonthlyPdf;
+    }
+
+    if (RegExp(
+      r'\b(?:scan\s+(?:a\s+)?receipt|receipt\s+scan|scan\s+bill|bill\s+scan|receipt\s+(?:camera|photo)|camera\s+receipt|receipt\s+karo|receipt\s+scan\s+karo)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.scanReceipt;
+    }
+
+    if (RegExp(
+      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme|change\s+theme|theme\s+change\s+karo|theme\s+badlo|mode\s+badlo)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeToggle;
     }
     if (RegExp(
-      r'\b(?:dark\s*(?:mode|theme)\s*(?:off|band)|(?:turn\s+off|disable)\s+dark\s*(?:mode|theme)|light\s*(?:mode|theme)(?:\s+(?:on|karo|lagao|laga\s+do))?|normal\s+mode\s+karo)\b',
+      r'\b(?:dark\s*(?:mode|theme)\s*(?:off|band)|(?:turn\s+off|disable)\s+dark\s*(?:mode|theme)|light\s*(?:mode|theme)(?:\s+(?:on|karo|kar\s+do|lagao|laga\s+do))?|normal\s+mode\s+karo|light\s+karo|light\s+kar\s+do|day\s+mode)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeOff;
     }
     if (RegExp(
-      r'\b(?:dark\s*(?:mode|theme)(?:\s+(?:on|karo|lagao|laga\s+do|chalao))?|(?:turn\s+on|enable)\s+dark\s*(?:mode|theme)|theme\s+dark\s+karo)\b',
+      r'\b(?:dark\s*(?:mode|theme)(?:\s+(?:on|karo|kar\s+do|lagao|laga\s+do|chalao))?|(?:turn\s+on|enable)\s+dark\s*(?:mode|theme)|theme\s+dark\s+karo|dark\s+karo|dark\s+kar\s+do|night\s+mode)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeOn;
     }
     return null;
+  }
+
+  bool _hasMonthReference(String input) {
+    return RegExp(
+      r'\b(?:this\s+month|current\s+month|last\s+month|previous\s+month|next\s+month|is\s+mahine|iss\s+mahine|pichl(?:a|ay|e)\s+mahina|pichl(?:ay|e)\s+mahine|agla\s+mahina|aglay\s+mahine|january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+  }
+
+  bool _isBudgetPlannerControl(String input) {
+    final hasAmount = _hasAmountSignal(input);
+    final hasBudgetWord = RegExp(
+      r'\b(?:budget|saving|savings|bachat|buffer|safety|reserve|emergency)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    final hasItemControl = RegExp(
+      r'\b(?:max|maximum|limit|target|reduce|lower|less|kam|increase|raise|more|zyada|recurring|har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    final isBudgetQuestion = RegExp(
+      r'\b(?:safe|recommended|daily|roz|rozana|why|kyun|kiun|can\s+i|kya\s+(?:me|main))\b',
+      caseSensitive: false,
+    ).hasMatch(input) &&
+        RegExp(
+          r'\b(?:budget|spend|kharch)\b',
+          caseSensitive: false,
+        ).hasMatch(input);
+    final hasExplicitSaveGoal = RegExp(
+      r'\bsave\b.{0,28}\b(?:karni|karna|bachana|goal|target|monthly|mahina|mahine)\b|\b(?:goal|target)\b.{0,20}\bsave\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    final hasBareSaveGoal = RegExp(
+      r'^(?:save\s+\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?|\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?\s+save)$',
+      caseSensitive: false,
+    ).hasMatch(input.trim());
+    final hasCategoryAdjustment = RegExp(
+      r'\b(?:shopping|food|petrol|fuel|transport|bills?|hostel|education|health|entertainment)\b.{0,24}\b(?:kam|reduce|lower|less|zyada|increase|raise|more)\b|\b(?:kam|reduce|lower|less|zyada|increase|raise|more)\b.{0,24}\b(?:shopping|food|petrol|fuel|transport|bills?|hostel|education|health|entertainment)\b',
+      caseSensitive: false,
+    ).hasMatch(input) &&
+        !RegExp(
+          r'\b(?:entry|transaction|amount|naam|name|title)\b',
+          caseSensitive: false,
+        ).hasMatch(input);
+
+    if (isBudgetQuestion) return true;
+    if (hasBudgetWord && hasAmount) return true;
+    if ((hasExplicitSaveGoal || hasBareSaveGoal) && hasAmount) return true;
+    if (hasCategoryAdjustment) return true;
+    if (hasItemControl && (hasAmount || hasBudgetWord)) return true;
+    if (RegExp(
+      r'\b(?:har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _isBareNavigationCommand(String input) {
+    return RegExp(
+      r'^(?:home|dashboard|main|main\s+screen|main\s+page|wallet|wallets|accounts|income\s+accounts|udhar|udhaar|debt|loan|monthly\s+plan|smart\s+plan|budget\s+plan|budget|stats|statistics|analytics|spending\s+trends|settings|setting|preferences|trash|deleted\s+(?:entries|transactions|items)|about|about\s+app)$',
+      caseSensitive: false,
+    ).hasMatch(input.trim());
   }
 
   String? _navigationTarget(String input) {
@@ -371,8 +554,9 @@ class PrimaryIntentRouter {
     ).hasMatch(input)) {
       return 'Settings';
     }
-    if (RegExp(r'\b(monthly\s+plan|smart\s+plan|budget\s+plan|budget|mahine\s+ka\s+plan)\b')
-        .hasMatch(input)) {
+    if (RegExp(
+      r'\b(monthly\s+plan|smart\s+plan|budget\s+plan|budget|mahine\s+ka\s+plan)\b',
+    ).hasMatch(input)) {
       return 'Monthly Plan';
     }
     if (RegExp(r'\b(trash|deleted\s+(?:entries|transactions|items))\b')

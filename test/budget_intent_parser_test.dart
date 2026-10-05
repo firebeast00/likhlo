@@ -24,6 +24,13 @@ void main() {
       expect(intent.target, contains('petrol'));
     });
 
+    test('ignores month words when resolving a planned item', () {
+      final intent = parser.parse('November petrol max 4000');
+      expect(intent.action, BudgetIntentAction.setItemAmount);
+      expect(intent.amount, 4000);
+      expect(intent.target, 'petrol');
+    });
+
     test('understands recurring and one-time corrections', () {
       expect(
         parser.parse('hostel har month').action,
