@@ -42,8 +42,10 @@ void main() {
       expect(recovery.onDevice, isTrue);
       expect(recovery.tryOffline(error, isCloud: false, hasDraft: false,
         retryCount: session.retryCount), isFalse);
-      expect(session.onRecognizerError(retryable: false).action,
-        SpeechSessionAction.discardDraft);
+      final failure = session.onRecognizerError(retryable: false);
+      expect(failure.action, SpeechSessionAction.none);
+      expect(failure.transcript, isEmpty);
+      expect(session.state, SpeechSessionState.failed);
       recovery.reset();
       expect(recovery.onDevice, isFalse);
     });

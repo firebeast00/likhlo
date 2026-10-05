@@ -61,8 +61,9 @@ void main() {
             ),
           ));
           await tester.pumpAndSettle();
-          expect(tester.takeException(), isNull);
-          final title = find.text(AppStrings(language).display('Spending by Category'));
+          final error = tester.takeException();
+          expect(error, isNull, reason: error is FlutterError ? error.toStringDeep() : '$error');
+          final title = find.text(AppStrings(language).text('spending_by_category_d4aadf'));
           expect(title, findsOneWidget);
           final header = find.ancestor(of: title, matching: find.byType(Wrap));
           expect(header, findsOneWidget);
@@ -75,7 +76,7 @@ void main() {
 
   testWidgets('dimmer exports one laid-out accessible node and can be adjusted', (tester) async {
     final handle = tester.ensureSemantics();
-    addTearDown(handle.dispose);
+
     var value = 0.0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StatefulBuilder(
       builder: (context, setState) => AppDimmerSlider(
@@ -102,5 +103,6 @@ void main() {
     expect(value, lessThanOrEqualTo(0.75));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
+    handle.dispose();
   });
 }

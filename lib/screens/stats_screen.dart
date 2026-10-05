@@ -429,40 +429,37 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   child: Column(
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              AppStrings.current.display(category),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            AppStrings.current.text('_6c727a', {'p0': (percent * 100).toStringAsFixed(1)}),
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Rs. ${amount.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 10,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  AppStrings.current.display(category),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                Text(
+                                  AppStrings.current.text('_6c727a', {'p0': (percent * 100).toStringAsFixed(1)}),
+                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                                ),
+                                Text(
+                                  'Rs. ${amount.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                                ),
+                              ],
                             ),
                           ),
                         ],
