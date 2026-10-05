@@ -736,7 +736,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                   AppStrings.current.text('log_301699', {'p0': item.category, 'p1': item.frequency, 'p2': item.frequency == 1 ? '' : 's'}),
                 ),
                 trailing: PopupMenuButton<String>(
-                  tooltip: 'Set future behavior',
+                  tooltip: AppStrings.current.text('set_future_behavior_638001'),
                   onSelected: (value) async {
                     final recurring = value == 'recurring';
                     await ref
