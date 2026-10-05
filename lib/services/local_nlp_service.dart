@@ -36,6 +36,7 @@ enum SmartEntryAppAction {
   appLockOn,
   appLockOff,
   runMonthlyPlanCommand,
+  clearSearchFilters,
 }
 
 enum SmartEntryQueryMetric {
@@ -1423,6 +1424,8 @@ class LocalNlpService {
         return SmartEntryAppAction.appLockOff;
       case RoutedSmartAppAction.runMonthlyPlanCommand:
         return SmartEntryAppAction.runMonthlyPlanCommand;
+      case RoutedSmartAppAction.clearSearchFilters:
+        return SmartEntryAppAction.clearSearchFilters;
       case null:
         return null;
     }
