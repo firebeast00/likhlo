@@ -69,6 +69,31 @@ void main() {
     expect(request?.month, DateTime(2026, 9));
   });
 
+  test('cross-screen NLP actions preserve month and command text', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(appActionProvider.notifier).request(
+      AppActionType.runMonthlyPlanCommand,
+      month: DateTime(2026, 11, 18),
+      text: 'November petrol max 4000',
+    );
+    final planRequest = container.read(appActionProvider);
+
+    expect(planRequest?.action, AppActionType.runMonthlyPlanCommand);
+    expect(planRequest?.month, DateTime(2026, 11));
+    expect(planRequest?.text, 'November petrol max 4000');
+
+    container.read(appActionProvider.notifier).request(
+      AppActionType.openStatsMonth,
+      month: DateTime(2026, 9, 12),
+    );
+    final statsRequest = container.read(appActionProvider);
+
+    expect(statsRequest?.action, AppActionType.openStatsMonth);
+    expect(statsRequest?.month, DateTime(2026, 9));
+  });
+
   test('monthly PDF month resolver understands relative and named months', () {
     final now = DateTime(2026, 10, 5);
 
