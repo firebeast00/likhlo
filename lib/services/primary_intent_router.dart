@@ -506,15 +506,20 @@ class PrimaryIntentRouter {
       r'\b(?:safe|recommended|daily|roz|rozana|why|kyun|kiun|can\s+i|kya\s+(?:me|main))\b',
       caseSensitive: false,
     ).hasMatch(input) &&
-        RegExp(r'\b(?:budget|spend|kharch)\b', caseSensitive: false)
-            .hasMatch(input);
-
+        RegExp(
+          r'\b(?:budget|spend|kharch)\b',
+          caseSensitive: false,
+        ).hasMatch(input);
     final hasExplicitSaveGoal = RegExp(
       r'\bsave\b.{0,28}\b(?:karni|karna|bachana|goal|target|monthly|mahina|mahine)\b|\b(?:goal|target)\b.{0,20}\bsave\b',
       caseSensitive: false,
     ).hasMatch(input);
     final hasBareSaveGoal = RegExp(
-      r'^(?:save\s+\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?|\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?\s+save)
+      r'^(?:save\s+\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?|\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?\s+save)$',
+      caseSensitive: false,
+    ).hasMatch(input.trim());
+
+    if (isBudgetQuestion) return true;
     if (hasBudgetWord && hasAmount) return true;
     if ((hasExplicitSaveGoal || hasBareSaveGoal) && hasAmount) return true;
     if (hasItemControl && (hasAmount || hasBudgetWord)) return true;
