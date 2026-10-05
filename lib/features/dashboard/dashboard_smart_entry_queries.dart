@@ -262,7 +262,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     if (delegatedAction != null) {
       ref.read(appActionProvider.notifier).request(
         delegatedAction,
-        targetMonth: delegatedAction == AppActionType.openMonthlyPdf
+        month: delegatedAction == AppActionType.openMonthlyPdf
             ? resolveMonthlyPdfTargetMonth(command.rawInput)
             : null,
       );
