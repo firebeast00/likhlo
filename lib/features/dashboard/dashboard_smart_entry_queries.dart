@@ -459,7 +459,9 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final period = referencedMonth == null
         ? _smartTimeRangeLabel(command.timeRange)
         : DateFormat.yMMMM().format(referencedMonth);
-    final subject = hasCategory ? ' · ${command.category}' : '';
+    final Object subject = hasCategory
+        ? AppMessage('category_query_suffix', {'p0': AppLabel(command.category)})
+        : '';
 
     switch (metric) {
       case SmartEntryQueryMetric.spending:
@@ -486,7 +488,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
             ? matching.length
             : matching.where((entry) => entry.type == type).length;
         _showTransactionInfo(
-          AppMessage('records_eab69c', {'p0': type == null ? 'Income and expense' : type == 'income' ? 'Income' : 'Expense', 'p1': subject}),
+          AppMessage('records_eab69c', {'p0': AppLabel(type == null ? 'Income and expense' : type == 'income' ? 'Income' : 'Expense'), 'p1': subject}),
           title: AppMessage('transactions_3cd4cc', {'p0': count, 'p1': AppLabel(period)}),
         );
         break;

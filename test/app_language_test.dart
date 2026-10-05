@@ -110,5 +110,7 @@ void main() {
     final context = tester.element(find.byType(TextField));
     expect(Directionality.of(context), TextDirection.ltr);
     expect(MaterialLocalizations.of(context).datePickerHelpText, 'Tareekh chunen');
+    expect(MaterialLocalizations.of(context).formatMonthYear(DateTime(2026, 1)), 'Janwari 2026');
+    expect(MaterialLocalizations.of(context).parseCompactDate('01/05/2026'), DateTime(2026, 1, 5));
   });
 }

@@ -1508,5 +1508,6 @@
   "categories_6ccb60": "Categories",
   "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "Batch save nahi ho saka. Koi item add nahi hua.",
   "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "Receipt save nahi ho saki. Koi item add nahi hua.",
-  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Yeh entry delete karne se wallet ka balance negative ho jayega."
+  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Yeh entry delete karne se wallet ka balance negative ho jayega.",
+  "category_query_suffix": " · {p0}"
 }

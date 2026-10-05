@@ -460,5 +460,6 @@
   "categories_6ccb60": "کیٹیگریز",
   "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "بیچ محفوظ نہیں ہو سکا۔ کوئی آئٹم شامل نہیں ہوا۔",
   "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "رسید محفوظ نہیں ہو سکی۔ کوئی آئٹم شامل نہیں ہوا۔",
-  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "یہ اندراج حذف کرنے سے والیٹ کا بیلنس منفی ہو جائے گا۔"
+  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "یہ اندراج حذف کرنے سے والیٹ کا بیلنس منفی ہو جائے گا۔",
+  "category_query_suffix": "، {p0}"
 }

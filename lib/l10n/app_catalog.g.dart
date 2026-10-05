@@ -813,6 +813,7 @@ const englishMessages = <String, String>{
   "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "The batch could not be saved. No items were added.",
   "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "The receipt could not be saved. No items were added.",
   "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Deleting this entry would make a wallet balance negative.",
+  "category_query_suffix": " · {p0}",
 };
 
 const romanUrduMessages = <String, String>{
@@ -1629,6 +1630,7 @@ const romanUrduMessages = <String, String>{
   "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "Batch save nahi ho saka. Koi item add nahi hua.",
   "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "Receipt save nahi ho saki. Koi item add nahi hua.",
   "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Yeh entry delete karne se wallet ka balance negative ho jayega.",
+  "category_query_suffix": " · {p0}",
 };
 
 const urduSpeechMessages = <String, String>{
@@ -2093,5 +2095,6 @@ const urduSpeechMessages = <String, String>{
   "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "بیچ محفوظ نہیں ہو سکا۔ کوئی آئٹم شامل نہیں ہوا۔",
   "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "رسید محفوظ نہیں ہو سکی۔ کوئی آئٹم شامل نہیں ہوا۔",
   "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "یہ اندراج حذف کرنے سے والیٹ کا بیلنس منفی ہو جائے گا۔",
+  "category_query_suffix": "، {p0}",
 };
 

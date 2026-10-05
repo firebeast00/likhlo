@@ -67,6 +67,17 @@ class RomanUrduCupertinoStrings extends DefaultCupertinoLocalizations {
 
 class RomanUrduMaterialStrings extends DefaultMaterialLocalizations {
   const RomanUrduMaterialStrings();
+  static const _strings = AppStrings(AppLanguage.romanUrdu);
+  @override
+  String formatMonthYear(DateTime date) => _strings.dateLabel(super.formatMonthYear(date));
+  @override
+  String formatFullDate(DateTime date) => _strings.dateLabel(super.formatFullDate(date));
+  @override
+  String formatMediumDate(DateTime date) => _strings.dateLabel(super.formatMediumDate(date));
+  @override
+  String formatShortDate(DateTime date) => _strings.dateLabel(super.formatShortDate(date));
+  @override
+  List<String> get narrowWeekdays => const ['I', 'P', 'M', 'B', 'J', 'J', 'H'];
   @override
   String get cancelButtonLabel => 'Cancel';
   @override
