@@ -203,6 +203,32 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       return;
     }
 
+    if (action == SmartEntryAppAction.clearSearchFilters) {
+      final hadFilters = _isSearching ||
+          _searchQuery.isNotEmpty ||
+          _selectedCategoryTab != 'All' ||
+          _smartEntryTypeFilter != null ||
+          _smartEntrySearchRange != null ||
+          _smartEntrySearchAllHistory;
+      setState(() {
+        _isSearching = false;
+        _searchQuery = '';
+        _selectedCategoryTab = 'All';
+        _smartEntryTypeFilter = null;
+        _smartEntrySearchRange = null;
+        _smartEntrySearchAllHistory = false;
+      });
+      _searchQueryNotifier.value = '';
+      _categorySelectionNotifier.value = 'All';
+      _showTransactionInfo(
+        hadFilters
+            ? 'Search and transaction filters were cleared.'
+            : 'No transaction filters are active.',
+        title: hadFilters ? 'Filters cleared' : 'Nothing to clear',
+      );
+      return;
+    }
+
     if (action == SmartEntryAppAction.runMonthlyPlanCommand) {
       ref.read(appActionProvider.notifier).request(
         AppActionType.runMonthlyPlanCommand,
@@ -256,6 +282,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.darkModeToggle:
       case SmartEntryAppAction.scanReceipt:
       case SmartEntryAppAction.runMonthlyPlanCommand:
+      case SmartEntryAppAction.clearSearchFilters:
         delegatedAction = null;
         break;
     }
@@ -299,6 +326,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.appLockOn:
       case SmartEntryAppAction.appLockOff:
       case SmartEntryAppAction.runMonthlyPlanCommand:
+      case SmartEntryAppAction.clearSearchFilters:
         return;
     }
 
