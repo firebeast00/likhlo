@@ -203,6 +203,16 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       return;
     }
 
+    if (action == SmartEntryAppAction.runMonthlyPlanCommand) {
+      ref.read(appActionProvider.notifier).request(
+        AppActionType.runMonthlyPlanCommand,
+        month: parseReferencedMonth(command.rawInput),
+        text: command.rawInput,
+      );
+      _changeSection(AppSection.budget);
+      return;
+    }
+
     AppActionType? delegatedAction;
     switch (action) {
       case SmartEntryAppAction.openMonthlyPdf:
@@ -245,6 +255,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.darkModeOff:
       case SmartEntryAppAction.darkModeToggle:
       case SmartEntryAppAction.scanReceipt:
+      case SmartEntryAppAction.runMonthlyPlanCommand:
         delegatedAction = null;
         break;
     }
@@ -287,6 +298,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.smartEntryLanguageEnglish:
       case SmartEntryAppAction.appLockOn:
       case SmartEntryAppAction.appLockOff:
+      case SmartEntryAppAction.runMonthlyPlanCommand:
         return;
     }
 
@@ -529,6 +541,18 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     }
     final section = AppSection.fromLabel(target);
     if (section != null) {
+      final requestedMonth = parseReferencedMonth(command.rawInput);
+      if (section == AppSection.stats && requestedMonth != null) {
+        ref.read(appActionProvider.notifier).request(
+          AppActionType.openStatsMonth,
+          month: requestedMonth,
+        );
+      } else if (section == AppSection.budget && requestedMonth != null) {
+        ref.read(appActionProvider.notifier).request(
+          AppActionType.openMonthlyPlan,
+          month: requestedMonth,
+        );
+      }
       _changeSection(section);
       return;
     }
