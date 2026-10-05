@@ -31,7 +31,7 @@ void main() {
     for (final width in [320.0, 360.0, 800.0]) {
       for (final scale in [1.0, 1.5]) {
         testWidgets('Stats fits ${language.name} at $width with text scale $scale', (tester) async {
-          await settings.put('appLanguage', language.name);
+          await tester.runAsync(() => settings.put('appLanguage', language.name));
           await tester.binding.setSurfaceSize(Size(width, 772));
           addTearDown(() => tester.binding.setSurfaceSize(null));
           await tester.pumpWidget(ProviderScope(
@@ -68,7 +68,7 @@ void main() {
           expect(header, findsOneWidget);
           expect(find.descendant(of: header, matching: find.text('Rs. 15200')), findsOneWidget);
           await tester.pumpWidget(const SizedBox());
-        });
+        }, timeout: const Timeout(Duration(seconds: 30)));
       }
     }
   }

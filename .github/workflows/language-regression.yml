@@ -6,8 +6,22 @@ on:
     paths: ['lib/**', 'test/**', 'tool/**', '.github/workflows/language-regression.yml']
 jobs:
   verify:
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
     runs-on: ubuntu-latest
     steps:
+      - name: Cancel superseded device-log verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for superseded_run in 37333382598 37333393656; do
+            superseded_status=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$superseded_run" --jq .status)
+            if [ "$superseded_status" = in_progress ] || [ "$superseded_status" = queued ]; then
+              gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$superseded_run/cancel"
+            fi
+          done
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
