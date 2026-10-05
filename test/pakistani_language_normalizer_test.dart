@@ -49,6 +49,24 @@ void main() {
     );
   });
 
+  test('repairs live Stats month ASR variants only in voice context', () {
+    final status = normalizer.normalize(
+      'show October status',
+      enableContextualAsrRepairs: true,
+    );
+    final starts = normalizer.normalize(
+      'show September starts',
+      enableContextualAsrRepairs: true,
+    );
+    final typo = normalizer.normalize('show octouber stats');
+
+    expect(status.normalized, 'show october stats');
+    expect(starts.normalized, 'show september stats');
+    expect(typo.normalized, 'show october stats');
+    expect(status.appliedRules, contains('stats_asr_context'));
+    expect(starts.appliedRules, contains('stats_asr_context'));
+  });
+
   test('builds a selector and title patch for Roman Urdu edit', () {
     final plan = SmartInputEngine().parse(
       '400 ki headphones ka naam Kurch karo',
