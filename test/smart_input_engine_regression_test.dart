@@ -102,6 +102,42 @@ void main() {
       }
     });
 
+    test('routes daily settings controls without creating transactions', () {
+      final cases = <String, SmartEntryAppAction>{
+        'open backup': SmartEntryAppAction.openBackup,
+        'persistent quick entry on': SmartEntryAppAction.persistentQuickEntryOn,
+        'status bar entry band karo':
+            SmartEntryAppAction.persistentQuickEntryOff,
+        'smart entry reminders on': SmartEntryAppAction.smartRemindersOn,
+        'daily reminders band karo': SmartEntryAppAction.smartRemindersOff,
+        'spoken confirmations on':
+            SmartEntryAppAction.spokenConfirmationsOn,
+        'voice feedback band karo':
+            SmartEntryAppAction.spokenConfirmationsOff,
+        'smart entry language Roman Urdu':
+            SmartEntryAppAction.smartEntryLanguageRomanUrdu,
+        'English language mode':
+            SmartEntryAppAction.smartEntryLanguageEnglish,
+        'app lock on': SmartEntryAppAction.appLockOn,
+        'app lock band karo': SmartEntryAppAction.appLockOff,
+      };
+
+      for (final entry in cases.entries) {
+        final plan = engine.parse(entry.key, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl,
+            reason: entry.key);
+        expect(plan.parsed.appAction, entry.value, reason: entry.key);
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: entry.key);
+        expect(plan.parsed.amount, 0, reason: entry.key);
+      }
+    });
+
+    test('bare app lock text does not trigger authentication control', () {
+      final plan = engine.parse('app lock', categories);
+      expect(plan.parsed.appAction, isNull);
+      expect(plan.parsed.intent, isNot(SmartEntryIntent.appControl));
+    });
+
     test('understands monthly and daily summary phrases', () {
       final roman =
           engine.parse('is mahine ka hisaab dikhao', categories);
