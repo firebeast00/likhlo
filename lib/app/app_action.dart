@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum AppActionType {
   openMonthlyPdf,
+  openStatsMonth,
+  openMonthlyPlan,
+  runMonthlyPlanCommand,
   openBackup,
   persistentQuickEntryOn,
   persistentQuickEntryOff,
@@ -18,10 +21,14 @@ enum AppActionType {
 class AppActionRequest {
   final int id;
   final AppActionType action;
+  final DateTime? month;
+  final String? text;
 
   const AppActionRequest({
     required this.id,
     required this.action,
+    this.month,
+    this.text,
   });
 }
 
@@ -31,9 +38,18 @@ class AppActionController extends Notifier<AppActionRequest?> {
   @override
   AppActionRequest? build() => null;
 
-  void request(AppActionType action) {
+  void request(
+    AppActionType action, {
+    DateTime? month,
+    String? text,
+  }) {
     _nextId++;
-    state = AppActionRequest(id: _nextId, action: action);
+    state = AppActionRequest(
+      id: _nextId,
+      action: action,
+      month: month,
+      text: text,
+    );
   }
 
   void consume(int id) {
