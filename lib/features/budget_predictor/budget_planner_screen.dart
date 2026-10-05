@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/app_action.dart';
 import '../../providers/budget_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/speech_recognition_provider.dart';
@@ -32,6 +33,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
   bool _processingCommand = false;
   bool _saving = false;
   String? _assistantMessage;
+  int? _handledAppActionId;
 
   @override
   void dispose() {
@@ -39,6 +41,29 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
     final speech = _speech;
     if (speech != null) unawaited(speech.cancel());
     super.dispose();
+  }
+
+  Future<void> _handlePendingAppAction(
+    AppActionRequest request,
+  ) async {
+    if (request.action != AppActionType.openMonthlyPlan &&
+        request.action != AppActionType.runMonthlyPlanCommand) {
+      return;
+    }
+    ref.read(appActionProvider.notifier).consume(request.id);
+    if (!mounted) return;
+
+    final requestedMonth = request.month;
+    if (requestedMonth != null) {
+      _changeMonth(DateTime(requestedMonth.year, requestedMonth.month));
+    }
+
+    if (request.action == AppActionType.runMonthlyPlanCommand) {
+      final text = request.text?.trim() ?? '';
+      if (text.isNotEmpty) {
+        await _processBudgetCommand(text);
+      }
+    }
   }
 
   void _changeMonth(DateTime month) {
@@ -757,6 +782,18 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pendingAction = ref.watch(appActionProvider);
+    if (pendingAction != null &&
+        (pendingAction.action == AppActionType.openMonthlyPlan ||
+            pendingAction.action == AppActionType.runMonthlyPlanCommand) &&
+        _handledAppActionId != pendingAction.id) {
+      _handledAppActionId = pendingAction.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(_handlePendingAppAction(pendingAction));
+      });
+    }
+
     final plan = ref.watch(monthlySmartPlanProvider(_targetMonth));
     final preferences = ref.watch(budgetPlanPreferencesProvider);
     final savedBudget = ref.watch(budgetProvider)[budgetMonthKey(_targetMonth)];
