@@ -190,9 +190,24 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final action = command.appAction;
     if (action == null) {
       _showTransactionInfo(
-        'Try dark mode on, dark mode off, or toggle dark mode.',
+        'Try dark mode, light mode, monthly PDF, or scan receipt.',
         title: 'App control not recognized',
       );
+      return;
+    }
+
+    _smartInputCtrl.clear();
+
+    if (action == SmartEntryAppAction.openMonthlyPdf) {
+      ref
+          .read(appActionProvider.notifier)
+          .request(AppActionType.openMonthlyPdf);
+      _changeSection(AppSection.settings);
+      return;
+    }
+
+    if (action == SmartEntryAppAction.scanReceipt) {
+      await _scanReceiptIntoInput();
       return;
     }
 
@@ -211,9 +226,11 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.darkModeToggle:
         enableDark = !currentlyDark;
         break;
+      case SmartEntryAppAction.openMonthlyPdf:
+      case SmartEntryAppAction.scanReceipt:
+        return;
     }
 
-    _smartInputCtrl.clear();
     if (currentlyDark != enableDark) {
       notifier.updateThemeMode(enableDark ? 'dark' : 'light');
     }
