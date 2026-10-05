@@ -190,7 +190,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final action = command.appAction;
     if (action == null) {
       _showTransactionInfo(
-        'Try dark mode, light mode, monthly PDF, or scan receipt.',
+        'Try dark mode, monthly PDF, scan receipt, reminders, spoken confirmations, backup, language, or app lock.',
         title: 'App control not recognized',
       );
       return;
@@ -198,16 +198,38 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
 
     _smartInputCtrl.clear();
 
-    if (action == SmartEntryAppAction.openMonthlyPdf) {
-      ref
-          .read(appActionProvider.notifier)
-          .request(AppActionType.openMonthlyPdf);
-      _changeSection(AppSection.settings);
+    if (action == SmartEntryAppAction.scanReceipt) {
+      await _scanReceiptIntoInput();
       return;
     }
 
-    if (action == SmartEntryAppAction.scanReceipt) {
-      await _scanReceiptIntoInput();
+    final delegatedAction = switch (action) {
+      SmartEntryAppAction.openMonthlyPdf => AppActionType.openMonthlyPdf,
+      SmartEntryAppAction.openBackup => AppActionType.openBackup,
+      SmartEntryAppAction.persistentQuickEntryOn =>
+        AppActionType.persistentQuickEntryOn,
+      SmartEntryAppAction.persistentQuickEntryOff =>
+        AppActionType.persistentQuickEntryOff,
+      SmartEntryAppAction.smartRemindersOn => AppActionType.smartRemindersOn,
+      SmartEntryAppAction.smartRemindersOff => AppActionType.smartRemindersOff,
+      SmartEntryAppAction.spokenConfirmationsOn =>
+        AppActionType.spokenConfirmationsOn,
+      SmartEntryAppAction.spokenConfirmationsOff =>
+        AppActionType.spokenConfirmationsOff,
+      SmartEntryAppAction.smartEntryLanguageRomanUrdu =>
+        AppActionType.smartEntryLanguageRomanUrdu,
+      SmartEntryAppAction.smartEntryLanguageEnglish =>
+        AppActionType.smartEntryLanguageEnglish,
+      SmartEntryAppAction.appLockOn => AppActionType.appLockOn,
+      SmartEntryAppAction.appLockOff => AppActionType.appLockOff,
+      SmartEntryAppAction.darkModeOn ||
+      SmartEntryAppAction.darkModeOff ||
+      SmartEntryAppAction.darkModeToggle ||
+      SmartEntryAppAction.scanReceipt => null,
+    };
+    if (delegatedAction != null) {
+      ref.read(appActionProvider.notifier).request(delegatedAction);
+      _changeSection(AppSection.settings);
       return;
     }
 
@@ -228,6 +250,17 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         break;
       case SmartEntryAppAction.openMonthlyPdf:
       case SmartEntryAppAction.scanReceipt:
+      case SmartEntryAppAction.openBackup:
+      case SmartEntryAppAction.persistentQuickEntryOn:
+      case SmartEntryAppAction.persistentQuickEntryOff:
+      case SmartEntryAppAction.smartRemindersOn:
+      case SmartEntryAppAction.smartRemindersOff:
+      case SmartEntryAppAction.spokenConfirmationsOn:
+      case SmartEntryAppAction.spokenConfirmationsOff:
+      case SmartEntryAppAction.smartEntryLanguageRomanUrdu:
+      case SmartEntryAppAction.smartEntryLanguageEnglish:
+      case SmartEntryAppAction.appLockOn:
+      case SmartEntryAppAction.appLockOff:
         return;
     }
 
