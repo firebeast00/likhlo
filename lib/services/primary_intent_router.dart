@@ -29,6 +29,7 @@ enum RoutedSmartAppAction {
   smartEntryLanguageEnglish,
   appLockOn,
   appLockOff,
+  runMonthlyPlanCommand,
 }
 
 class PrimaryIntentRoute {
@@ -90,9 +91,11 @@ class PrimaryIntentRouter {
     );
     final showCanNavigate =
         !hasFinancialSubject || navigationTarget == 'Trash';
+    final hasMonthReference = _hasMonthReference(text);
     if (navigationTarget != null &&
         (hasStrongNavigationTrigger ||
             isBareNavigationCommand ||
+            hasMonthReference ||
             (hasShowMeTrigger && showCanNavigate))) {
       return PrimaryIntentRoute(
         intent: RoutedSmartIntent.navigate,
@@ -359,6 +362,10 @@ class PrimaryIntentRouter {
   }
 
   RoutedSmartAppAction? _appAction(String input) {
+    if (_isBudgetPlannerControl(input)) {
+      return RoutedSmartAppAction.runMonthlyPlanCommand;
+    }
+
     if (RegExp(
       r'\b(?:open|show|kholo|dikhao)\s+(?:backup|backup\s+restore)|(?:backup|backup\s+restore)\s+(?:open|show|kholo|dikhao)|restore\s+backup\b',
       caseSensitive: false,
@@ -468,6 +475,42 @@ class PrimaryIntentRouter {
       return RoutedSmartAppAction.darkModeOn;
     }
     return null;
+  }
+
+  bool _hasMonthReference(String input) {
+    return RegExp(
+      r'\b(?:this\s+month|current\s+month|last\s+month|previous\s+month|next\s+month|is\s+mahine|iss\s+mahine|pichl(?:a|ay|e)\s+mahina|pichl(?:ay|e)\s+mahine|agla\s+mahina|aglay\s+mahine|january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+  }
+
+  bool _isBudgetPlannerControl(String input) {
+    final hasAmount = _hasAmountSignal(input);
+    final hasBudgetWord = RegExp(
+      r'\b(?:budget|saving|savings|save|bachat|buffer|safety|reserve|emergency)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    final hasItemControl = RegExp(
+      r'\b(?:max|maximum|limit|target|reduce|lower|less|kam|increase|raise|more|zyada|recurring|repeat|har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    final isBudgetQuestion = RegExp(
+      r'\b(?:safe|recommended|daily|roz|rozana|why|kyun|kiun|can\s+i|kya\s+(?:me|main))\b',
+      caseSensitive: false,
+    ).hasMatch(input) &&
+        RegExp(r'\b(?:budget|spend|kharch)\b', caseSensitive: false)
+            .hasMatch(input);
+
+    if (isBudgetQuestion) return true;
+    if (hasBudgetWord && hasAmount) return true;
+    if (hasItemControl && (hasAmount || hasBudgetWord)) return true;
+    if (RegExp(
+      r'\b(?:har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return true;
+    }
+    return false;
   }
 
   bool _isBareNavigationCommand(String input) {
