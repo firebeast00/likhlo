@@ -49,10 +49,13 @@ class AppActionController extends Notifier<AppActionRequest?> {
     String? text,
   }) {
     _nextId++;
+    final requestedMonth = month ?? targetMonth;
     state = AppActionRequest(
       id: _nextId,
       action: action,
-      month: month ?? targetMonth,
+      month: requestedMonth == null
+          ? null
+          : DateTime(requestedMonth.year, requestedMonth.month),
       text: text,
     );
   }
