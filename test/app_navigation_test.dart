@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:student_expense_manager/app/app_action.dart';
 import 'package:student_expense_manager/app/app_navigation.dart';
 import 'package:student_expense_manager/app/app_shell.dart';
 
@@ -35,6 +36,23 @@ void main() {
         expect(systemBackDestination(section), AppSection.dashboard);
       }
     }
+  });
+
+  test('app action channel delivers and consumes one PDF request', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(container.read(appActionProvider), isNull);
+    container
+        .read(appActionProvider.notifier)
+        .request(AppActionType.openMonthlyPdf);
+
+    final request = container.read(appActionProvider);
+    expect(request, isNotNull);
+    expect(request!.action, AppActionType.openMonthlyPdf);
+
+    container.read(appActionProvider.notifier).consume(request.id);
+    expect(container.read(appActionProvider), isNull);
   });
 
 }
