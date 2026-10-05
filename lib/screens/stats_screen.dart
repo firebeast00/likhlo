@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -53,9 +54,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
+          SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Stats are available through the current month.'),
+            content: Text(AppStrings.current.text('stats_are_available_through_the_current_month_b47844')),
           ),
         );
     }
@@ -73,6 +74,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final pendingAction = ref.watch(appActionProvider);
     if (pendingAction != null &&
         pendingAction.action == AppActionType.openStatsMonth &&
@@ -96,8 +98,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Spending Trends',
+            Text(
+              AppStrings.current.text('spending_trends_2bffb9'),
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
@@ -106,7 +108,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Six-month overview ending in $monthLabel',
+              AppStrings.current.text('six_month_overview_ending_in_8ef0ef', {'p0': monthLabel}),
               style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -198,7 +200,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
-                                stats.monthLabels[index],
+                                AppStrings.current.dateLabel(stats.monthLabels[index]),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -280,22 +282,28 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Spending by category',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  'Rs. ${stats.totalSpent.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    color: primaryColor,
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    AppStrings.current.text('spending_by_category_d4aadf'),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                   ),
-                ),
-              ],
+                  Text(
+                    'Rs. ${stats.totalSpent.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: primaryColor,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             Divider(color: Colors.grey.withValues(alpha: 0.15)),
@@ -313,7 +321,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'No spending data for $monthLabel',
+                        AppStrings.current.text('no_spending_data_for_cb6041', {'p0': monthLabel}),
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontWeight: FontWeight.w500,
@@ -334,7 +342,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Spent',
+                            AppStrings.current.text('spent_c0d3c9'),
                             style: TextStyle(
                               color: Colors.grey.shade500,
                               fontSize: 12,
@@ -421,40 +429,37 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   child: Column(
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              category,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            '${(percent * 100).toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Rs. ${amount.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 10,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  AppStrings.current.display(category),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                Text(
+                                  AppStrings.current.text('_6c727a', {'p0': (percent * 100).toStringAsFixed(1)}),
+                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                                ),
+                                Text(
+                                  'Rs. ${amount.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -477,13 +482,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               }),
             ],
             const SizedBox(height: 30),
-            const Text(
-              'Wallet Activity',
+            Text(
+              AppStrings.current.text('wallet_activity_55b837'),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
             Text(
-              'Entries and money movement for $monthLabel',
+              AppStrings.current.text('entries_and_money_movement_for_160a95', {'p0': monthLabel}),
               style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
             ),
             const SizedBox(height: 14),
@@ -519,7 +524,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              label,
+              AppStrings.current.display(label),
               style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
             ),
             const SizedBox(height: 5),
@@ -590,7 +595,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         ),
                       ),
                       Text(
-                        '${activity.entryCount} entr${activity.entryCount == 1 ? 'y' : 'ies'} · ${activity.walletType}',
+                        AppStrings.current.text('entr_b66858', {'p0': activity.entryCount, 'p1': activity.entryCount == 1 ? 'y' : 'ies', 'p2': activity.walletType}),
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 11,
@@ -600,7 +605,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                   ),
                 ),
                 Text(
-                  'Net ${activity.netFlow >= 0 ? '+' : '-'}Rs. ${activity.netFlow.abs().toStringAsFixed(0)}',
+                  AppStrings.current.text('net_rs_aac7a9', {'p0': activity.netFlow >= 0 ? '+' : '-', 'p1': activity.netFlow.abs().toStringAsFixed(0)}),
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
@@ -651,7 +656,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        '$label Rs. ${amount.toStringAsFixed(0)}',
+        AppStrings.current.text('rs_0a1fb6', {'p0': label, 'p1': amount.toStringAsFixed(0)}),
         style: TextStyle(
           color: color.shade700,
           fontSize: 10.5,
@@ -686,7 +691,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          '${activity.walletName} · ${DateFormat.yMMMM().format(_selectedMonth)}',
+                          '${activity.walletName} · ${AppStrings.current.dateLabel(DateFormat.yMMMM().format(_selectedMonth))}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
@@ -729,10 +734,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          "${DateFormat('dd MMM').format(entry.date)} · ${entry.category}",
+                          "${AppStrings.current.dateLabel(DateFormat('dd MMM').format(entry.date))} · ${AppStrings.current.display(entry.category)}",
                         ),
                         trailing: Text(
-                          '${isIncome ? '+' : '-'}Rs. ${entry.amount.toStringAsFixed(0)}',
+                          AppStrings.current.text('rs_d8aea4', {'p0': isIncome ? '+' : '-', 'p1': entry.amount.toStringAsFixed(0)}),
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             color: isTransfer
@@ -767,7 +772,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         ),
       ),
       child: Text(
-        '$text (${percent.toStringAsFixed(0)}%)',
+        AppStrings.current.text('_e86e71', {'p0': text, 'p1': percent.toStringAsFixed(0)}),
         style: TextStyle(
           color: isDark ? Colors.white : Colors.black87,
           fontSize: 11,

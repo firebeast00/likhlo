@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../l10n/app_strings.dart';
 
 class SettingsState {
   final String themeMode;
   final String smartEntryLanguage;
+  final String appLanguage;
   final double brightnessLevel;
   final String userName;
   final String userProfession;
@@ -12,6 +14,7 @@ class SettingsState {
   SettingsState({
     this.themeMode = 'light',
     this.smartEntryLanguage = 'romanUrdu',
+    this.appLanguage = 'english',
     this.brightnessLevel = 0.0,
     this.userName = '',
     this.userProfession = '',
@@ -21,6 +24,7 @@ class SettingsState {
   SettingsState copyWith({
     String? themeMode,
     String? smartEntryLanguage,
+    String? appLanguage,
     double? brightnessLevel,
     String? userName,
     String? userProfession,
@@ -29,6 +33,7 @@ class SettingsState {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
       smartEntryLanguage: smartEntryLanguage ?? this.smartEntryLanguage,
+      appLanguage: appLanguage ?? this.appLanguage,
       brightnessLevel: brightnessLevel ?? this.brightnessLevel,
       userName: userName ?? this.userName,
       userProfession: userProfession ?? this.userProfession,
@@ -47,6 +52,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void _loadSettings() {
     state = SettingsState(
       themeMode: _box.get('themeMode', defaultValue: 'light'),
+      appLanguage: AppLanguage.parse(_box.get('appLanguage')).name,
       smartEntryLanguage: _box.get('smartEntryLanguage') == 'english'
           ? 'english' : 'romanUrdu',
       brightnessLevel:
@@ -67,6 +73,12 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (language != 'romanUrdu' && language != 'english') return;
     await _box.put('smartEntryLanguage', language);
     state = state.copyWith(smartEntryLanguage: language);
+  }
+
+  Future<void> updateAppLanguage(String language) async {
+    if (language != 'romanUrdu' && language != 'english') return;
+    await _box.put('appLanguage', language);
+    state = state.copyWith(appLanguage: language);
   }
 
   void updateBrightness(double level) {

@@ -28,17 +28,17 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                 ),
               ),
               const SizedBox(width: 11),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Set up your first money',
+                      AppStrings.current.text('set_up_your_first_money_c2c03e'),
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Your total balance automatically equals all wallet balances.',
+                      AppStrings.current.text('your_total_balance_automatically_equals_all_wall_a044f3'),
                       style: TextStyle(fontSize: 11.5, color: Colors.grey),
                     ),
                   ],
@@ -53,25 +53,25 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
             children: [
               ActionChip(
                 avatar: const Icon(Icons.south_west_rounded, size: 17),
-                label: const Text('Add first income'),
+                label: Text(AppStrings.current.text('add_first_income_a489e8')),
                 onPressed: () => _showAddOrEditModal(initialType: 'income'),
               ),
               ActionChip(
                 avatar: const Icon(Icons.account_balance_wallet_outlined, size: 17),
-                label: const Text('Set wallet balance'),
+                label: Text(AppStrings.current.text('set_wallet_balance_c9c8e4')),
                 onPressed: _openIncomeAccounts,
               ),
               ActionChip(
                 avatar: const Icon(Icons.auto_awesome_rounded, size: 17),
-                label: const Text('Try Smart Entry'),
+                label: Text(AppStrings.current.text('try_smart_entry_fa76d5')),
                 onPressed: () {
                   _smartInputCtrl.text = '5000 salary JazzCash mein add karo';
                   _smartInputCtrl.selection = TextSelection.collapsed(
                     offset: _smartInputCtrl.text.length,
                   );
                   _showTransactionInfo(
-                    'Review the example, then tap Send.',
-                    title: 'Smart Entry example ready',
+                    AppMessage('review_the_example_then_tap_send_55b44f'),
+                    title: AppMessage('smart_entry_example_ready_753417'),
                   );
                 },
               ),
@@ -84,7 +84,7 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
 
   Widget _buildExpenseList(List<Expense> expenses, Color primaryColor, bool isDark, {required bool isSliver}) {
     if (expenses.isEmpty) {
-      final emptyState = Center(child: Padding(padding: const EdgeInsets.only(top: 40.0), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_rounded, size: 50, color: Colors.grey.withValues(alpha: 0.3)), const SizedBox(height: 12), Text("No transactions here yet.", style: TextStyle(color: Colors.grey.shade500, fontSize: 13))])));
+      final emptyState = Center(child: Padding(padding: const EdgeInsets.only(top: 40.0), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_rounded, size: 50, color: Colors.grey.withValues(alpha: 0.3)), const SizedBox(height: 12), Text(AppStrings.current.text('no_transactions_here_yet_6e0cda'), style: TextStyle(color: Colors.grey.shade500, fontSize: 13))])));
       return isSliver ? SliverFillRemaining(hasScrollBody: false, child: emptyState) : emptyState;
     }
 
@@ -146,7 +146,7 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
             border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
           ),
           child: Text(
-            "Today's Spend: Rs. ${todaySpend.toStringAsFixed(0)}",
+            AppStrings.current.text('today_s_spend_rs_ca82eb', {'p0': todaySpend.toStringAsFixed(0)}),
             style: TextStyle(
               color: primaryColor,
               fontWeight: FontWeight.bold,
@@ -199,8 +199,8 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                       const SizedBox(height: 16),
                       Text(
                         isTransfer
-                            ? 'Move Transfer to Trash?'
-                            : 'Move Transaction to Trash?',
+                            ? AppStrings.current.text('move_transfer_to_trash_5ce57e')
+                            : AppStrings.current.text('move_transaction_to_trash_e78f60'),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -209,8 +209,8 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                       const SizedBox(height: 8),
                       Text(
                         isTransfer
-                            ? 'Both linked wallet entries will move together and can be restored.'
-                            : "Move '${e.title}' to Trash? It can be restored for 30 days.",
+                            ? AppStrings.current.text('both_linked_wallet_entries_will_move_together_an_f82612')
+                            : AppStrings.current.text('move_to_trash_it_can_be_restored_for_30_days_5372a8', {'p0': e.title}),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13,
@@ -224,7 +224,7 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                           Expanded(
                             child: TextButton(
                               onPressed: () => Navigator.of(dialogCtx).pop(false),
-                              child: const Text('Cancel'),
+                              child: Text(AppStrings.current.text('cancel_77dfd2')),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -235,7 +235,7 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                                 foregroundColor: Colors.white,
                               ),
                               onPressed: () => Navigator.of(dialogCtx).pop(true),
-                              child: const Text('Move to Trash'),
+                              child: Text(AppStrings.current.text('move_to_trash_dffd3b')),
                             ),
                           ),
                         ],
@@ -257,7 +257,7 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
         if (!mounted) return false;
         if (!result.succeeded) {
           _showTransactionError(
-            result.reason ?? 'The entry could not be moved to Trash.',
+            result.reason ?? AppMessage('the_entry_could_not_be_moved_to_trash_ec0ca1'),
           );
           return false;
         }
@@ -269,9 +269,9 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
           '${e.title} · Rs. ${e.amount.toStringAsFixed(2)}',
         ));
         _showDeletionMessage(
-          "'${e.title}' can be restored from Trash.",
-          title: isTransfer ? 'Transfer moved to Trash' : 'Moved to Trash',
-          actionLabel: 'Undo',
+          AppMessage('can_be_restored_from_trash_11909a', {'p0': e.title}),
+          title: isTransfer ? AppMessage('transfer_moved_to_trash_e0cc25') : AppMessage('moved_to_trash_b646b3'),
+          actionLabel: AppMessage('undo_39fc72'),
           onAction: () async {
             final restored = isTransfer
                 ? await ref
@@ -283,8 +283,8 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
             if (!mounted) return;
             if (restored.succeeded) {
               _showTransactionInfo(
-                'The entry was restored.',
-                title: 'Restored',
+                AppMessage('the_entry_was_restored_057112'),
+                title: AppMessage('restored_b54d62'),
                 announce: false,
               );
             }
@@ -305,12 +305,12 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                     children: [
                       Text(e.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 4),
-                      Row(children: [Icon(Icons.schedule_rounded, size: 11, color: Colors.grey.shade500), const SizedBox(width: 4), Text(DateFormat.MMMEd().format(e.date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))]),
+                      Row(children: [Icon(Icons.schedule_rounded, size: 11, color: Colors.grey.shade500), const SizedBox(width: 4), Text(AppStrings.current.dateLabel(DateFormat.MMMEd().format(e.date)), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))]),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text("$amountSign Rs. ${e.amount.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: amountColor)),
+                Text(AppStrings.current.text('rs_0a1fb6', {'p0': amountSign, 'p1': e.amount.toStringAsFixed(0)}), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: amountColor)),
               ],
             )
         ),

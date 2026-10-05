@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -191,7 +192,7 @@ class _BatchTransactionReviewScreenState
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(AppStrings.current.display(message)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.red.shade700,
         ),
@@ -200,13 +201,14 @@ class _BatchTransactionReviewScreenState
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final wallets = ref.watch(walletProvider);
     final categories = ref.watch(categoryProvider);
     final canSave = _canSave(wallets, categories);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Review entries'),
+        title: Text(AppStrings.current.text('review_entries_042cd1')),
       ),
       body: SafeArea(
         child: ListView(
@@ -217,14 +219,14 @@ class _BatchTransactionReviewScreenState
             _buildGlobalSettings(wallets, categories),
             const SizedBox(height: 16),
             Text(
-              'Detected entries',
+              AppStrings.current.text('detected_entries_b986ed'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
-              'Selected entries are saved atomically: either all are added or none are.',
+              AppStrings.current.text('selected_entries_are_saved_atomically_either_all_6c6754'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -244,16 +246,16 @@ class _BatchTransactionReviewScreenState
                 });
               },
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add manual item'),
+              label: Text(AppStrings.current.text('add_manual_item_5cbf10')),
             ),
             const SizedBox(height: 16),
             _buildSummary(),
             const SizedBox(height: 12),
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
-              title: const Text('Original input'),
-              subtitle: const Text(
-                'Use this to verify what Likhlo interpreted.',
+              title: Text(AppStrings.current.text('original_input_04f90b')),
+              subtitle: Text(
+                AppStrings.current.text('use_this_to_verify_what_likhlo_interpreted_7703b9'),
               ),
               children: [
                 Align(
@@ -279,8 +281,8 @@ class _BatchTransactionReviewScreenState
               : const Icon(Icons.check_rounded),
           label: Text(
             _saving
-                ? 'Saving...'
-                : 'Save ${_selectedRows.length} entries',
+                ? AppStrings.current.text('saving_ae7e88')
+                : AppStrings.current.text('save_entries_f920ee', {'p0': _selectedRows.length}),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
@@ -307,7 +309,7 @@ class _BatchTransactionReviewScreenState
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Multiple $source entries were detected. Review each item before saving. Nothing has been added yet.',
+                AppStrings.current.text('multiple_entries_were_detected_review_each_item__aaeaf9', {'p0': source}),
               ),
             ),
           ],
@@ -328,7 +330,7 @@ class _BatchTransactionReviewScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Apply to selected entries',
+              AppStrings.current.text('apply_to_selected_entries_8d2c19'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -341,11 +343,11 @@ class _BatchTransactionReviewScreenState
                   wallets.any((wallet) => wallet.id == _globalWalletId)
                       ? _globalWalletId
                       : null,
-              decoration: const InputDecoration(
-                labelText: 'Wallet',
+              decoration: InputDecoration(
+                labelText: AppStrings.current.text('wallet_b60862'),
                 border: OutlineInputBorder(),
               ),
-              hint: const Text('Keep detected wallets'),
+              hint: Text(AppStrings.current.text('keep_detected_wallets_6de769')),
               items: wallets
                   .map(
                     (wallet) => DropdownMenuItem(
@@ -366,17 +368,17 @@ class _BatchTransactionReviewScreenState
               initialValue: categories.contains(_globalCategory)
                   ? _globalCategory
                   : null,
-              decoration: const InputDecoration(
-                labelText: 'Expense category',
+              decoration: InputDecoration(
+                labelText: AppStrings.current.text('expense_category_a78210'),
                 border: OutlineInputBorder(),
               ),
-              hint: const Text('Keep detected categories'),
+              hint: Text(AppStrings.current.text('keep_detected_categories_bae015')),
               items: categories
                   .map(
                     (category) => DropdownMenuItem(
                       value: category,
                       child: Text(
-                        category,
+                        AppStrings.current.display(category),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -413,7 +415,7 @@ class _BatchTransactionReviewScreenState
                 ),
                 Expanded(
                   child: Text(
-                    row.type == 'income' ? 'Income' : 'Expense',
+                    row.type == 'income' ? AppStrings.current.text('income_1c89b1') : AppStrings.current.text('expense_a0db8e'),
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: row.type == 'income'
@@ -423,12 +425,12 @@ class _BatchTransactionReviewScreenState
                   ),
                 ),
                 if (row.hasInheritedContext)
-                  const Tooltip(
-                    message: 'Wallet or date inherited from batch context',
+                  Tooltip(
+                    message: AppStrings.current.text('wallet_or_date_inherited_from_batch_context_e9f30d'),
                     child: Icon(Icons.link_rounded, size: 18),
                   ),
                 IconButton(
-                  tooltip: 'Remove item',
+                  tooltip: AppStrings.current.text('remove_item_76ecba'),
                   onPressed: () {
                     setState(() {
                       final removed = _rows.removeAt(index);
@@ -443,8 +445,8 @@ class _BatchTransactionReviewScreenState
               controller: row.title,
               enabled: row.included,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Title',
+              decoration: InputDecoration(
+                labelText: AppStrings.current.text('title_768e0c'),
                 border: OutlineInputBorder(),
               ),
               onChanged: (_) => setState(() {}),
@@ -455,8 +457,8 @@ class _BatchTransactionReviewScreenState
               enabled: row.included,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Amount (Rs)',
+              decoration: InputDecoration(
+                labelText: AppStrings.current.text('amount_rs_34c21f'),
                 border: OutlineInputBorder(),
               ),
               onChanged: (_) => setState(() {}),
@@ -468,8 +470,8 @@ class _BatchTransactionReviewScreenState
               initialValue: wallets.any((wallet) => wallet.id == row.walletId)
                   ? row.walletId
                   : null,
-              decoration: const InputDecoration(
-                labelText: 'Wallet',
+              decoration: InputDecoration(
+                labelText: AppStrings.current.text('wallet_b60862'),
                 border: OutlineInputBorder(),
               ),
               items: wallets
@@ -495,8 +497,8 @@ class _BatchTransactionReviewScreenState
                 initialValue: categories.contains(row.category)
                     ? row.category
                     : null,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
+                decoration: InputDecoration(
+                  labelText: AppStrings.current.text('category_a3c686'),
                   border: OutlineInputBorder(),
                 ),
                 items: categories
@@ -504,7 +506,7 @@ class _BatchTransactionReviewScreenState
                       (category) => DropdownMenuItem(
                         value: category,
                         child: Text(
-                          category,
+                          AppStrings.current.display(category),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -560,7 +562,7 @@ class _BatchTransactionReviewScreenState
     final prefix = signed && amount > 0 ? '+' : '';
     return Row(
       children: [
-        Expanded(child: Text(label)),
+        Expanded(child: Text(AppStrings.current.display(label))),
         Text(
           'Rs. $prefix${amount.toStringAsFixed(0)}',
           style: const TextStyle(fontWeight: FontWeight.bold),

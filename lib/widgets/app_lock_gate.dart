@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -100,7 +101,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
     DeviceAuthResult result;
     try {
       result = await _authenticator.authenticate(
-        reason: 'Unlock Likhlo to access your financial records.',
+        reason: AppStrings.current.display('Unlock Likhlo to access your financial records.'),
         biometricOnly: false,
       );
     } catch (error) {
@@ -120,6 +121,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     if (!_locked) return widget.child;
 
     final colors = Theme.of(context).colorScheme;
@@ -148,8 +150,8 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      'Likhlo is locked',
+                    Text(
+                      AppStrings.current.text('likhlo_is_locked_172ae9'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 25,
@@ -158,8 +160,8 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      _message ??
-                          'Authenticate with your fingerprint, Face ID, or device passcode to continue.',
+                      AppStrings.current.display(_message ??
+                          'Authenticate with your fingerprint, Face ID, or device passcode to continue.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: colors.onSurfaceVariant,
@@ -176,7 +178,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
                             )
                           : const Icon(Icons.fingerprint_rounded),
                       label: Text(
-                        _authenticating ? 'Authenticating…' : 'Unlock Likhlo',
+                        _authenticating ? AppStrings.current.text('authenticating_a2f167') : AppStrings.current.text('unlock_likhlo_949a0d'),
                       ),
                     ),
                   ],

@@ -1,0 +1,1513 @@
+{
+  "@@locale": "en",
+  "likhlo_could_not_open_local_storage_5dabd7": "Likhlo could not open local storage",
+  "your_data_has_not_been_deleted_close_and_reopen__ec7722": "Your data has not been deleted. Close and reopen the app. If the problem continues, back up the app data before reinstalling.",
+  "close_and_restart_8b7c03": "Close and restart",
+  "search_transactions_65da39": "Search transactions...",
+  "main_62bce9": "Main",
+  "udhar_3b8cbd": "Udhar",
+  "open_sidebar_24d219": "Open sidebar",
+  "wallets_98d5a1": "Wallets",
+  "close_search_0906f9": "Close search",
+  "search_bce064": "Search",
+  "explore_b965ae": "Explore",
+  "dark_mode_e7f8b9": "Dark Mode",
+  "dismiss_message_98f3b0": "Dismiss message",
+  "udhar_records_could_not_be_opened_2a95a2": "Udhar records could not be opened.",
+  "try_again_042c86": "Try again",
+  "likhlo_is_locked_172ae9": "Likhlo is locked",
+  "authenticate_with_your_fingerprint_face_id_or_de_4c7321": "Authenticate with your fingerprint, Face ID, or device passcode to continue.",
+  "authenticating_a2f167": "Authenticating…",
+  "unlock_likhlo_949a0d": "Unlock Likhlo",
+  "listening_now_dbfe77": "Listening now",
+  "smart_entry_2ac121": "Smart Entry",
+  "say_who_how_much_and_whether_you_gave_or_took_1c38ab": "Say who, how much and whether you gave or took",
+  "wallet_tap_to_change_d3f3e7": "Wallet: {p0} · Tap to change",
+  "@wallet_tap_to_change_d3f3e7": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "select_udhaar_wallet_27c9ae": "Select Udhaar wallet",
+  "listening_6c19a4": "Listening…",
+  "e_g_ali_ko_500_udhaar_diya_b1a7c5": "e.g. Lent 500 to Ali",
+  "scan_receipt_08a533": "Scan receipt",
+  "stop_listening_e13421": "Stop listening",
+  "voice_input_c0b2ce": "Voice input",
+  "save_udhaar_entry_5e7f15": "Save Udhaar entry",
+  "select_month_4342f7": "Select month",
+  "year_879e32": "Year",
+  "cancel_77dfd2": "Cancel",
+  "select_859822": "Select",
+  "previous_month_46a299": "Previous month",
+  "tap_to_choose_month_f4d52f": "Tap to choose month",
+  "next_month_8abf7c": "Next month",
+  "back_to_dashboard_b3963d": "Back to dashboard",
+  "review_entries_042cd1": "Review entries",
+  "detected_entries_b986ed": "Detected entries",
+  "selected_entries_are_saved_atomically_either_all_6c6754": "Selected entries are saved atomically: either all are added or none are.",
+  "add_manual_item_5cbf10": "Add manual item",
+  "original_input_04f90b": "Original input",
+  "use_this_to_verify_what_likhlo_interpreted_7703b9": "Use this to verify what Likhlo interpreted.",
+  "saving_ae7e88": "Saving...",
+  "save_entries_f920ee": "Save {p0} entries",
+  "@save_entries_f920ee": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "multiple_entries_were_detected_review_each_item__aaeaf9": "Multiple {p0} entries were detected. Review each item before saving. Nothing has been added yet.",
+  "@multiple_entries_were_detected_review_each_item__aaeaf9": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "apply_to_selected_entries_8d2c19": "Apply to selected entries",
+  "wallet_b60862": "Wallet",
+  "keep_detected_wallets_6de769": "Keep detected wallets",
+  "expense_category_a78210": "Expense category",
+  "keep_detected_categories_bae015": "Keep detected categories",
+  "income_1c89b1": "Income",
+  "expense_a0db8e": "Expense",
+  "wallet_or_date_inherited_from_batch_context_e9f30d": "Wallet or date inherited from batch context",
+  "remove_item_76ecba": "Remove item",
+  "title_768e0c": "Title",
+  "amount_rs_34c21f": "Amount (Rs)",
+  "category_a3c686": "Category",
+  "edit_profile_cd280a": "Edit Profile",
+  "full_name_64346b": "Full Name",
+  "profession_role_467818": "Profession / Role",
+  "save_efc007": "Save",
+  "theme_color_29ddb7": "Theme Color",
+  "preferences_9dfd34": "Preferences",
+  "appearance_41def7": "Appearance",
+  "sleek_theme_for_night_use_8d3602": "Sleek theme for night use",
+  "customize_app_accent_0c03d5": "Customize app accent",
+  "screen_dimmer_732fed": "Screen Dimmer",
+  "dims_the_entire_app_interface_50aa9f": "Dims the entire app interface",
+  "notifications_alerts_8ac4aa": "Notifications & Alerts",
+  "persistent_quick_entry_f95553": "Persistent Quick Entry",
+  "voice_and_direct_text_entry_from_the_status_bar_e28e69": "Voice and direct text entry from the status bar",
+  "smart_entry_reminders_e9e662": "Smart Entry Reminders",
+  "receive_daily_nudges_to_log_your_expenses_0dba02": "Receive daily nudges to log your expenses",
+  "voice_privacy_d87a87": "Voice & Privacy",
+  "smart_entry_language_ca86c2": "Smart Entry language",
+  "typing_aur_voice_ki_zaban_both_languages_remain__5e25cb": "Input language for typing and speech. Both languages remain supported.",
+  "roman_urdu_24aeea": "Roman Urdu",
+  "english_649df0": "English",
+  "likhlo_app_lock_2ef137": "Likhlo App Lock",
+  "require_fingerprint_face_id_or_device_passcode_a_eee4b0": "Require fingerprint, Face ID, or device passcode after leaving the app",
+  "cloud_voice_pilot_fcb911": "Cloud Voice Pilot",
+  "allow_cloud_speech_only_when_a_secure_gateway_is_60fcf1": "Allow cloud speech only when a secure gateway is configured",
+  "anonymous_voice_diagnostics_4da485": "Anonymous Voice Diagnostics",
+  "share_timing_and_error_categories_never_audio_or_f7281d": "Share timing and error categories, never audio or transcripts",
+  "spoken_confirmations_8da677": "Spoken Confirmations",
+  "use_fixed_transaction_wording_when_voice_feedbac_c1498b": "Use fixed transaction wording when voice feedback is available",
+  "data_reports_386d2e": "Data & Reports",
+  "backup_restore_3bdd40": "Backup & Restore",
+  "create_or_restore_an_encrypted_likhlo_backup_2ad7ac": "Create or restore an encrypted Likhlo backup",
+  "export_monthly_pdf_f024ee": "Export Monthly PDF",
+  "choose_month_and_export_ccb888": "{p0} · choose month and export",
+  "@choose_month_and_export_ccb888": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "likhlo_monthly_summary_3c9ad8": "Likhlo Monthly Summary",
+  "page_of_6e848e": "Page {p0} of {p1}",
+  "@page_of_6e848e": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "likhlo_b062c4": "LIKHLO",
+  "monthly_financial_summary_29a988": "Monthly Financial Summary",
+  "ledger_entries_3f5f01": "{p0} ledger entries{p1}",
+  "@ledger_entries_3f5f01": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "student_account_78d744": "Student Account",
+  "spending_by_category_d4aadf": "Spending by category",
+  "categories_7326ba": "{p0} categories",
+  "@categories_7326ba": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_3921b4": "{p0}  Rs. {p1}",
+  "@rs_3921b4": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "transaction_history_4ed32a": "Transaction History",
+  "entries_f8a4e0": "{p0} entries",
+  "@entries_f8a4e0": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "no_ledger_transactions_available_1abd8e": "No ledger transactions available.",
+  "udhar_debt_44bce8": "Udhar / Debt",
+  "udhar_activity_linked_to_this_month_status_refle_1265dd": "Udhar activity linked to this month. Status reflects the current debt state.",
+  "active_c24984": "{p0} active",
+  "@active_c24984": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "generated_securely_via_likhlo_expense_manager_686e4a": "Generated securely via Likhlo Expense Manager.",
+  "could_not_export_the_report_please_try_again_1182f1": "Could not export the report. Please try again.",
+  "welcome_to_likhlo_59777c": "Welcome to Likhlo!",
+  "first_tell_us_a_little_about_yourself_a232ea": "First, tell us a little about yourself.",
+  "back_b52b36": "Back",
+  "set_up_your_money_15a172": "Set up your money",
+  "optional_you_can_change_all_of_this_later_92e4a4": "Optional — you can change all of this later.",
+  "income_wallet_61f7ff": "Income wallet",
+  "skip_for_now_6fc096": "Skip for now",
+  "new_wallet_325723": "New wallet",
+  "update_wallet_fd811d": "Update wallet",
+  "wallet_name_33ba81": "Wallet name",
+  "current_balance_a234f7": "Current balance",
+  "amount_currently_available_87bcc0": "Amount currently available",
+  "this_amount_is_included_automatically_in_the_tot_1e4c27": "This amount is included automatically in the total shown on the Home screen.",
+  "reserve_wallet_686caf": "Reserve wallet",
+  "mark_money_that_you_prefer_to_keep_aside_1ac728": "Mark money that you prefer to keep aside.",
+  "create_6e157c": "Create",
+  "update_fb91e2": "Update",
+  "add_income_4d6cdd": "Add income",
+  "income_title_a0661e": "Income title",
+  "salary_allowance_freelance_051ac3": "Salary, allowance, freelance…",
+  "amount_43dc85": "Amount",
+  "this_income_increases_the_selected_wallet_and_th_3f8261": "This income increases the selected wallet and the total available balance.",
+  "clear_wallet_balance_989625": "Clear wallet balance?",
+  "set_to_rs_0_transaction_history_will_remain_avai_61a4b0": "Set {p0} to Rs. 0? Transaction history will remain available.",
+  "@set_to_rs_0_transaction_history_will_remain_avai_61a4b0": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "clear_balance_204c15": "Clear balance",
+  "at_least_one_wallet_is_required_ad359c": "At least one wallet is required.",
+  "delete_wallet_d09dab": "Delete wallet?",
+  "delete_its_transaction_history_and_opening_adjus_be1766": "Delete {p0}? Its transaction history and opening adjustment will move to {p1}.",
+  "@delete_its_transaction_history_and_opening_adjus_be1766": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "delete_f6fdbe": "Delete",
+  "create_wallet_f4a4e0": "Create wallet",
+  "rename_update_9ef904": "Rename / update",
+  "review_receipt_c65cbb": "Review receipt",
+  "individual_items_75b5eb": "Individual items",
+  "single_total_4d8a59": "Single total",
+  "raw_scanned_text_f7d374": "Raw scanned text",
+  "use_this_to_verify_any_uncertain_fields_6ecd91": "Use this to verify any uncertain fields.",
+  "save_rs_c7ccc7": "Save Rs. {p0}",
+  "@save_rs_c7ccc7": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "scan_confidence_check_names_and_amounts_before_s_6396a5": "Scan confidence: {p0}%. Check names and amounts before saving. Nothing is added until you confirm below.",
+  "@scan_confidence_check_names_and_amounts_before_s_6396a5": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "payment_details_b8579d": "Payment Details",
+  "paid_from_a2cf4d": "Paid From",
+  "receipt_items_7103c3": "Receipt items",
+  "selected_items_are_saved_atomically_either_all_a_690c15": "Selected items are saved atomically (either all are added or none are).",
+  "save_despite_this_difference_e206c1": "Save despite this difference",
+  "the_items_you_selected_do_not_match_the_total_de_d4d711": "The items you selected do not match the total detected on the receipt.",
+  "item_name_497c97": "Item Name",
+  "receipt_description_9ffce2": "Receipt Description",
+  "receipt_total_rs_5b78f7": "Receipt Total (Rs)",
+  "single_total_mode_creates_one_expense_only_indiv_71fae6": "Single-total mode creates one expense only; individual items are ignored.",
+  "recover_previous_data_d16eb5": "Recover previous data?",
+  "this_replaces_the_current_data_with_the_snapshot_342c91": "This replaces the current data with the snapshot saved immediately before your last restore.",
+  "recover_4addbf": "Recover",
+  "review_backup_d1e459": "Review backup",
+  "created_08513d": "Created: {p0}",
+  "@created_08513d": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "current_data_will_be_replaced_likhlo_will_first__e5d8b7": "Current data will be replaced. Likhlo will first keep one local recovery snapshot.",
+  "restore_3cbe6d": "Restore",
+  "your_financial_data_stays_private_eafd2a": "Your financial data stays private",
+  "backups_are_encrypted_before_leaving_the_app_kee_415db3": "Backups are encrypted before leaving the app. Keep the passphrase safe—Likhlo cannot recover it.",
+  "smart_backup_5ed013": "Smart backup",
+  "on_android_the_backup_file_you_select_becomes_th_373cc8": "On Android, the backup file you select becomes the rolling automatic backup target. It is checked every 24 hours and rewritten only when financial data or portable settings changed.",
+  "device_biometrics_the_automatic_backup_timestamp_18c56f": "Device biometrics, the automatic-backup timestamp, and temporary recovery metadata stay on this phone and are intentionally not imported to another device.",
+  "create_encrypted_backup_56c337": "Create encrypted backup",
+  "transactions_trash_wallets_categories_settings_p_cceb75": "Transactions + Trash, wallets, categories, settings, preferences and Udhar",
+  "restore_from_backup_eb2bb4": "Restore from backup",
+  "validate_and_preview_before_replacing_data_183600": "Validate and preview before replacing data",
+  "recover_data_before_last_restore_7eec15": "Recover data before last restore",
+  "available_until_the_next_successful_recovery_a3d274": "Available until the next successful recovery",
+  "protect_backup_b03065": "Protect backup",
+  "unlock_backup_f761d5": "Unlock backup",
+  "passphrase_89950c": "Passphrase",
+  "at_least_8_characters_it_cannot_be_recovered_b299d6": "At least 8 characters. It cannot be recovered.",
+  "confirm_passphrase_ebaac0": "Confirm passphrase",
+  "continue_2e0262": "Continue",
+  "unlock_1526a1": "Unlock",
+  "receipt_scan_706316": "Receipt scan",
+  "edit_selection_f1a66e": "Edit Selection",
+  "smart_selection_applied_tap_any_box_to_manually__362bef": "Smart selection applied! Tap any box to manually add missed items or remove unwanted text.",
+  "continue_d65c29": "Continue ({p0})",
+  "@continue_d65c29": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "stats_are_available_through_the_current_month_b47844": "Stats are available through the current month.",
+  "spending_trends_2bffb9": "Spending Trends",
+  "six_month_overview_ending_in_8ef0ef": "Six-month overview ending in {p0}",
+  "@six_month_overview_ending_in_8ef0ef": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "no_spending_data_for_cb6041": "No spending data for {p0}",
+  "@no_spending_data_for_cb6041": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "spent_c0d3c9": "Spent",
+  "_6c727a": "{p0}%",
+  "@_6c727a": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "wallet_activity_55b837": "Wallet Activity",
+  "entries_and_money_movement_for_160a95": "Entries and money movement for {p0}",
+  "@entries_and_money_movement_for_160a95": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "entr_b66858": "{p0} entr{p1} · {p2}",
+  "@entr_b66858": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "net_rs_aac7a9": "Net {p0}Rs. {p1}",
+  "@net_rs_aac7a9": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_0a1fb6": "{p0} Rs. {p1}",
+  "@rs_0a1fb6": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_d8aea4": "{p0}Rs. {p1}",
+  "@rs_d8aea4": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "_e86e71": "{p0} ({p1}%)",
+  "@_e86e71": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "create_a_wallet_first_16db9a": "Create a wallet first.",
+  "default_quick_udhar_wallet_b85f12": "Default Quick Udhar wallet",
+  "automatic_ac9041": "Automatic",
+  "use_cash_first_an_explicitly_named_wallet_still__b1776a": "Use Cash first; an explicitly named wallet still wins",
+  "rs_be0230": "{p0} · Rs. {p1}",
+  "@rs_be0230": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "voice_recognition_stopped_please_try_again_010e48": "Voice recognition stopped. Please try again.",
+  "speech_recognition_unavailable_5e1738": "Speech recognition unavailable.",
+  "say_an_amount_and_person_e_g_ali_ko_500_udhaar_d_4cec2a": "Say an amount and person, e.g. 'Ali ko 500 udhaar diya'.",
+  "receipt_scan_failed_try_another_photo_73a1b5": "Receipt scan failed. Try another photo.",
+  "enter_a_person_valid_amount_and_wallet_274c96": "Enter a person, valid amount and wallet.",
+  "insufficient_balance_available_rs_c0000f": "Insufficient balance. Available: Rs. {p0}.",
+  "@insufficient_balance_available_rs_c0000f": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "udhaar_could_not_be_saved_68ebc3": "Udhaar could not be saved.",
+  "udhaar_recorded_rs_d8137b": "Udhaar recorded: Rs. {p0} · {p1} · {p2}",
+  "@udhaar_recorded_rs_d8137b": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "udhaar_could_not_be_saved_try_again_07468f": "Udhaar could not be saved. Try again.",
+  "udhaar_could_not_be_settled_112eec": "Udhaar could not be settled.",
+  "add_udhar_b02fb6": "Add Udhar",
+  "record_money_you_gave_or_received_as_a_loan_bf8eee": "Record money you gave or received as a loan.",
+  "i_gave_3efbfc": "I Gave",
+  "i_took_69ea8d": "I Took",
+  "paid_from_1daaef": "Paid from",
+  "received_in_5adc08": "Received in",
+  "due_date_optional_be5b29": "Due date (optional)",
+  "due_483844": "Due {p0}",
+  "@due_483844": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "clear_due_date_b96659": "Clear due date",
+  "choose_a_wallet_first_0ea8ab": "Choose a wallet first.",
+  "save_record_506b9b": "Save record",
+  "settled_udhaar_with_7b396c": "Settled Udhaar with {p0}",
+  "@settled_udhaar_with_7b396c": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "you_will_receive_4eef2e": "You will receive",
+  "you_owe_811b81": "You owe",
+  "you_gave_money_to_this_person_7e151d": "You gave money to this person",
+  "you_received_money_from_this_person_2d1c37": "You received money from this person",
+  "due_145caf": "Due",
+  "mark_settled_014b7c": "Mark settled",
+  "net_receivable_rs_09b02c": "Net receivable · Rs. {p0}",
+  "@net_receivable_rs_09b02c": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "net_payable_rs_d22be0": "Net payable · Rs. {p0}",
+  "@net_payable_rs_d22be0": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "quick_udhar_94a696": "Quick Udhar",
+  "listening_now_7320c5": "Listening now…",
+  "type_or_speak_naturally_saves_instantly_when_cle_ba20f8": "Type or speak naturally · saves instantly when clear",
+  "misal_ali_ko_500_udhaar_diya_3aff61": "e.g. Lent 500 to Ali",
+  "e_g_borrowed_500_from_sara_70d6bf": "e.g. Borrowed 500 from Sara",
+  "save_quick_udhar_1145fe": "Save Quick Udhar",
+  "settle_3ebe66": "Settle",
+  "no_active_udhar_you_are_all_settled_f8e202": "No active Udhar. You are all settled.",
+  "no_udhar_records_match_this_filter_91440a": "No Udhar records match this filter.",
+  "trash_is_empty_49b796": "Trash is empty",
+  "deleted_entries_are_kept_for_30_days_aa3bcc": "Deleted entries are kept for 30 days.",
+  "deleted_998369": "{p0} deleted {p1}",
+  "@deleted_998369": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "empty_trash_cb42d7": "Empty Trash",
+  "delete_permanently_e63b51": "Delete permanently",
+  "delete_permanently_afd1aa": "Delete permanently?",
+  "this_entry_and_any_linked_udhaar_record_cannot_b_a5449d": "This entry and any linked Udhaar record cannot be recovered.",
+  "empty_trash_ad55b6": "Empty Trash?",
+  "permanently_delete_all_entries_this_cannot_be_un_3bf5c2": "Permanently delete all {p0} entries? This cannot be undone.",
+  "@permanently_delete_all_entries_this_cannot_be_un_3bf5c2": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "this_record_cannot_be_recovered_3c1744": "This record cannot be recovered.",
+  "likhlo_6ef8c8": "Likhlo",
+  "version_2_5_0_stable_5ceaa9": "Version 2.5.0 (Stable)",
+  "lead_developer_f82e5e": "Lead Developer",
+  "jawad_rajper_bb85e4": "Jawad Rajper",
+  "full_stack_developer_bsit_sbbu_ef83d3": "Full-Stack Developer • BSIT, SBBU",
+  "engineered_as_a_comprehensive_final_year_project_0e4603": "Engineered as a comprehensive final year project to solve real-world student financial management challenges.",
+  "jawadrajper5001_gmail_com_2e3527": "jawadrajper5001@gmail.com",
+  "our_mission_e36a91": "Our Mission",
+  "empowering_students_to_track_pocket_money_manage_b04d12": "Empowering students to track pocket money, manage hostel khata, and handle Udhaar with AI-driven insights.",
+  "privacy_first_b8351d": "Privacy First",
+  "all_your_financial_data_is_stored_securely_and_l_f4ef75": "All your financial data is stored securely and locally on your device using Hive.",
+  "architecture_b040b4": "Architecture",
+  "built_with_flutter_riverpod_local_nlp_and_materi_36cf20": "Built with Flutter, Riverpod, Local NLP, and Material 3 Design.",
+  "made_with_passion_in_sindh_pakistan_f99d0b": "Made with passion in Sindh, Pakistan",
+  "likhlo_app_c9fcc6": "© {p0} Likhlo App",
+  "@likhlo_app_c9fcc6": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "safety_buffer_5e46e6": "Safety buffer",
+  "extra_room_for_unexpected_expenses_931dab": "Extra room for unexpected expenses.",
+  "use_recommended_e66bad": "Use recommended",
+  "no_safety_buffer_6bd135": "No safety buffer",
+  "rs_0_af8d13": "Rs. 0",
+  "custom_amount_f72192": "Custom amount",
+  "include_in_this_month_2e9b26": "Include in this month",
+  "change_planned_amount_8ac7c2": "Change planned amount",
+  "treat_as_recurring_89b369": "Treat as recurring",
+  "treat_as_one_time_9e153d": "Treat as one-time",
+  "use_learned_amount_again_38db2c": "Use learned amount again",
+  "log_301699": "{p0} · {p1} log{p2}",
+  "@log_301699": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "one_time_6fea9e": "One time",
+  "recurring_349f0e": "Recurring",
+  "handled_fe83b2": "{p0}/{p1} handled",
+  "@handled_fe83b2": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "recommended_budget_37d332": "Recommended budget",
+  "saved_rs_25fe8b": "Saved Rs. {p0}",
+  "@saved_rs_25fe8b": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "built_from_recent_recurring_spending_and_your_co_848382": "Built from recent recurring spending and your corrections.",
+  "saving_56a228": "Saving…",
+  "use_this_plan_c42be4": "Use this plan",
+  "e_g_save_5k_petrol_max_4k_647139": "e.g. save 5k · petrol max 4k",
+  "speak_7a8171": "Speak",
+  "apply_cfea41": "Apply",
+  "see_all_expected_items_48ada0": "See all expected items",
+  "handled_rs_6f90cf": "Handled · Rs. {p0}",
+  "@handled_rs_6f90cf": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_so_far_a82197": "Rs. {p0} so far",
+  "@rs_so_far_a82197": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "unplanned_spending_f858c9": "Unplanned spending",
+  "review_all_3b6f3c": "Review all {p0}",
+  "@review_all_3b6f3c": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "review_e29a79": "Review",
+  "custom_recommended_rs_4b325e": "Custom · recommended Rs. {p0}",
+  "@custom_recommended_rs_4b325e": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "recommended_from_recent_unexpected_spending_ff0129": "Recommended from recent unexpected spending",
+  "mention_only_one_wallet_when_selecting_an_entry__e76615": "Mention only one wallet when selecting an entry to repeat.",
+  "multiple_wallets_detected_e80229": "Multiple wallets detected",
+  "no_safe_matching_entry_was_found_add_a_title_amo_c374ba": "No safe matching entry was found. Add a title, amount, date, or wallet.",
+  "entry_not_found_998d95": "Entry not found",
+  "the_original_wallet_does_not_have_enough_balance_7dc949": "The original wallet does not have enough balance to repeat this expense.",
+  "the_original_wallet_is_no_longer_available_44ee95": "The original wallet is no longer available.",
+  "entry_not_repeated_ce59a0": "Entry not repeated",
+  "income_repeated_de54da": "Income repeated",
+  "expense_repeated_96bebf": "Expense repeated",
+  "rs_361275": "{p0} — Rs. {p1}",
+  "@rs_361275": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "undo_39fc72": "Undo",
+  "the_repeated_entry_was_removed_d5e791": "The repeated entry was removed.",
+  "repeat_undone_981d9c": "Repeat undone",
+  "active_record_d88f50": "{p0} active record{p1}.",
+  "@active_record_d88f50": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_to_receive_fb9fc2": "Rs. {p0} to receive",
+  "@rs_to_receive_fb9fc2": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_to_pay_346fb7": "Rs. {p0} to pay",
+  "@rs_to_pay_346fb7": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "to_receive_rs_to_pay_rs_active_overdue_ed8440": "To receive Rs. {p0} · To pay Rs. {p1} · {p2} active · {p3} overdue.",
+  "@to_receive_rs_to_pay_rs_active_overdue_ed8440": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      },
+      "p3": {
+        "type": "Object"
+      }
+    }
+  },
+  "udhar_net_rs_c3ca07": "Udhar net Rs. {p0}",
+  "@udhar_net_rs_c3ca07": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "try_dark_mode_monthly_pdf_scan_receipt_reminders_a70d88": "Try dark mode, monthly PDF, scan receipt, reminders, spoken confirmations, backup, language, or app lock.",
+  "app_control_not_recognized_031b39": "App control not recognized",
+  "app_menu_opened_1299a3": "App menu opened.",
+  "the_app_menu_is_not_available_on_this_screen_d11d51": "The app menu is not available on this screen.",
+  "menu_unavailable_cbb15e": "Menu unavailable",
+  "a_new_theme_color_was_selected_177be3": "A new theme color was selected.",
+  "theme_color_is_now_active_713f50": "{p0} theme color is now active.",
+  "@theme_color_is_now_active_713f50": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "theme_color_changed_4b05d6": "Theme color changed",
+  "theme_1a3211": "{p0} theme",
+  "@theme_1a3211": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "search_and_transaction_filters_were_cleared_5b0ca8": "Search and transaction filters were cleared.",
+  "no_transaction_filters_are_active_97e05d": "No transaction filters are active.",
+  "filters_cleared_4849be": "Filters cleared",
+  "nothing_to_clear_ec219a": "Nothing to clear",
+  "dark_mode_is_now_enabled_d0531a": "Dark mode is now enabled.",
+  "light_mode_is_now_enabled_38fa87": "Light mode is now enabled.",
+  "dark_mode_on_44cf93": "Dark mode on",
+  "dark_mode_off_d3b1a8": "Dark mode off",
+  "ask_something_like_how_much_did_i_spend_this_mon_d4b5b9": "Ask something like 'how much did I spend this month?'",
+  "question_needs_more_detail_0deb52": "Question needs more detail",
+  "mention_one_wallet_at_a_time_for_a_precise_answe_1b73fb": "Mention one wallet at a time for a precise answer.",
+  "rs_across_wallet_d86033": "Rs. {p0} across {p1} wallet{p2}.",
+  "@rs_across_wallet_d86033": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "total_wallet_balance_dc1cda": "Total wallet balance",
+  "rs_available_69ca43": "Rs. {p0} available.",
+  "@rs_available_69ca43": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "balance_bc2b71": "{p0} balance",
+  "@balance_bc2b71": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "expense_2a0b6d": "{p0} expense{p1}{p2}.",
+  "@expense_2a0b6d": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_spent_3fb486": "Rs. {p0} spent · {p1}",
+  "@rs_spent_3fb486": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "income_entr_596b1b": "{p0} income entr{p1}{p2}.",
+  "@income_entr_596b1b": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "rs_received_91524c": "Rs. {p0} received · {p1}",
+  "@rs_received_91524c": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "income_rs_expenses_rs_bf056a": "Income Rs. {p0} · Expenses Rs. {p1}.",
+  "@income_rs_expenses_rs_bf056a": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "net_rs_692f91": "Net Rs. {p0} · {p1}",
+  "@net_rs_692f91": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "records_eab69c": "{p0} records{p1}.",
+  "@records_eab69c": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "transactions_3cd4cc": "{p0} transactions · {p1}",
+  "@transactions_3cd4cc": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "income_rs_spent_rs_net_rs_entr_032470": "Income Rs. {p0} · Spent Rs. {p1} · Net Rs. {p2} · {p3} entr{p4}. {p5}",
+  "@income_rs_spent_rs_net_rs_entr_032470": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      },
+      "p3": {
+        "type": "Object"
+      },
+      "p4": {
+        "type": "Object"
+      },
+      "p5": {
+        "type": "Object"
+      }
+    }
+  },
+  "financial_summary_e8c7e7": "Financial summary · {p0}",
+  "@financial_summary_e8c7e7": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "close_search_to_return_to_the_normal_monthly_vie_aaab1c": "Close search to return to the normal monthly view.",
+  "transaction_filters_applied_2e8692": "Transaction filters applied",
+  "try_home_wallets_udhaar_monthly_plan_stats_setti_4c294f": "Try Home, Wallets, Udhaar, Monthly Plan, Stats, Settings, Trash, or About.",
+  "screen_not_recognized_946e3d": "Screen not recognized",
+  "opening_wallets_a26f50": "Opening Wallets.",
+  "dashboard_opened_004ce9": "Dashboard opened.",
+  "udhar_opened_558358": "Udhar opened.",
+  "this_was_not_saved_as_a_normal_expense_use_quick_02786f": "This was not saved as a normal expense. Use Quick Udhar here to review and save the debt entry.",
+  "udhar_command_detected_6ba7b1": "Udhar command detected",
+  "opening_7e01ca": "Opening {p0}.",
+  "@opening_7e01ca": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "select_month_and_year_5391d2": "Select month and year",
+  "include_an_amount_for_example_transfer_500_cash__529a65": "Include an amount, for example: 'transfer 500 Cash to JazzCash'.",
+  "transfer_amount_required_954377": "Transfer amount required",
+  "create_at_least_two_wallets_before_making_a_tran_955aed": "Create at least two wallets before making a transfer.",
+  "two_wallets_required_b3126b": "Two wallets required",
+  "name_both_wallets_for_example_transfer_500_cash__f77376": "Name both wallets, for example: 'transfer 500 Cash to JazzCash'.",
+  "source_and_destination_required_3885f6": "Source and destination required",
+  "i_found_both_wallets_but_the_transfer_direction__2e2ccb": "I found both wallets but the transfer direction is not clear. Say “Cash se JazzCash me” or “Cash to JazzCash”.",
+  "confirm_transfer_direction_c1e278": "Confirm transfer direction",
+  "choose_two_different_wallets_32b992": "Choose two different wallets.",
+  "invalid_transfer_d8d151": "Invalid transfer",
+  "available_in_rs_required_rs_9a7b7b": "Available in {p0}: Rs. {p1}. Required: Rs. {p2}.",
+  "@available_in_rs_required_rs_9a7b7b": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "insufficient_balance_1a1823": "Insufficient balance",
+  "the_source_wallet_changed_or_no_longer_has_enoug_8a6366": "The source wallet changed or no longer has enough money.",
+  "transfer_not_saved_ff0de3": "Transfer not saved",
+  "rs_b100db": "Rs. {p0} · {p1} → {p2}",
+  "@rs_b100db": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "transfer_completed_9fca88": "Transfer completed",
+  "the_transfer_was_reversed_6d1d88": "The transfer was reversed.",
+  "transfer_undone_e53f3d": "Transfer undone",
+  "add_receipt_943857": "Add Receipt",
+  "take_photo_e9765b": "Take Photo",
+  "choose_from_gallery_5b17ab": "Choose from Gallery",
+  "for_best_results_keep_the_full_receipt_flat_fill_b7a128": "For best results, keep the full receipt flat, fill the frame, avoid shadows, and make sure prices are sharp.",
+  "camera_or_scanner_error_occurred_4a27da": "Camera or scanner error occurred.",
+  "no_reliable_receipt_items_or_total_were_detected_f8eee3": "No reliable receipt items or total were detected. Retake the photo with the full receipt visible and good lighting.",
+  "receipt_details_not_found_d29e07": "Receipt details not found",
+  "the_reviewed_receipt_was_added_to_your_records_047d90": "The reviewed receipt was added to your records.",
+  "receipt_saved_f4656f": "Receipt saved",
+  "say_what_to_change_for_example_change_burger_amo_64942a": "Say what to change, for example: 'change burger amount to 600' or 'headphones ka naam Kurch karo'.",
+  "change_required_76a96b": "Change required",
+  "the_new_amount_must_be_greater_than_zero_10e92d": "The new amount must be greater than zero.",
+  "invalid_amount_a2f6ca": "Invalid amount",
+  "mention_only_one_wallet_so_the_correct_entry_can_ab7e95": "Mention only one wallet so the correct entry can be identified.",
+  "no_safe_matching_entry_was_found_name_the_entry__ed32d9": "No safe matching entry was found. Name the entry you want to edit.",
+  "the_matching_entry_is_not_certain_enough_to_chan_0675f1": "The matching entry is not certain enough to change automatically. Add its amount, date, or wallet.",
+  "review_target_entry_6a2f72": "Review target entry",
+  "deleting_this_income_would_make_the_wallet_balan_993f82": "Deleting this income would make the wallet balance negative.",
+  "income_cannot_be_deleted_3705f4": "Income cannot be deleted",
+  "the_entry_changed_before_it_could_be_deleted_try_063808": "The entry changed before it could be deleted. Try again.",
+  "entry_not_deleted_20151f": "Entry not deleted",
+  "entry_moved_to_trash_4ff9bd": "Entry moved to Trash",
+  "the_deleted_entry_was_restored_c688ef": "The deleted entry was restored.",
+  "deletion_undone_1d6e39": "Deletion undone",
+  "the_entry_could_not_be_restored_because_the_wall_f5ba51": "The entry could not be restored because the wallet changed.",
+  "undo_failed_2311b4": "Undo failed",
+  "choose_an_existing_category_e42e1e": "Choose an existing category: {p0}.",
+  "@choose_an_existing_category_e42e1e": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "category_not_found_19c290": "Category not found",
+  "the_entry_already_has_these_details_2b9c79": "The entry already has these details.",
+  "no_change_needed_8a26a1": "No change needed",
+  "the_wallet_cannot_support_this_change_or_the_ent_dccbfc": "The wallet cannot support this change, or the entry changed. Review its balance and try again.",
+  "entry_not_updated_4104d8": "Entry not updated",
+  "rs_03d36d": "{p0} · Rs. {p1} · {p2}",
+  "@rs_03d36d": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "entry_updated_53550c": "Entry updated",
+  "the_previous_amount_was_restored_dc306f": "The previous amount was restored.",
+  "edit_undone_c701f8": "Edit undone",
+  "the_previous_amount_could_not_be_restored_becaus_d3b46f": "The previous amount could not be restored because the wallet changed.",
+  "speak_naturally_it_saves_automatically_35800d": "Speak naturally — it saves automatically",
+  "select_default_smart_entry_wallet_f54e86": "Select default Smart Entry wallet",
+  "misal_500_biryani_par_kharch_kiya_6fef97": "e.g. Spent 500 on biryani",
+  "e_g_500_biryani_from_jazzcash_ed8442": "e.g. 500 biryani from JazzCash",
+  "save_smart_entry_ec5c33": "Save Smart Entry",
+  "total_available_43f41a": "Total available",
+  "choose_daily_wallets_dee1a5": "Choose daily wallets",
+  "spent_this_month_2ecf74": "Spent this month",
+  "all_wallets_0134de": "All wallets",
+  "daily_wallets_5cc919": "Daily wallets",
+  "of_shown_54e7c9": "{p0} of {p1} shown",
+  "@of_shown_54e7c9": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      }
+    }
+  },
+  "no_wallets_yet_f53201": "No wallets yet",
+  "there_is_no_notification_entry_waiting_for_revie_4ed463": "There is no notification entry waiting for review.",
+  "nothing_to_review_9ad647": "Nothing to review",
+  "voice_entry_db16f4": "Voice entry",
+  "speak_one_complete_expense_income_or_transfer_a__6d039c": "Speak one complete expense, income, or transfer. A failed attempt is discarded so the next command starts clean.",
+  "voice_transcript_15df98": "Voice transcript",
+  "done_e9b450": "Done",
+  "new_category_309531": "New Category",
+  "choose_a_different_name_for_this_category_46fbd6": "Choose a different name for this category.",
+  "category_already_exists_8ab7fa": "Category already exists",
+  "keep_at_least_one_expense_category_a44f7a": "Keep at least one expense category.",
+  "delete_category_61aa7c": "Delete Category?",
+  "delete_existing_transactions_will_remain_unchang_da852e": "Delete '{p0}'? Existing transactions will remain unchanged.",
+  "@delete_existing_transactions_will_remain_unchang_da852e": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "category_was_deleted_39d1c3": "Category '{p0}' was deleted.",
+  "@category_was_deleted_39d1c3": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "category_deleted_5e23de": "Category deleted",
+  "new_6403f2": "New",
+  "your_previous_voice_command_is_still_being_proce_4be015": "Your previous voice command is still being processed.",
+  "please_wait_ee9e88": "Please wait",
+  "speech_recognition_is_not_available_enable_the_g_17bd68": "Speech recognition is not available. Enable the Google app or your phone's speech-recognition service, then allow microphone access.",
+  "voice_recognition_unavailable_1fa909": "Voice recognition unavailable",
+  "voice_recognition_could_not_start_check_micropho_db2292": "Voice recognition could not start. Check microphone permission and the phone's speech-recognition service.",
+  "voice_log_unavailable_9d7ecf": "Voice Log unavailable",
+  "voice_recognition_needs_an_internet_connection_o_2451e5": "Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.",
+  "voice_service_is_offline_4130dd": "Voice service is offline",
+  "no_working_speech_language_was_found_enable_the__646a52": "No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.",
+  "speech_language_unavailable_5e3d34": "Speech language unavailable",
+  "voice_log_stopped_before_it_received_a_final_res_3ba187": "Voice Log stopped before it received a final result. Please say the full command again.",
+  "voice_log_stopped_c214bc": "Voice Log stopped",
+  "the_voice_command_was_incomplete_please_tap_the__e3c527": "The voice command was incomplete. Please tap the microphone and say the full command again.",
+  "voice_command_incomplete_0baf1a": "Voice command incomplete",
+  "voice_recognition_stopped_before_hearing_any_wor_1b2943": "Voice recognition stopped before hearing any words. Tap the microphone and try again.",
+  "voice_stopped_too_soon_1a2e53": "Voice stopped too soon",
+  "voice_log_250101": "Voice Log",
+  "add_transaction_ea77fd": "Add Transaction",
+  "create_a_wallet_before_selecting_a_smart_entry_d_d0d3ec": "Create a wallet before selecting a Smart Entry default.",
+  "no_wallets_afdf07": "No wallets",
+  "default_smart_entry_wallet_a6ad73": "Default Smart Entry wallet",
+  "use_cash_first_then_jazzcash_28d262": "Use Cash first, then JazzCash",
+  "create_a_wallet_before_choosing_daily_wallets_b0193d": "Create a wallet before choosing daily wallets.",
+  "choose_up_to_4_wallets_for_quick_home_tracking_668cf2": "Choose up to 4 wallets for quick Home tracking.",
+  "4_388ab6": "{p0}/4",
+  "@4_388ab6": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "save_daily_wallets_316059": "Save daily wallets",
+  "delete_this_transfer_and_create_it_again_if_its__f61a0b": "Delete this transfer and create it again if its details need to change.",
+  "transfers_cannot_be_edited_557173": "Transfers cannot be edited",
+  "review_before_saving_6f92b7": "Review before saving",
+  "moving_money_between_wallets_2919b3": "Moving money between wallets",
+  "enter_a_valid_amount_above_zero_8262af": "Enter a valid amount above zero.",
+  "available_in_rs_required_rs_add_money_to_this_wa_96b697": "Available in {p0}: Rs. {p1}. Required: Rs. {p2}. Add money to this wallet or enter a smaller amount.",
+  "@available_in_rs_required_rs_add_money_to_this_wa_96b697": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "create_at_least_two_wallets_to_transfer_money_c80e1c": "Create at least two wallets to transfer money.",
+  "available_in_the_source_wallet_rs_enter_a_smalle_ac724e": "Available in the source wallet: Rs. {p0}. Enter a smaller amount or add money first.",
+  "@available_in_the_source_wallet_rs_enter_a_smalle_ac724e": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "the_source_wallet_no_longer_has_enough_money_for_63c806": "The source wallet no longer has enough money for this transfer.",
+  "enter_a_transaction_title_817c58": "Enter a transaction title.",
+  "check_the_selected_wallet_balance_and_try_again_b1bee5": "Check the selected wallet balance and try again.",
+  "transaction_not_saved_16554e": "Transaction not saved",
+  "this_transaction_no_longer_exists_11cb0e": "This transaction no longer exists.",
+  "money_was_moved_between_the_selected_wallets_a92dc6": "Money was moved between the selected wallets.",
+  "the_income_was_added_to_the_selected_wallet_36d17e": "The income was added to the selected wallet.",
+  "the_expense_was_saved_to_the_selected_wallet_2f0ad9": "The expense was saved to the selected wallet.",
+  "complete_transfer_bf7f6e": "Complete Transfer",
+  "save_transaction_a3f812": "Save Transaction",
+  "one_of_the_detected_entries_could_not_be_safely__876c93": "One of the detected entries could not be safely interpreted. Nothing was saved.",
+  "multiple_entries_not_saved_4eb2b6": "Multiple entries not saved",
+  "create_a_cash_or_jazzcash_wallet_before_using_sm_8358f6": "Create a Cash or JazzCash wallet before using Smart Entry.",
+  "wallet_required_2f5332": "Wallet required",
+  "the_reviewed_entries_were_saved_together_e40eed": "The reviewed entries were saved together.",
+  "entries_saved_9ed5ce": "Entries saved",
+  "include_an_amount_for_example_500_biryani_or_1_5_011d46": "Include an amount, for example: '500 biryani' or '1.5k petrol from JazzCash'.",
+  "amount_not_detected_d9d89a": "Amount not detected",
+  "the_selected_wallet_changed_or_no_longer_has_eno_34f20d": "The selected wallet changed or no longer has enough balance. Try the entry again.",
+  "smart_entry_not_saved_b8ec80": "Smart Entry not saved",
+  "income_added_fa12b0": "Income added",
+  "expense_saved_a7f2ed": "Expense saved",
+  "rs_370e31": "{p0} — Rs. {p1} · {p2}",
+  "@rs_370e31": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      },
+      "p1": {
+        "type": "Object"
+      },
+      "p2": {
+        "type": "Object"
+      }
+    }
+  },
+  "the_instant_smart_entry_was_removed_0941a9": "The instant Smart Entry was removed.",
+  "entry_undone_60fe48": "Entry undone",
+  "the_smart_entry_was_saved_to_the_selected_wallet_a313b9": "The Smart Entry was saved to the selected wallet.",
+  "choose_entry_to_delete_fafeb7": "Choose entry to delete",
+  "choose_entry_to_repeat_05a271": "Choose entry to repeat",
+  "choose_entry_to_edit_8765a3": "Choose entry to edit",
+  "several_entries_match_your_command_e9a6dd": "Several entries match your command.",
+  "set_up_your_first_money_c2c03e": "Set up your first money",
+  "your_total_balance_automatically_equals_all_wall_a044f3": "Your total balance automatically equals all wallet balances.",
+  "add_first_income_a489e8": "Add first income",
+  "set_wallet_balance_c9c8e4": "Set wallet balance",
+  "try_smart_entry_fa76d5": "Try Smart Entry",
+  "review_the_example_then_tap_send_55b44f": "Review the example, then tap Send.",
+  "smart_entry_example_ready_753417": "Smart Entry example ready",
+  "no_transactions_here_yet_6e0cda": "No transactions here yet.",
+  "today_s_spend_rs_ca82eb": "Today's Spend: Rs. {p0}",
+  "@today_s_spend_rs_ca82eb": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "move_transfer_to_trash_5ce57e": "Move Transfer to Trash?",
+  "move_transaction_to_trash_e78f60": "Move Transaction to Trash?",
+  "both_linked_wallet_entries_will_move_together_an_f82612": "Both linked wallet entries will move together and can be restored.",
+  "move_to_trash_it_can_be_restored_for_30_days_5372a8": "Move '{p0}' to Trash? It can be restored for 30 days.",
+  "@move_to_trash_it_can_be_restored_for_30_days_5372a8": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "move_to_trash_dffd3b": "Move to Trash",
+  "the_entry_could_not_be_moved_to_trash_ec0ca1": "The entry could not be moved to Trash.",
+  "can_be_restored_from_trash_11909a": "'{p0}' can be restored from Trash.",
+  "@can_be_restored_from_trash_11909a": {
+    "placeholders": {
+      "p0": {
+        "type": "Object"
+      }
+    }
+  },
+  "transfer_moved_to_trash_e0cc25": "Transfer moved to Trash",
+  "moved_to_trash_b646b3": "Moved to Trash",
+  "the_entry_was_restored_057112": "The entry was restored.",
+  "restored_b54d62": "Restored",
+  "app_language_01e178": "App language",
+  "english_or_roman_urdu_for_app_text_and_notificat_f49dbb": "English or Roman Urdu for app text and notifications",
+  "preview_voice_560a6f": "Preview voice",
+  "english_voice_is_used_if_an_urdu_voice_or_spoken_310b3d": "English voice is used if an Urdu voice or spoken translation is unavailable.",
+  "app_language_is_now_english_44ca9f": "App language is now English.",
+  "app_language_is_now_roman_urdu_e1c77a": "App language is now Roman Urdu.",
+  "this_is_your_spoken_feedback_voice_33df03": "This is your spoken feedback voice.",
+  "enable_spoken_confirmations_to_preview_the_voice_793e0a": "Enable Spoken Confirmations to preview the voice.",
+  "unable_to_continue_77a7c5": "Unable to continue",
+  "completed_1798b3": "Completed",
+  "information_0eb5ed": "Information",
+  "dashboard_d87f47": "Dashboard",
+  "monthly_plan_df5188": "Monthly Plan",
+  "stats_be763e": "Stats",
+  "settings_c7f73b": "Settings",
+  "trash_e3bf62": "Trash",
+  "about_6b21fb": "About",
+  "welcome_e52e5e": "Welcome!",
+  "student_42b327": "Student",
+  "set_up_profile_adba6f": "Set up profile",
+  "tap_to_add_details_54ab77": "Tap to add details",
+  "confirm_your_identity_to_enable_likhlo_app_lock_8b0718": "Confirm your identity to enable Likhlo App Lock.",
+  "confirm_your_identity_to_disable_likhlo_app_lock_bac11c": "Confirm your identity to disable Likhlo App Lock.",
+  "likhlo_app_lock_is_enabled_ef7ba9": "Likhlo App Lock is enabled.",
+  "likhlo_app_lock_is_disabled_1a87b4": "Likhlo App Lock is disabled.",
+  "likhlo_app_lock_is_already_enabled_73d212": "Likhlo App Lock is already enabled.",
+  "likhlo_app_lock_is_already_disabled_f2396e": "Likhlo App Lock is already disabled.",
+  "choose_a_month_for_the_pdf_report_674263": "Choose a month for the PDF report.",
+  "opening_pdf_report_91cc99": "Opening {p0} PDF report.",
+  "opening_backup_888e73": "Opening Backup.",
+  "showing_stats_3d7ede": "Showing {p0} Stats.",
+  "persistent_quick_entry_is_enabled_f8a890": "Persistent Quick Entry is enabled.",
+  "persistent_quick_entry_is_disabled_22c786": "Persistent Quick Entry is disabled.",
+  "smart_entry_reminders_are_enabled_337a08": "Smart Entry reminders are enabled.",
+  "smart_entry_reminders_are_disabled_10139b": "Smart Entry reminders are disabled.",
+  "spoken_confirmations_are_enabled_e042ee": "Spoken confirmations are enabled.",
+  "spoken_confirmations_are_disabled_17d1bc": "Spoken confirmations are disabled.",
+  "smart_entry_language_is_now_roman_urdu_0173b6": "Smart Entry language is now Roman Urdu.",
+  "smart_entry_language_is_now_english_ea7792": "Smart Entry language is now English.",
+  "no_entry_text_was_provided_89de90": "No entry text was provided.",
+  "this_notification_entry_was_already_handled_852ff8": "This notification entry was already handled.",
+  "open_likhlo_to_review_this_command_73258d": "Open Likhlo to review this command.",
+  "entry_needs_review_before_it_can_be_saved_b95b8c": "Entry needs review before it can be saved.",
+  "the_entry_could_not_be_saved_24cf03": "The entry could not be saved.",
+  "the_entry_could_not_be_saved_please_try_again_c01aba": "The entry could not be saved. Please try again.",
+  "rs_saved_3b195e": "{p0} — Rs. {p1} saved.",
+  "the_entry_could_not_be_saved_open_likhlo_to_try__026755": "The entry could not be saved. Open Likhlo to try again.",
+  "quick_ledger_widget_a928e2": "Quick Ledger Widget",
+  "reminders_alerts_f59fff": "Reminders & Alerts",
+  "persistent_quick_entry_shortcuts_in_notification_074c32": "Persistent quick-entry shortcuts in notification bar",
+  "expense_entry_and_payment_reminders_c4a207": "Expense entry and payment reminders",
+  "custom_tone_alerts_8983e0": "Custom Tone Alerts",
+  "type_entry_93ed19": "Type entry",
+  "likhlo_quick_entry_8e6693": "Likhlo Quick Entry",
+  "spent_today_rs_balance_rs_3386dc": "Spent today: Rs. {p0} • Balance: Rs. {p1}",
+  "midday_check_in_012d43": "Midday Check-in 🍱",
+  "did_you_buy_lunch_chai_or_fuel_today_tap_to_reco_adf570": "Did you buy lunch, chai, or fuel today? Tap to record it!",
+  "daily_spending_wrap_up_ab9867": "Daily Spending Wrap-up 🌙",
+  "close_out_your_daily_ledger_take_5_seconds_to_re_aa9b3d": "Close out your daily ledger! Take 5 seconds to review today's expenses.",
+  "log_now_b4f675": "➕ Log Now",
+  "review_in_likhlo_936f5d": "Review in Likhlo",
+  "entry_saved_b629dc": "Entry saved",
+  "already_handled_3a2a39": "Already handled",
+  "review_entry_deb59d": "Review entry",
+  "udhaar_due_today_1ffa6c": "Udhaar Due Today! 💰",
+  "udhaar_saved_cdbf5f": "Udhaar saved",
+  "udhaar_settled_5c2033": "Udhaar settled",
+  "transfer_saved_0d1cca": "Transfer saved",
+  "transfer_deleted_8b8eff": "Transfer deleted",
+  "entry_deleted_c7211d": "Entry deleted",
+  "rs_transferred_between_wallets_80ff3e": "Rs. {p0} transferred between wallets.",
+  "rupees_expense_saved_c7486b": "{p0}, {p1} rupees expense saved.",
+  "rupees_income_added_78878f": "{p0}, {p1} rupees income added.",
+  "rupees_transferred_34226d": "{p0} rupees transferred.",
+  "rupees_transferred_from_to_617a7c": "{p0} rupees transferred from {p1} to {p2}.",
+  "updated_to_rupees_0e6360": "{p0} updated to {p1} rupees.",
+  "rupees_entry_deleted_763218": "{p0}, {p1} rupees entry deleted.",
+  "rupees_entry_repeated_f17ed0": "{p0}, {p1} rupees entry repeated.",
+  "today_2dd2be": "today",
+  "yesterday_1aa96b": "yesterday",
+  "this_week_dae1e5": "this week",
+  "last_week_c4a943": "last week",
+  "this_month_0bd41b": "this month",
+  "last_month_54184f": "last month",
+  "all_time_5ae5c4": "all time",
+  "income_and_expense_da0b3c": "Income and expense",
+  "no_expense_category_yet_bc0df6": "No expense category yet.",
+  "top_rs_69a910": "Top: {p0} Rs. {p1}.",
+  "all_6a7208": "All",
+  "food_35b259": "Food",
+  "transport_c10d76": "Transport",
+  "shopping_96a0dc": "Shopping",
+  "entertainment_8c520b": "Entertainment",
+  "health_3703cd": "Health",
+  "education_aaf87f": "Education",
+  "bills_815465": "Bills",
+  "general_9239ee": "General",
+  "transfer_cbb4cc": "Transfer",
+  "income_allowance_3a60d6": "Income / Allowance",
+  "quick_expense_70c7a2": "Quick Expense",
+  "income_allowance_1f58fa": "Income Allowance",
+  "to_receive_3184f0": "To receive",
+  "to_pay_58d126": "To pay",
+  "net_flow_a81201": "Net flow",
+  "net_change_1818c9": "Net change",
+  "udhar_records_cd5f5e": "Udhar records",
+  "settled_68c154": "{p0} settled",
+  "no_due_date_811035": "No due date",
+  "d_overdue_c123bb": "{p0}d overdue",
+  "day_overdue_8cf772": "{p0} day{p1} overdue",
+  "due_today_11ea0f": "Due today",
+  "due_tomorrow_4fc752": "Due tomorrow",
+  "due_in_days_e2f6ee": "Due in {p0} days",
+  "wallet_unavailable_d013b4": "Wallet unavailable",
+  "legacy_record_3d6953": "Legacy record",
+  "automatic_wallet_6e5fd5": "Automatic wallet",
+  "automatic_currently_c878d9": "Automatic · currently {p0}",
+  "default_for_commands_without_a_named_wallet_ff3c01": "Default for commands without a named wallet",
+  "person_name_d73594": "Person name",
+  "amount_rs_96a91c": "Amount (Rs.)",
+  "category_name_912f07": "Category Name",
+  "from_wallet_f51f54": "From Wallet",
+  "to_wallet_d9ca0a": "To Wallet",
+  "open_monthly_statistics_adb521": "Open monthly statistics",
+  "open_wallet_accounts_6c466a": "Open wallet accounts",
+  "enter_a_wallet_name_28fb75": "Enter a wallet name.",
+  "enter_a_valid_balance_of_zero_or_more_d97990": "Enter a valid balance of zero or more.",
+  "a_wallet_with_this_name_already_exists_d73b3f": "A wallet with this name already exists.",
+  "could_not_save_this_income_760f26": "Could not save this income.",
+  "the_batch_could_not_be_saved_no_transactions_wer_5b7c01": "The batch could not be saved. No transactions were added.",
+  "choose_a_wallet_and_category_at_the_top_first_39325b": "Choose a wallet and category at the top first.",
+  "enter_a_valid_receipt_total_c06b11": "Enter a valid receipt total.",
+  "every_selected_item_needs_a_valid_name_and_amoun_4d0a30": "Every selected item needs a valid name and amount.",
+  "select_at_least_one_receipt_item_0590ae": "Select at least one receipt item.",
+  "insufficient_balance_in_need_rs_but_you_only_hav_73a7b6": "Insufficient balance in {p0}. Need Rs. {p1}, but you only have Rs. {p2}.",
+  "the_receipt_could_not_be_saved_0fe896": "The receipt could not be saved.",
+  "no_raw_text_was_recognized_b4806e": "No raw text was recognized.",
+  "detected_receipt_total_d468ae": "Detected receipt total",
+  "sum_of_selected_items_3c40c5": "Sum of selected items",
+  "the_receipt_could_not_be_read_please_try_another_b63841": "The receipt could not be read. Please try another image.",
+  "please_fill_in_both_profile_fields_to_continue_725726": "Please fill in both profile fields to continue.",
+  "use_zero_or_a_positive_amount_in_each_money_fiel_fc3705": "Use zero or a positive amount in each money field.",
+  "setup_could_not_be_completed_your_existing_data__5de45c": "Setup could not be completed. Your existing data is safe.",
+  "what_should_we_call_you_68e7d7": "What should we call you?",
+  "what_do_you_do_e_g_student_6acd9a": "What do you do? (e.g. Student)",
+  "opening_wallet_balances_0d4547": "Opening wallet balances",
+  "add_your_first_income_90499d": "Add your first income",
+  "income_amount_c3c633": "Income amount",
+  "monthly_spending_target_ef1edd": "Monthly spending target",
+  "optional_target_e993fd": "Optional target",
+  "finish_setup_c516d2": "Finish setup",
+  "enter_at_least_8_characters_eececb": "Enter at least 8 characters",
+  "passphrases_do_not_match_42a0ba": "Passphrases do not match",
+  "save_encrypted_likhlo_backup_1376e0": "Save encrypted Likhlo backup",
+  "choose_a_likhlo_backup_98e94f": "Choose a Likhlo backup",
+  "this_backup_exceeds_the_25_mb_limit_7216dc": "This backup exceeds the 25 MB limit.",
+  "encrypted_backup_saved_automatic_refresh_runs_da_db4059": "Encrypted backup saved. Automatic refresh runs daily only when your data changed.",
+  "encrypted_backup_saved_successfully_522966": "Encrypted backup saved successfully.",
+  "could_not_open_the_file_picker_please_try_again_17cb28": "Could not open the file picker. Please try again.",
+  "could_not_select_the_backup_file_7f6a4e": "Could not select the backup file.",
+  "this_backup_is_larger_than_the_25_mb_safety_limi_c41c91": "This backup is larger than the 25 MB safety limit.",
+  "could_not_read_this_file_select_the_original_lik_162288": "Could not read this file. Select the original Likhlo backup again.",
+  "backup_restored_successfully_your_previous_data__a9ebee": "Backup restored successfully. Your previous data is available as a recovery snapshot.",
+  "no_valid_recovery_snapshot_is_available_673bc2": "No valid recovery snapshot is available.",
+  "previous_data_recovered_b48357": "Previous data recovered.",
+  "backup_operation_failed_no_data_was_deleted_4027af": "Backup operation failed. No data was deleted.",
+  "this_entry_could_not_be_restored_49dd94": "This entry could not be restored.",
+  "entry_restored_to_its_original_wallet_fe22e2": "Entry restored to its original wallet.",
+  "entry_permanently_deleted_fe8b90": "Entry permanently deleted.",
+  "entry_not_found_2addee": "Entry not found.",
+  "trash_emptied_98bc21": "Trash emptied.",
+  "unlock_likhlo_to_access_your_financial_records_c16719": "Unlock Likhlo to access your financial records.",
+  "authentication_could_not_be_completed_please_try_7d8e44": "Authentication could not be completed. Please try again.",
+  "authentication_was_cancelled_your_financial_reco_0f714f": "Authentication was cancelled. Your financial records remain locked.",
+  "device_authentication_is_unavailable_check_your__6ac711": "Device authentication is unavailable. Check your phone security settings and try again.",
+  "no_fingerprint_or_face_id_is_enrolled_add_one_in_4814bb": "No fingerprint or Face ID is enrolled. Add one in your phone settings first.",
+  "set_a_secure_screen_lock_on_your_phone_before_us_26ed09": "Set a secure screen lock on your phone before using Likhlo App Lock.",
+  "authentication_is_temporarily_locked_after_too_m_f54bca": "Authentication is temporarily locked after too many attempts. Wait briefly, then try again.",
+  "authentication_is_locked_unlock_your_phone_with__a0eed1": "Authentication is locked. Unlock your phone with its PIN or passcode, then try again.",
+  "fingerprint_face_id_or_device_authentication_is__512da5": "Fingerprint, Face ID, or device authentication is not available on this phone.",
+  "budget_saved_for_rs_e82658": "Budget saved for {p0} · Rs. {p1}",
+  "plan_updated_4fc636": "Plan updated.",
+  "tell_me_the_monthly_budget_amount_06c043": "Tell me the monthly budget amount.",
+  "monthly_budget_set_to_rs_d6c87c": "Monthly budget set to Rs. {p0}.",
+  "tell_me_how_much_you_want_to_save_e13d4d": "Tell me how much you want to save.",
+  "savings_target_cleared_687815": "Savings target cleared.",
+  "rs_is_protected_for_savings_05cb07": "Rs. {p0} is protected for savings.",
+  "tell_me_the_safety_buffer_amount_b5474f": "Tell me the safety buffer amount.",
+  "safety_buffer_set_to_rs_4bf7ce": "Safety buffer set to Rs. {p0}.",
+  "i_could_not_match_that_to_a_planned_item_bd742b": "I could not match that to a planned item.",
+  "tell_me_the_amount_for_2628eb": "Tell me the amount for {p0}.",
+  "planned_at_rs_f7719f": "{p0} planned at Rs. {p1}.",
+  "i_could_not_match_that_recurring_item_031c20": "I could not match that recurring item.",
+  "will_be_treated_as_recurring_39c549": "{p0} will be treated as recurring.",
+  "i_could_not_match_that_one_time_item_e7249a": "I could not match that one-time item.",
+  "marked_as_one_time_63399f": "{p0} marked as one-time.",
+  "a_safe_plan_is_about_rs_before_savings_4c104d": "A safe plan is about Rs. {p0} before savings.",
+  "add_income_first_so_i_can_calculate_a_safe_daily_38f438": "Add income first so I can calculate a safe daily amount.",
+  "safe_daily_spending_is_about_rs_91b1ec": "Safe daily spending is about Rs. {p0}.",
+  "tell_me_how_much_you_want_to_spend_4b8bc8": "Tell me how much you want to spend.",
+  "add_income_first_so_i_can_judge_that_safely_dd5646": "Add income first so I can judge that safely.",
+  "yes_after_rs_about_rs_remains_outside_your_savin_6f4aaf": "Yes. After Rs. {p0}, about Rs. {p1} remains outside your savings target.",
+  "that_is_about_rs_above_the_money_currently_avail_0d94dd": "That is about Rs. {p0} above the money currently available outside savings.",
+  "the_rs_plan_is_rs_expected_spending_plus_rs_safe_cb55c5": "The Rs. {p0} plan is Rs. {p1} expected spending plus Rs. {p2} safety buffer.",
+  "try_budget_40k_save_5k_petrol_max_4k_or_hostel_h_f6c069": "Try “budget 40k”, “save 5k”, “petrol max 4k”, or “hostel har month”.",
+  "voice_input_could_not_start_c343fc": "Voice input could not start.",
+  "voice_recognition_is_not_available_on_this_devic_6b1a5d": "Voice recognition is not available on this device.",
+  "savings_goal_2c2609": "Savings goal",
+  "custom_safety_buffer_998181": "Custom safety buffer",
+  "set_future_behavior_638001": "Set future behavior",
+  "smart_insight_19e152": "Smart insight",
+  "no_reliable_recurring_items_yet_keep_logging_nor_5e4ae8": "No reliable recurring items yet. Keep logging normally.",
+  "around_day_11faba": "around day {p0}",
+  "strong_pattern_e66817": "Strong pattern",
+  "likely_recurring_69594b": "Likely recurring",
+  "review_suggestion_bcac70": "Review suggestion",
+  "no_unexpected_spending_detected_this_month_d88a4e": "No unexpected spending detected this month.",
+  "expected_items_12763b": "Expected items",
+  "expected_spending_c021af": "Expected spending",
+  "savings_4390be": "Savings",
+  "remaining_cc632b": "Remaining",
+  "command_not_recognized_1fbc72": "Command not recognized",
+  "try_an_expense_or_income_command_with_an_amount_445c34": "Try an expense or income command with an amount.",
+  "voice_recognition_corrected_a_similar_sounding_f_fb9afc": "Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.",
+  "review_the_detected_title_amount_category_date_a_43b34f": "Review the detected title, amount, category, date, and wallet before saving.",
+  "the_named_wallet_cannot_cover_this_expense_choos_b57a9c": "The named wallet cannot cover this expense. Choose another wallet before saving.",
+  "your_default_wallet_cannot_cover_this_expense_ch_eb3860": "Your default wallet, {p0}, cannot cover this expense. Choose another funded account.",
+  "the_wallet_previously_used_for_this_entry_cannot_8643c8": "The wallet previously used for this entry cannot cover it. Choose another funded wallet.",
+  "cash_and_jazzcash_are_empty_choose_the_wallet_th_52e58f": "Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.",
+  "cash_and_jazzcash_cannot_cover_this_amount_choos_729a9c": "Cash and JazzCash cannot cover this amount. Choose another funded wallet.",
+  "unknown_wallet_66ac46": "Unknown wallet",
+  "collect_rs_from_277c3e": "Collect Rs. {p0} from {p1}.",
+  "pay_rs_to_e09f03": "Pay Rs. {p0} to {p1}.",
+  "receive_965fb2": "Receive",
+  "owe_3bee06": "Owe",
+  "due_soon_a01f64": "Due soon",
+  "date_eb9a4b": "Date",
+  "type_3deb74": "Type",
+  "person_8c41ae": "Person",
+  "direction_fd8e45": "Direction",
+  "status_bae7d5": "Status",
+  "expenses_8d437d": "Expenses",
+  "entries_f056d0": "Entries",
+  "active_a733b8": "Active",
+  "overdue_07217c": "Overdue",
+  "settled_7fb3a9": "Settled",
+  "today_24345a": "Today",
+  "tomorrow_1948bf": "Tomorrow",
+  "expected_6ac87f": "Expected",
+  "safety_db6e7e": "Safety",
+  "unknown_bc7819": "Unknown",
+  "short_0fe7d8": "Short",
+  "free_75f527": "Free",
+  "plan_is_above_expected_income_d66b64": "Plan is above expected income",
+  "reduce_about_rs_or_lower_the_savings_target_d20408": "Reduce about Rs. {p0} or lower the savings target.",
+  "savings_protected_ab867b": "Savings protected",
+  "this_plan_keeps_rs_aside_and_leaves_about_rs_fre_197673": "This plan keeps Rs. {p0} aside and leaves about Rs. {p1} free.",
+  "is_running_high_7c4eff": "{p0} is running high",
+  "about_rs_above_the_planned_amount_so_far_c1adf8": "About Rs. {p0} above the planned amount so far.",
+  "upcoming_around_day_4d3e91": "Upcoming around day {p0}",
+  "about_rs_7a6b0e": "{p0} · about Rs. {p1}.",
+  "safe_pace_for_the_rest_of_the_month_ce8928": "Safe pace for the rest of the month",
+  "about_rs_per_day_from_the_money_not_reserved_for_632a9f": "About Rs. {p0} per day from the money not reserved for savings.",
+  "plan_is_learning_b0b03c": "Plan is learning",
+  "keep_logging_normally_likhlo_will_refine_recurri_35452a": "Keep logging normally. Likhlo will refine recurring amounts and timing from your history.",
+  "ledger_validation_rejected_the_transaction_aa0162": "Ledger validation rejected the transaction.",
+  "every_selected_batch_item_needs_a_valid_amount_3677ea": "Every selected batch item needs a valid amount.",
+  "every_selected_receipt_item_needs_a_valid_amount_4edf71": "Every selected receipt item needs a valid amount.",
+  "confirm_the_receipt_total_difference_before_savi_42cef1": "Confirm the receipt total difference before saving.",
+  "the_selected_wallet_cannot_fund_the_full_batch_n_327b74": "The selected wallet cannot fund the full batch. Nothing was saved.",
+  "a_transfer_requires_a_valid_outgoing_and_incomin_57b64b": "A transfer requires a valid outgoing and incoming pair.",
+  "ledger_validation_rejected_the_transfer_d22df3": "Ledger validation rejected the transfer.",
+  "the_transaction_could_not_be_updated_8e45ea": "The transaction could not be updated.",
+  "the_transaction_no_longer_exists_b46d97": "The transaction no longer exists.",
+  "the_transfer_no_longer_exists_293da4": "The transfer no longer exists.",
+  "the_transaction_cannot_be_restored_to_its_origin_70f124": "The transaction cannot be restored to its original wallet.",
+  "both_transfer_wallets_are_required_before_restor_2f0258": "Both transfer wallets are required before restoring.",
+  "the_trash_entry_no_longer_exists_4ab2da": "The Trash entry no longer exists.",
+  "difference_b16f1f": "Difference",
+  "transactions_1e3281": "Transactions",
+  "categories_6ccb60": "Categories",
+  "the_batch_could_not_be_saved_no_items_were_added_dddf0e": "The batch could not be saved. No items were added.",
+  "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "The receipt could not be saved. No items were added.",
+  "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "Deleting this entry would make a wallet balance negative.",
+  "category_query_suffix": " · {p0}"
+}

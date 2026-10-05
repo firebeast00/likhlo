@@ -11,6 +11,8 @@ import 'package:hive/hive.dart';
 import '../models/expense_model.dart';
 import '../models/wallet_model.dart';
 import 'notification_entry_service.dart';
+import '../l10n/app_strings.dart';
+import '../models/debt_model.dart';
 
 const _notificationEntryPortName = 'likhlo_notification_entry_port_v1';
 
@@ -57,6 +59,7 @@ Future<_NotificationEntryOutcome> _processNotificationEntry(
     });
     final message = await reply.first.timeout(const Duration(seconds: 20));
     if (message is Map) {
+      NotificationService()._backgroundLanguage = AppLanguage.parse(message['appLanguage']);
       final dispositionName = message['disposition']?.toString();
       final disposition = NotificationEntryDisposition.values.firstWhere(
         (value) => value.name == dispositionName,
@@ -116,6 +119,8 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  AppLanguage? _backgroundLanguage;
+  AppStrings get _strings => AppStrings(_backgroundLanguage ?? AppLanguage.read());
   ReceivePort? _entryBridgePort;
 
   // Notification ID Partitioning
@@ -164,6 +169,7 @@ class NotificationService {
       final status = persistentStatusSnapshot();
       replyTo.send({
         'disposition': result.disposition.name,
+        'appLanguage': AppLanguage.read().name,
         'message': result.message,
         if (status != null) ...status,
       });
@@ -301,8 +307,8 @@ class NotificationService {
     return NotificationDetails(
       android: AndroidNotificationDetails(
         channelId,
-        channelName,
-        channelDescription: channelDesc,
+        _strings.display(channelName),
+        channelDescription: _strings.display(channelDesc),
         importance: isPersistent ? Importance.low : Importance.max,
         priority: isPersistent ? Priority.low : Priority.high,
         ongoing: isPersistent, // Keeps notification pinned in status bar
@@ -346,13 +352,13 @@ class NotificationService {
 
       final details = await _getDetails(
         isPersistent: true,
-        actions: const [
+        actions: [
           AndroidNotificationAction(
             inlineEntryActionId,
-            'Type entry',
+            _strings.display('Type entry'),
             inputs: <AndroidNotificationActionInput>[
               AndroidNotificationActionInput(
-                label: 'e.g. 500 biryani from JazzCash',
+                label: _strings.display('e.g. 500 biryani from JazzCash'),
               ),
             ],
             allowGeneratedReplies: true,
@@ -361,7 +367,7 @@ class NotificationService {
           ),
           AndroidNotificationAction(
             'action_voice_log',
-            'Voice entry',
+            _strings.display('Voice entry'),
             showsUserInterface: true,
             cancelNotification: false,
           ),
@@ -370,12 +376,38 @@ class NotificationService {
 
       await _notifications.show(
         persistentBarId,
-        'Likhlo Quick Entry',
-        'Spent today: Rs. ${spentToday.toStringAsFixed(0)} • Balance: Rs. ${remainingToday.toStringAsFixed(0)}',
+        _strings.display('Likhlo Quick Entry'),
+        _strings.display('Spent today: Rs. ${spentToday.toStringAsFixed(0)} • Balance: Rs. ${remainingToday.toStringAsFixed(0)}'),
         details,
       );
     } catch (e) {
       debugPrint("❌ Error showing Persistent Notification: $e");
+    }
+  }
+
+  /// Rebuild presentation using existing IDs, due times and action payloads.
+  Future<void> refreshLocalizedContent() async {
+    try {
+      tz.initializeTimeZones();
+      if (!_initialized) await initializeForBackgroundAction();
+      await refreshPersistentStatusBarWidget();
+      await scheduleSmartEntryReminders();
+      final pending = await _notifications.pendingNotificationRequests();
+      if (!Hive.isBoxOpen('debts')) await Hive.openBox<DebtEntry>('debts');
+      final ids = pending.map((request) => request.id).toSet();
+      for (final debt in Hive.box<DebtEntry>('debts').values) {
+        final id = debt.key;
+        final due = debt.dueDate;
+        if (id is! int || !ids.contains(id) || due == null ||
+            debt.deletedAt != null || debt.settledAt != null ||
+            !due.isAfter(DateTime.now())) continue;
+        await scheduleNotification(id, 'Udhaar Due Today! 💰',
+          debt.type == 'lent'
+              ? 'Collect Rs. ${debt.amount.toStringAsFixed(0)} from ${debt.borrowerName}.'
+              : 'Pay Rs. ${debt.amount.toStringAsFixed(0)} to ${debt.borrowerName}.', due);
+      }
+    } catch (error) {
+      debugPrint('Localized notification refresh unavailable: $error');
     }
   }
 
@@ -402,11 +434,11 @@ class NotificationService {
 
   /// A brief device notification after a confirmed manual ledger operation.
   /// Notification failures never change whether the ledger operation succeeded.
-  Future<void> showManualLedgerResult(String title, String detail) async {
+  Future<void> showManualLedgerResult(Object title, Object detail) async {
     try {
       if (!_initialized) await initializeForBackgroundAction();
       final details = await _getDetails();
-      await _notifications.show(manualLedgerResultId, title, detail, details);
+      await _notifications.show(manualLedgerResultId, _strings.display(title), _strings.display(detail), details);
     } catch (error) {
       debugPrint('Manual entry notification unavailable: $error');
     }
@@ -513,15 +545,15 @@ class NotificationService {
 
   Future<void> _scheduleDailyRepeating({
     required int id,
-    required String title,
-    required String body,
+    required Object title,
+    required Object body,
     required int hour,
     required int minute,
     required String payload,
   }) async {
     final details = await _getDetails(
-      actions: const [
-        AndroidNotificationAction('action_add_expense', '➕ Log Now',
+      actions: [
+        AndroidNotificationAction('action_add_expense', _strings.display('➕ Log Now'),
             showsUserInterface: true),
       ],
     );
@@ -536,8 +568,8 @@ class NotificationService {
 
     await _notifications.zonedSchedule(
       id,
-      title,
-      body,
+      _strings.display(title),
+      _strings.display(body),
       scheduledDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -548,10 +580,10 @@ class NotificationService {
     );
   }
 
-  Future<void> showInstantNotification(String title, String body) async {
+  Future<void> showInstantNotification(Object title, Object body) async {
     try {
       final details = await _getDetails();
-      await _notifications.show(testNotificationId, title, body, details);
+      await _notifications.show(testNotificationId, _strings.display(title), _strings.display(body), details);
     } catch (e) {
       debugPrint("❌ Error Showing Instant Notification: $e");
     }
@@ -566,10 +598,10 @@ class NotificationService {
             result.disposition == NotificationEntryDisposition.failed;
     final details = await _getDetails(
       actions: needsReview
-          ? const [
+          ? [
               AndroidNotificationAction(
                 reviewEntryActionId,
-                'Review in Likhlo',
+                _strings.display('Review in Likhlo'),
                 showsUserInterface: true,
               ),
             ]
@@ -577,12 +609,12 @@ class NotificationService {
     );
     await _notifications.show(
       notificationEntryResultId,
-      result.disposition == NotificationEntryDisposition.saved
+      _strings.display(result.disposition == NotificationEntryDisposition.saved
           ? 'Entry saved'
           : result.disposition == NotificationEntryDisposition.duplicate
               ? 'Already handled'
-              : 'Review entry',
-      result.message,
+              : 'Review entry'),
+      _strings.display(result.message),
       details,
       payload: needsReview ? reviewEntryActionId : null,
     );
@@ -590,7 +622,7 @@ class NotificationService {
   // ==================== ⏰ GENERIC SCHEDULING (Used by Udhaar) ====================
 
   Future<void> scheduleNotification(
-      int id, String title, String body, DateTime scheduledTime) async {
+      int id, Object title, Object body, DateTime scheduledTime) async {
     try {
       final details = await _getDetails(); // Uses the updated robust details
 
@@ -602,8 +634,8 @@ class NotificationService {
 
       await _notifications.zonedSchedule(
         id,
-        title,
-        body,
+        _strings.display(title),
+        _strings.display(body),
         tz.TZDateTime.from(scheduledTime, tz.local),
         details,
         uiLocalNotificationDateInterpretation:

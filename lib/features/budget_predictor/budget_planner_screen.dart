@@ -1,3 +1,4 @@
+import '../../l10n/app_strings.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -32,7 +33,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
   bool _isListening = false;
   bool _processingCommand = false;
   bool _saving = false;
-  String? _assistantMessage;
+  List<String>? _assistantMessages;
   int? _handledAppActionId;
 
   @override
@@ -70,7 +71,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
     FocusScope.of(context).unfocus();
     setState(() {
       _targetMonth = DateTime(month.year, month.month);
-      _assistantMessage = null;
+      _assistantMessages = null;
     });
   }
 
@@ -164,9 +165,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
       if (!mounted) return;
       _commandController.clear();
       setState(() {
-        _assistantMessage = replies.isEmpty
-            ? 'Plan updated.'
-            : replies.join(' ');
+        _assistantMessages = replies.isEmpty ? ['Plan updated.'] : replies;
       });
     } finally {
       if (mounted) setState(() => _processingCommand = false);
@@ -461,17 +460,17 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const ListTile(
+                ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
-                    'Safety buffer',
+                    AppStrings.current.text('safety_buffer_5e46e6'),
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  subtitle: Text('Extra room for unexpected expenses.'),
+                  subtitle: Text(AppStrings.current.text('extra_room_for_unexpected_expenses_931dab')),
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Use recommended'),
+                  title: Text(AppStrings.current.text('use_recommended_e66bad')),
                   trailing: Text('Rs. ${suggested.toStringAsFixed(0)}'),
                   selected: custom == null,
                   onTap: () async {
@@ -483,8 +482,8 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('No safety buffer'),
-                  trailing: const Text('Rs. 0'),
+                  title: Text(AppStrings.current.text('no_safety_buffer_6bd135')),
+                  trailing: Text(AppStrings.current.text('rs_0_af8d13')),
                   selected: custom == 0,
                   onTap: () async {
                     Navigator.pop(sheetContext);
@@ -495,7 +494,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Custom amount'),
+                  title: Text(AppStrings.current.text('custom_amount_f72192')),
                   trailing: custom != null && custom > 0
                       ? Text('Rs. ${custom.toStringAsFixed(0)}')
                       : null,
@@ -531,7 +530,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
     final result = await showDialog<double>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(title),
+        title: Text(AppStrings.current.display(title)),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -544,7 +543,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(AppStrings.current.text('cancel_77dfd2')),
           ),
           FilledButton(
             onPressed: () {
@@ -554,7 +553,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                   (allowZero ? value >= 0 : value > 0);
               if (valid) Navigator.pop(dialogContext, value);
             },
-            child: const Text('Save'),
+            child: Text(AppStrings.current.text('save_efc007')),
           ),
         ],
       ),
@@ -588,12 +587,12 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
                 subtitle: Text(
-                  '${suggestion.category} · Rs. ${amount.toStringAsFixed(0)}',
+                  AppStrings.current.text('rs_be0230', {'p0': suggestion.category, 'p1': amount.toStringAsFixed(0)}),
                 ),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Include in this month'),
+                title: Text(AppStrings.current.text('include_in_this_month_2e9b26')),
                 value: included,
                 onChanged: (value) async {
                   await ref
@@ -605,7 +604,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.edit_outlined),
-                title: const Text('Change planned amount'),
+                title: Text(AppStrings.current.text('change_planned_amount_8ac7c2')),
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   final value = await _amountDialog(
@@ -625,7 +624,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.repeat_rounded),
-                title: const Text('Treat as recurring'),
+                title: Text(AppStrings.current.text('treat_as_recurring_89b369')),
                 onTap: () async {
                   await ref
                       .read(monthlyPlanMemoryProvider.notifier)
@@ -639,7 +638,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.looks_one_outlined),
-                title: const Text('Treat as one-time'),
+                title: Text(AppStrings.current.text('treat_as_one_time_9e153d')),
                 onTap: () async {
                   await ref
                       .read(budgetPlanPreferencesProvider.notifier)
@@ -655,7 +654,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.restart_alt_rounded),
-                  title: const Text('Use learned amount again'),
+                  title: Text(AppStrings.current.text('use_learned_amount_again_38db2c')),
                   onTap: () async {
                     await ref
                         .read(budgetPlanPreferencesProvider.notifier)
@@ -734,10 +733,10 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: Text(
-                  '${item.category} · ${item.frequency} log${item.frequency == 1 ? '' : 's'}',
+                  AppStrings.current.text('log_301699', {'p0': item.category, 'p1': item.frequency, 'p2': item.frequency == 1 ? '' : 's'}),
                 ),
                 trailing: PopupMenuButton<String>(
-                  tooltip: 'Set future behavior',
+                  tooltip: AppStrings.current.text('set_future_behavior_638001'),
                   onSelected: (value) async {
                     final recurring = value == 'recurring';
                     await ref
@@ -750,14 +749,14 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
                       Navigator.pop(sheetContext);
                     }
                   },
-                  itemBuilder: (_) => const [
+                  itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'one_time',
-                      child: Text('One time'),
+                      child: Text(AppStrings.current.text('one_time_6fea9e')),
                     ),
                     PopupMenuItem(
                       value: 'recurring',
-                      child: Text('Recurring'),
+                      child: Text(AppStrings.current.text('recurring_349f0e')),
                     ),
                   ],
                 ),
@@ -775,13 +774,14 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text(message),
+          content: Text(AppStrings.current.display(message)),
         ),
       );
   }
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final pendingAction = ref.watch(appActionProvider);
     if (pendingAction != null &&
         (pendingAction.action == AppActionType.openMonthlyPlan ||
@@ -854,7 +854,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
           color: primaryColor,
           listening: _isListening,
           processing: _processingCommand,
-          assistantMessage: _assistantMessage,
+          assistantMessage: _assistantMessages?.map(AppStrings.current.display).join(' '),
           onSubmit: _processBudgetCommand,
           onVoiceTap: _toggleVoice,
         ),
@@ -864,7 +864,7 @@ class _BudgetPlannerScreenState extends ConsumerState<BudgetPlannerScreen> {
           trailing: plan.expectedItems.isEmpty
               ? null
               : Text(
-                  '${plan.handledCount}/${plan.expectedItems.length} handled',
+                  AppStrings.current.text('handled_fe83b2', {'p0': plan.handledCount, 'p1': plan.expectedItems.length}),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
         ),
@@ -956,6 +956,7 @@ class _PlanHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final negative = freeAfterPlan != null && freeAfterPlan! < 0;
     return Container(
       padding: const EdgeInsets.all(18),
@@ -971,7 +972,7 @@ class _PlanHeroCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Recommended budget',
+                  AppStrings.current.text('recommended_budget_37d332'),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
@@ -990,7 +991,7 @@ class _PlanHeroCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Saved Rs. ${savedBudget!.toStringAsFixed(0)}',
+                    AppStrings.current.text('saved_rs_25fe8b', {'p0': savedBudget!.toStringAsFixed(0)}),
                     style: const TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w700,
@@ -1010,7 +1011,7 @@ class _PlanHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Built from recent recurring spending and your corrections.',
+            AppStrings.current.text('built_from_recent_recurring_spending_and_your_co_848382'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
@@ -1060,7 +1061,7 @@ class _PlanHeroCard extends StatelessWidget {
               ),
               icon: const Icon(Icons.auto_awesome_rounded, size: 19),
               label: Text(
-                saving ? 'Saving…' : 'Use this plan',
+                saving ? AppStrings.current.text('saving_56a228') : AppStrings.current.text('use_this_plan_c42be4'),
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
@@ -1086,6 +1087,7 @@ class _MetricChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final colors = Theme.of(context).colorScheme;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
@@ -1102,7 +1104,7 @@ class _MetricChip extends StatelessWidget {
           TextSpan(
             children: [
               TextSpan(
-                text: '$label  ',
+                text: '${AppStrings.current.display(label)}  ',
                 style: TextStyle(
                   color: emphasis
                       ? colors.onErrorContainer
@@ -1112,7 +1114,7 @@ class _MetricChip extends StatelessWidget {
                 ),
               ),
               TextSpan(
-                text: value,
+                text: AppStrings.current.display(value),
                 style: TextStyle(
                   color: emphasis
                       ? colors.onErrorContainer
@@ -1150,6 +1152,7 @@ class _SmartPlanCommandBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return Card(
       elevation: 0,
       child: Padding(
@@ -1165,15 +1168,15 @@ class _SmartPlanCommandBar extends StatelessWidget {
                     controller: controller,
                     textInputAction: TextInputAction.send,
                     onSubmitted: processing ? null : onSubmit,
-                    decoration: const InputDecoration(
-                      hintText: 'e.g. save 5k · petrol max 4k',
+                    decoration: InputDecoration(
+                      hintText: AppStrings.current.text('e_g_save_5k_petrol_max_4k_647139'),
                       border: InputBorder.none,
                       isDense: true,
                     ),
                   ),
                 ),
                 IconButton(
-                  tooltip: listening ? 'Stop listening' : 'Speak',
+                  tooltip: listening ? AppStrings.current.text('stop_listening_e13421') : AppStrings.current.text('speak_7a8171'),
                   onPressed: processing ? null : onVoiceTap,
                   icon: Icon(
                     listening
@@ -1183,7 +1186,7 @@ class _SmartPlanCommandBar extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Apply',
+                  tooltip: AppStrings.current.text('apply_cfea41'),
                   onPressed: processing
                       ? null
                       : () => onSubmit(controller.text),
@@ -1201,7 +1204,7 @@ class _SmartPlanCommandBar extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  assistantMessage!,
+                  AppStrings.current.display(assistantMessage!),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -1226,11 +1229,12 @@ class _CompactSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return Row(
       children: [
         Expanded(
           child: Text(
-            title,
+            AppStrings.current.display(title),
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,
@@ -1260,6 +1264,7 @@ class _ExpectedSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     if (items.isEmpty) {
       return const _CompactEmptyCard(
         icon: Icons.event_note_outlined,
@@ -1286,7 +1291,7 @@ class _ExpectedSummaryCard extends StatelessWidget {
             const Divider(height: 1),
             TextButton(
               onPressed: onSeeAll,
-              child: const Text('See all expected items'),
+              child: Text(AppStrings.current.text('see_all_expected_items_48ada0')),
             ),
           ],
         ],
@@ -1310,6 +1315,7 @@ class _ExpectedRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final suggestion = item.suggestion;
     final timing = suggestion.expectedDay == null
         ? null
@@ -1339,10 +1345,10 @@ class _ExpectedRow extends StatelessWidget {
       ),
       subtitle: Text(
         item.status == MonthlyPlanItemStatus.handled
-            ? 'Handled · Rs. ${item.actualAmount.toStringAsFixed(0)}'
+            ? AppStrings.current.text('handled_rs_6f90cf', {'p0': item.actualAmount.toStringAsFixed(0)})
             : item.status == MonthlyPlanItemStatus.inProgress
-                ? 'Rs. ${item.actualAmount.toStringAsFixed(0)} so far'
-                : timing ?? _confidenceLabel(suggestion.confidenceTier),
+                ? AppStrings.current.text('rs_so_far_a82197', {'p0': item.actualAmount.toStringAsFixed(0)})
+                : AppStrings.current.display(timing ?? _confidenceLabel(suggestion.confidenceTier)),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -1376,6 +1382,7 @@ class _UnplannedSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     if (items.isEmpty) {
       return const _CompactEmptyCard(
         icon: Icons.check_circle_outline_rounded,
@@ -1395,9 +1402,9 @@ class _UnplannedSummaryCard extends StatelessWidget {
               children: [
                 const Icon(Icons.new_releases_outlined, size: 21),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Unplanned spending',
+                    AppStrings.current.text('unplanned_spending_f858c9'),
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
@@ -1437,8 +1444,8 @@ class _UnplannedSummaryCard extends StatelessWidget {
                 onPressed: onReview,
                 child: Text(
                   items.length > 3
-                      ? 'Review all ${items.length}'
-                      : 'Review',
+                      ? AppStrings.current.text('review_all_3b6f3c', {'p0': items.length})
+                      : AppStrings.current.text('review_e29a79'),
                 ),
               ),
             ),
@@ -1464,19 +1471,20 @@ class _BufferRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return Card(
       elevation: 0,
       child: ListTile(
         onTap: onTap,
         leading: const Icon(Icons.shield_outlined),
-        title: const Text(
-          'Safety buffer',
+        title: Text(
+          AppStrings.current.text('safety_buffer_5e46e6'),
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         subtitle: Text(
           isCustom
-              ? 'Custom · recommended Rs. ${recommended.toStringAsFixed(0)}'
-              : 'Recommended from recent unexpected spending',
+              ? AppStrings.current.text('custom_recommended_rs_4b325e', {'p0': recommended.toStringAsFixed(0)})
+              : AppStrings.current.text('recommended_from_recent_unexpected_spending_ff0129'),
         ),
         trailing: Text(
           'Rs. ${amount.toStringAsFixed(0)}',
@@ -1494,6 +1502,7 @@ class _InsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final colors = Theme.of(context).colorScheme;
     IconData icon;
     Color color;
@@ -1533,12 +1542,12 @@ class _InsightCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  insight.title,
+                  AppStrings.current.display(insight.title),
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  insight.message,
+                  AppStrings.current.display(insight.message),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -1561,6 +1570,7 @@ class _CompactEmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return Card(
       elevation: 0,
       child: Padding(
@@ -1574,7 +1584,7 @@ class _CompactEmptyCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                text,
+                AppStrings.current.display(text),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),

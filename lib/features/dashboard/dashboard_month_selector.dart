@@ -8,7 +8,7 @@ extension _DashboardMonthMethods on _HomeScreenState {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Select month and year'),
+          title: Text(AppStrings.current.text('select_month_and_year_5391d2')),
           content: SizedBox(
             width: 320,
             child: Column(
@@ -16,8 +16,8 @@ extension _DashboardMonthMethods on _HomeScreenState {
               children: [
                 DropdownButtonFormField<int>(
                   initialValue: selectedYear,
-                  decoration: const InputDecoration(
-                    labelText: 'Year',
+                  decoration: InputDecoration(
+                    labelText: AppStrings.current.text('year_879e32'),
                     prefixIcon: Icon(Icons.calendar_today_rounded),
                   ),
                   items: [
@@ -57,7 +57,7 @@ extension _DashboardMonthMethods on _HomeScreenState {
                         dialogContext,
                         DateTime(selectedYear, month, 1),
                       ),
-                      child: Text(DateFormat.MMM().format(DateTime(2000, month))),
+                      child: Text(AppStrings.current.dateLabel(DateFormat.MMM().format(DateTime(2000, month)))),
                     );
                   },
                 ),
@@ -67,7 +67,7 @@ extension _DashboardMonthMethods on _HomeScreenState {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+              child: Text(AppStrings.current.text('cancel_77dfd2')),
             ),
           ],
         ),
@@ -93,7 +93,7 @@ extension _DashboardMonthMethods on _HomeScreenState {
             onPressed: _pickBudgetMonth,
             icon: const Icon(Icons.calendar_month_rounded, size: 18),
             label: Text(
-              DateFormat.yMMMM().format(_focusedMonth),
+              AppStrings.current.dateLabel(DateFormat.yMMMM().format(_focusedMonth)),
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,

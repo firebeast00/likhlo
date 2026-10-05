@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import 'primary_ledger_tabs.dart';
@@ -25,6 +26,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return AppBar(
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -33,7 +35,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
               style: const TextStyle(fontSize: 15),
               decoration: InputDecoration(
                 border: InputBorder.none,
-                hintText: 'Search transactions...',
+                hintText: AppStrings.current.text('search_transactions_65da39'),
                 hintStyle: TextStyle(
                   color: Colors.grey.shade400,
                   fontSize: 14,
@@ -42,7 +44,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
               onChanged: onSearchChanged,
             )
           : Text(
-              activeTab == PrimaryLedgerTab.main ? 'Main' : 'Udhar',
+              activeTab == PrimaryLedgerTab.main ? AppStrings.current.text('main_62bce9') : AppStrings.current.text('udhar_3b8cbd'),
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 17,
@@ -51,7 +53,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: true,
       leading: Builder(
         builder: (context) => IconButton(
-          tooltip: 'Open sidebar',
+          tooltip: AppStrings.current.text('open_sidebar_24d219'),
           icon: const Icon(Icons.view_sidebar_outlined, size: 24),
           onPressed: () {
             onBeforeOpenDrawer();
@@ -62,7 +64,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       actions: [
         if (activeTab == PrimaryLedgerTab.main && !isSearching)
           IconButton(
-            tooltip: 'Wallets',
+            tooltip: AppStrings.current.text('wallets_98d5a1'),
             icon: const Icon(
               Icons.account_balance_wallet_outlined,
               size: 22,
@@ -71,7 +73,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         if (activeTab == PrimaryLedgerTab.main)
           IconButton(
-            tooltip: isSearching ? 'Close search' : 'Search',
+            tooltip: isSearching ? AppStrings.current.text('close_search_0906f9') : AppStrings.current.text('search_bce064'),
             icon: Icon(
               isSearching ? Icons.close_rounded : Icons.search_rounded,
               size: 22,

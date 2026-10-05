@@ -1,0 +1,48 @@
+name: Language and ledger regression
+on:
+  push:
+    branches: [codex/english-roman-urdu]
+  pull_request:
+    paths: ['lib/**', 'test/**', 'tool/**', '.github/workflows/language-regression.yml']
+concurrency:
+  group: language-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: python3 tool/generate_app_catalog.py --check
+      - id: dependencies
+        run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - if: ${{ always() && steps.dependencies.outcome == 'success' }}
+        name: Compare full suite with pre-language baseline
+        shell: bash
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/language-baseline" 0b7849e9a55bca3968dfa25b19a58f32a8811195
+          cd "$RUNNER_TEMP/language-baseline"
+          flutter pub get
+          set +e
+          flutter test --reporter json > "$RUNNER_TEMP/baseline-tests.json"
+          baseline_status=$?
+          cd "$GITHUB_WORKSPACE"
+          flutter test --reporter json > "$RUNNER_TEMP/head-tests.json"
+          head_status=$?
+          set -e
+          echo "Full suite exit codes: baseline=$baseline_status head=$head_status"
+          python3 tool/compare_flutter_tests.py "$RUNNER_TEMP/baseline-tests.json" "$RUNNER_TEMP/head-tests.json"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: language-test-reports
+          path: ${{ runner.temp }}/*-tests.json

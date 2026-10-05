@@ -19,8 +19,8 @@ extension _DashboardNotificationMethods on _HomeScreenState {
     final text = stored is Map ? stored['text']?.toString().trim() : null;
     if (text == null || text.isEmpty) {
       _showTransactionInfo(
-        'There is no notification entry waiting for review.',
-        title: 'Nothing to review',
+        AppMessage('there_is_no_notification_entry_waiting_for_revie_4ed463'),
+        title: AppMessage('nothing_to_review_9ad647'),
       );
       return;
     }
@@ -54,12 +54,12 @@ extension _DashboardNotificationMethods on _HomeScreenState {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Voice entry',
+              AppStrings.current.text('voice_entry_db16f4'),
               style: Theme.of(sheetContext).textTheme.titleLarge,
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Speak one complete expense, income, or transfer. A failed attempt is discarded so the next command starts clean.',
+            Text(
+              AppStrings.current.text('speak_one_complete_expense_income_or_transfer_a__6d039c'),
             ),
             const SizedBox(height: 16),
             ValueListenableBuilder<TextEditingValue>(
@@ -69,7 +69,7 @@ extension _DashboardNotificationMethods on _HomeScreenState {
                 minLines: 2,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  labelText: _isListening ? 'Listening…' : 'Voice transcript',
+                  labelText: _isListening ? AppStrings.current.text('listening_6c19a4') : AppStrings.current.text('voice_transcript_15df98'),
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -81,14 +81,14 @@ extension _DashboardNotificationMethods on _HomeScreenState {
                   child: OutlinedButton.icon(
                     onPressed: _listenForExpense,
                     icon: const Icon(Icons.mic_rounded),
-                    label: const Text('Speak'),
+                    label: Text(AppStrings.current.text('speak_7a8171')),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
                     onPressed: () => Navigator.of(sheetContext).pop(),
-                    child: const Text('Done'),
+                    child: Text(AppStrings.current.text('done_e9b450')),
                   ),
                 ),
               ],

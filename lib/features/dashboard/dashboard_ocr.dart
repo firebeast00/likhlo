@@ -17,24 +17,24 @@ extension _DashboardOcrMethods on _HomeScreenState {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('Add Receipt', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(AppStrings.current.text('add_receipt_943857'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded),
-                title: const Text('Take Photo'),
+                title: Text(AppStrings.current.text('take_photo_e9765b')),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded),
-                title: const Text('Choose from Gallery'),
+                title: Text(AppStrings.current.text('choose_from_gallery_5b17ab')),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
                 child: Text(
-                  'For best results, keep the full receipt flat, fill the frame, avoid shadows, and make sure prices are sharp.',
+                  AppStrings.current.text('for_best_results_keep_the_full_receipt_flat_fill_b7a128'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
@@ -80,7 +80,7 @@ extension _DashboardOcrMethods on _HomeScreenState {
     } catch (e) {
       debugPrint("Scanner Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Camera or scanner error occurred.')),
+        SnackBar(content: Text(AppStrings.current.text('camera_or_scanner_error_occurred_4a27da'))),
       );
     } finally {
       if (mounted) _setScanningReceipt(false);
@@ -103,8 +103,8 @@ extension _DashboardOcrMethods on _HomeScreenState {
   Future<void> _reviewScannedReceipt(ScannedReceipt receipt) async {
     if (receipt.total <= 0 && receipt.items.isEmpty) {
       _showTransactionError(
-        'No reliable receipt items or total were detected. Retake the photo with the full receipt visible and good lighting.',
-        title: 'Receipt details not found',
+        AppMessage('no_reliable_receipt_items_or_total_were_detected_f8eee3'),
+        title: AppMessage('receipt_details_not_found_d29e07'),
       );
       return;
     }
@@ -116,8 +116,8 @@ extension _DashboardOcrMethods on _HomeScreenState {
     );
     if (confirmed == true && mounted) {
       _showExpenseMessage(
-        'The reviewed receipt was added to your records.',
-        title: 'Receipt saved',
+        AppMessage('the_reviewed_receipt_was_added_to_your_records_047d90'),
+        title: AppMessage('receipt_saved_f4656f'),
       );
     }
   }

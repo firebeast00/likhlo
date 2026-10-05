@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../features/budget_predictor/budget_planner_screen.dart';
@@ -78,6 +79,7 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return PopScope(
       canPop: systemBackDestination(currentSection) == null,
       onPopInvokedWithResult: (didPop, result) {
@@ -107,7 +109,7 @@ class AppShell extends StatelessWidget {
                 ),
                 centerTitle: true,
                 leading: IconButton(
-                  tooltip: 'Back to dashboard',
+                  tooltip: AppStrings.current.text('back_to_dashboard_b3963d'),
                   icon: const Icon(Icons.arrow_back_rounded, size: 24),
                   onPressed: () => onSectionChanged(AppSection.dashboard),
                 ),

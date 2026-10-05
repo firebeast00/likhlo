@@ -184,6 +184,7 @@ class NotificationEntryService {
     }
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
     if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(WalletAdapter());
+    if (!Hive.isBoxOpen('settings')) await Hive.openBox('settings');
     if (!Hive.isBoxOpen('preferences')) await Hive.openBox('preferences');
     if (!Hive.isBoxOpen('expenses')) {
       await Hive.openBox<Expense>('expenses');

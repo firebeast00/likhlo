@@ -26,7 +26,7 @@ extension _DashboardCategoryMethods on _HomeScreenState {
           children: [
             Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(Icons.category_rounded, color: primaryColor, size: 20)),
             const SizedBox(width: 12),
-            const Expanded(child: Text("New Category", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+            Expanded(child: Text(AppStrings.current.text('new_category_309531'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
           ],
         ),
         content: _buildModernInput(catCtrl, "Category Name", Icons.new_label_rounded, primaryColor),
@@ -34,7 +34,7 @@ extension _DashboardCategoryMethods on _HomeScreenState {
         actions: [
           Row(
             children: [
-              Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey)))),
+              Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppStrings.current.text('cancel_77dfd2'), style: TextStyle(color: Colors.grey)))),
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
@@ -46,8 +46,8 @@ extension _DashboardCategoryMethods on _HomeScreenState {
                           .addCategory(catCtrl.text.trim());
                       if (!added) {
                         _showTransactionError(
-                          'Choose a different name for this category.',
-                          title: 'Category already exists',
+                          AppMessage('choose_a_different_name_for_this_category_46fbd6'),
+                          title: AppMessage('category_already_exists_8ab7fa'),
                         );
                         return;
                       }
@@ -59,7 +59,7 @@ extension _DashboardCategoryMethods on _HomeScreenState {
                       });
                     }
                   },
-                  child: const Text("Save"),
+                  child: Text(AppStrings.current.text('save_efc007')),
                 ),
               ),
             ],
@@ -75,7 +75,7 @@ extension _DashboardCategoryMethods on _HomeScreenState {
     final categories = ref.read(categoryProvider);
 
     if (categories.length <= 1) {
-      _showTransactionError('Keep at least one expense category.');
+      _showTransactionError(AppMessage('keep_at_least_one_expense_category_a44f7a'));
       return;
     }
 
@@ -83,18 +83,18 @@ extension _DashboardCategoryMethods on _HomeScreenState {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
-          'Delete Category?',
+        title: Text(
+          AppStrings.current.text('delete_category_61aa7c'),
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         content: Text(
-          "Delete '$category'? Existing transactions will remain unchanged.",
+          AppStrings.current.text('delete_existing_transactions_will_remain_unchang_da852e', {'p0': category}),
           style: const TextStyle(fontSize: 13, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppStrings.current.text('cancel_77dfd2')),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -102,7 +102,7 @@ extension _DashboardCategoryMethods on _HomeScreenState {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
+            child: Text(AppStrings.current.text('delete_f6fdbe')),
           ),
         ],
       ),
@@ -116,8 +116,8 @@ extension _DashboardCategoryMethods on _HomeScreenState {
       _categorySelectionNotifier.value = 'All';
     }
     _showDeletionMessage(
-      "Category '$category' was deleted.",
-      title: 'Category deleted',
+      AppMessage('category_was_deleted_39d1c3', {'p0': category}),
+      title: AppMessage('category_deleted_5e23de'),
     );
   }
 

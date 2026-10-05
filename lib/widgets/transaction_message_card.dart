@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 enum TransactionMessageTone {
@@ -31,6 +32,7 @@ class TransactionMessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -176,7 +178,7 @@ class TransactionMessageCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   IconButton(
                     visualDensity: VisualDensity.compact,
-                    tooltip: 'Dismiss message',
+                    tooltip: AppStrings.current.text('dismiss_message_98f3b0'),
                     onPressed: onDismiss,
                     icon: Icon(
                       Icons.close_rounded,

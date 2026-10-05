@@ -22,8 +22,8 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
-        'Create a wallet before selecting a Smart Entry default.',
-        title: 'No wallets',
+        AppMessage('create_a_wallet_before_selecting_a_smart_entry_d_d0d3ec'),
+        title: AppMessage('no_wallets_afdf07'),
       );
       return;
     }
@@ -42,12 +42,12 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Default Smart Entry wallet',
+                    AppStrings.current.text('default_smart_entry_wallet_a6ad73'),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -72,12 +72,12 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                               .primary,
                         ),
                       ),
-                      title: const Text(
-                        'Automatic',
+                      title: Text(
+                        AppStrings.current.text('automatic_ac9041'),
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      subtitle: const Text(
-                        'Use Cash first, then JazzCash',
+                      subtitle: Text(
+                        AppStrings.current.text('use_cash_first_then_jazzcash_28d262'),
                       ),
                       trailing: selectedId == null
                           ? const Icon(Icons.check_circle_rounded)
@@ -111,7 +111,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                           ),
                         ),
                         subtitle: Text(
-                          '${wallet.isBackup ? 'Reserve wallet' : 'Wallet'} · Rs. ${walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}',
+                          AppStrings.current.text('rs_be0230', {'p0': wallet.isBackup ? 'Reserve wallet' : 'Wallet', 'p1': walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}),
                         ),
                         trailing: selectedId == wallet.id
                             ? const Icon(Icons.check_circle_rounded)
@@ -183,8 +183,8 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
-        'Create a wallet before choosing daily wallets.',
-        title: 'No wallets',
+        AppMessage('create_a_wallet_before_choosing_daily_wallets_b0193d'),
+        title: AppMessage('no_wallets_afdf07'),
       );
       return;
     }
@@ -212,12 +212,12 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                     child: Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Daily wallets',
+                                AppStrings.current.text('daily_wallets_5cc919'),
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
@@ -225,7 +225,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                               ),
                               SizedBox(height: 3),
                               Text(
-                                'Choose up to 4 wallets for quick Home tracking.',
+                                AppStrings.current.text('choose_up_to_4_wallets_for_quick_home_tracking_668cf2'),
                                 style: TextStyle(
                                   color: Colors.grey,
                                   fontSize: 12,
@@ -235,7 +235,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                           ),
                         ),
                         Text(
-                          '${selectedIds.length}/4',
+                          AppStrings.current.text('4_388ab6', {'p0': selectedIds.length}),
                           style: TextStyle(
                             color: Theme.of(sheetContext).colorScheme.primary,
                             fontWeight: FontWeight.w800,
@@ -287,7 +287,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                             ),
                           ),
                           subtitle: Text(
-                            '${wallet.isBackup ? 'Reserve wallet' : 'Wallet'} · Rs. ${balance.toStringAsFixed(0)}',
+                            AppStrings.current.text('rs_be0230', {'p0': wallet.isBackup ? 'Reserve wallet' : 'Wallet', 'p1': balance.toStringAsFixed(0)}),
                           ),
                           controlAffinity: ListTileControlAffinity.trailing,
                         );
@@ -306,7 +306,7 @@ extension _DashboardWalletActionMethods on _HomeScreenState {
                           selectedIds.toList(growable: false),
                         ),
                         icon: const Icon(Icons.check_rounded),
-                        label: const Text('Save daily wallets'),
+                        label: Text(AppStrings.current.text('save_daily_wallets_316059')),
                       ),
                     ),
                   ),

@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -87,6 +88,7 @@ class _PrimaryLedgerTabsState extends State<PrimaryLedgerTabs> {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final selected = widget.controller.selected;
     final colors = Theme.of(context).colorScheme;
     return Column(
@@ -95,15 +97,15 @@ class _PrimaryLedgerTabsState extends State<PrimaryLedgerTabs> {
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
           child: SegmentedButton<PrimaryLedgerTab>(
             showSelectedIcon: false,
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: PrimaryLedgerTab.main,
-                label: Text('Main'),
+                label: Text(AppStrings.current.text('main_62bce9')),
                 icon: Icon(Icons.home_outlined, size: 18),
               ),
               ButtonSegment(
                 value: PrimaryLedgerTab.udhar,
-                label: Text('Udhar'),
+                label: Text(AppStrings.current.text('udhar_3b8cbd')),
                 icon: Icon(Icons.handshake_outlined, size: 18),
               ),
             ],
@@ -170,6 +172,7 @@ class _LazyUdharTabState extends State<_LazyUdharTab> {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return FutureBuilder<void>(
       future: _ready,
       builder: (context, snapshot) {
@@ -185,11 +188,11 @@ class _LazyUdharTabState extends State<_LazyUdharTab> {
                 children: [
                   const Icon(Icons.error_outline_rounded, size: 42),
                   const SizedBox(height: 12),
-                  const Text('Udhar records could not be opened.'),
+                  Text(AppStrings.current.text('udhar_records_could_not_be_opened_2a95a2')),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => setState(() => _ready = _openBox()),
-                    child: const Text('Try again'),
+                    child: Text(AppStrings.current.text('try_again_042c86')),
                   ),
                 ],
               ),

@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -91,13 +92,14 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     if (_scanError != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Receipt scan')),
+        appBar: AppBar(title: Text(AppStrings.current.text('receipt_scan_706316'))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(_scanError!, textAlign: TextAlign.center),
+            child: Text(AppStrings.current.display(_scanError!), textAlign: TextAlign.center),
           ),
         ),
       );
@@ -112,7 +114,7 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Edit Selection'),
+        title: Text(AppStrings.current.text('edit_selection_f1a66e')),
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
       ),
@@ -126,7 +128,7 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.teal.withOpacity(0.5)),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(
                   Icons.auto_awesome_rounded,
@@ -136,7 +138,7 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Smart selection applied! Tap any box to manually add missed items or remove unwanted text.',
+                    AppStrings.current.text('smart_selection_applied_tap_any_box_to_manually__362bef'),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 13,
@@ -216,7 +218,7 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
                 color: Colors.white,
               ),
               label: Text(
-                'Continue (${_selectedLines.length})',
+                AppStrings.current.text('continue_d65c29', {'p0': _selectedLines.length}),
                 style: const TextStyle(color: Colors.white),
               ),
             )

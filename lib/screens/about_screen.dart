@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 class AboutScreen extends StatelessWidget {
@@ -5,6 +6,7 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).primaryColor;
     final currentYear = DateTime.now().year;
@@ -36,7 +38,7 @@ class AboutScreen extends StatelessWidget {
 
             // --- 2. APP IDENTITY ---
             Text(
-              "Likhlo",
+              AppStrings.current.text('likhlo_6ef8c8'),
               style: TextStyle(
                   fontSize: 34,
                   fontWeight: FontWeight.w900,
@@ -50,7 +52,7 @@ class AboutScreen extends StatelessWidget {
                   color: primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12)),
               child: Text(
-                "Version 2.5.0 (Stable)",
+                AppStrings.current.text('version_2_5_0_stable_5ceaa9'),
                 style: TextStyle(
                     fontSize: 12,
                     color: primary,
@@ -86,18 +88,18 @@ class AboutScreen extends StatelessWidget {
                             color: Colors.white, size: 24),
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("Lead Developer",
+                            Text(AppStrings.current.text('lead_developer_f82e5e'),
                                 style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: 0.5)),
                             SizedBox(height: 4),
-                            Text("Jawad Rajper",
+                            Text(AppStrings.current.text('jawad_rajper_bb85e4'),
                                 style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 20,
@@ -108,8 +110,8 @@ class AboutScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    "Full-Stack Developer • BSIT, SBBU",
+                  Text(
+                    AppStrings.current.text('full_stack_developer_bsit_sbbu_ef83d3'),
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -117,7 +119,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Engineered as a comprehensive final year project to solve real-world student financial management challenges.",
+                    AppStrings.current.text('engineered_as_a_comprehensive_final_year_project_0e4603'),
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 13,
@@ -132,7 +134,7 @@ class AboutScreen extends StatelessWidget {
                       color: Colors.black.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Column(
+                    child: Column(
                       children: [
                         Row(
                           children: [
@@ -140,7 +142,7 @@ class AboutScreen extends StatelessWidget {
                                 color: Colors.white70, size: 16),
                             SizedBox(width: 12),
                             Expanded(
-                                child: Text("jawadrajper5001@gmail.com",
+                                child: Text(AppStrings.current.text('jawadrajper5001_gmail_com_2e3527'),
                                     style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 13,
@@ -187,9 +189,9 @@ class AboutScreen extends StatelessWidget {
                     context: context,
                     icon: Icons.rocket_launch_rounded,
                     iconColor: Colors.orange,
-                    title: "Our Mission",
+                    title: AppStrings.current.text('our_mission_e36a91'),
                     subtitle:
-                        "Empowering students to track pocket money, manage hostel khata, and handle Udhaar with AI-driven insights.",
+                        AppStrings.current.text('empowering_students_to_track_pocket_money_manage_b04d12'),
                   ),
                   Divider(
                       height: 1,
@@ -201,9 +203,9 @@ class AboutScreen extends StatelessWidget {
                     context: context,
                     icon: Icons.shield_rounded,
                     iconColor: Colors.green,
-                    title: "Privacy First",
+                    title: AppStrings.current.text('privacy_first_b8351d'),
                     subtitle:
-                        "All your financial data is stored securely and locally on your device using Hive.",
+                        AppStrings.current.text('all_your_financial_data_is_stored_securely_and_l_f4ef75'),
                   ),
                   Divider(
                       height: 1,
@@ -215,9 +217,9 @@ class AboutScreen extends StatelessWidget {
                     context: context,
                     icon: Icons.code_rounded,
                     iconColor: Colors.blue,
-                    title: "Architecture",
+                    title: AppStrings.current.text('architecture_b040b4'),
                     subtitle:
-                        "Built with Flutter, Riverpod, Local NLP, and Material 3 Design.",
+                        AppStrings.current.text('built_with_flutter_riverpod_local_nlp_and_materi_36cf20'),
                   ),
                 ],
               ),
@@ -227,13 +229,13 @@ class AboutScreen extends StatelessWidget {
             // --- 5. FOOTER ---
             Icon(Icons.favorite_rounded, color: Colors.red.shade400, size: 24),
             const SizedBox(height: 12),
-            Text("Made with passion in Sindh, Pakistan",
+            Text(AppStrings.current.text('made_with_passion_in_sindh_pakistan_f99d0b'),
                 style: TextStyle(
                     color: Colors.grey.shade500,
                     fontSize: 12,
                     fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text("© $currentYear Likhlo App",
+            Text(AppStrings.current.text('likhlo_app_c9fcc6', {'p0': currentYear}),
                 style: TextStyle(
                     color: Colors.grey.withValues(alpha: 0.5), fontSize: 11)),
             const SizedBox(height: 40),
@@ -270,13 +272,13 @@ class AboutScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 2),
-                Text(title,
+                Text(AppStrings.current.display(title),
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         color: isDark ? Colors.white : Colors.black87)),
                 const SizedBox(height: 6),
-                Text(subtitle,
+                Text(AppStrings.current.display(subtitle),
                     style: TextStyle(
                         color: Colors.grey.shade500,
                         height: 1.4,

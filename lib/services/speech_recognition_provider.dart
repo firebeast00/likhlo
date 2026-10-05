@@ -39,12 +39,14 @@ class SpeechRecognitionError {
 class SpeechRecognitionListenOptions {
   final String? localeId;
   final bool partialResults;
+  final bool onDevice;
   final Duration pauseFor;
   final Duration listenFor;
 
   const SpeechRecognitionListenOptions({
     this.localeId,
     this.partialResults = true,
+    this.onDevice = false,
     this.pauseFor = const Duration(seconds: 3),
     this.listenFor = const Duration(seconds: 20),
   });
@@ -128,6 +130,7 @@ class DeviceSpeechRecognitionProvider implements SpeechRecognitionProvider {
         localeId: options.localeId,
         cancelOnError: true,
         partialResults: options.partialResults,
+        onDevice: options.onDevice,
         // Smart Entry commands are short sentences rather than isolated
         // search terms. This improves phrase continuity on iOS; Android
         // recognizers currently ignore ListenMode and use pauseFor below.

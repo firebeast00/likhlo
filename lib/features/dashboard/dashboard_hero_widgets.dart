@@ -31,9 +31,9 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Total available',
+                  AppStrings.current.text('total_available_43f41a'),
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
@@ -42,7 +42,7 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
                 ),
               ),
               IconButton(
-                tooltip: 'Choose daily wallets',
+                tooltip: AppStrings.current.text('choose_daily_wallets_dee1a5'),
                 onPressed: _showHomeWalletPicker,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
@@ -76,7 +76,7 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
             children: [
               Expanded(
                 child: _buildBalanceMetric(
-                  label: 'Spent this month',
+                  label: AppStrings.current.text('spent_this_month_2ecf74'),
                   value: 'Rs. ${spent.toStringAsFixed(0)}',
                   onTap: () => _changeSection(AppSection.stats),
                   semanticHint: 'Open monthly statistics',
@@ -85,7 +85,7 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
               const SizedBox(width: 10),
               Expanded(
                 child: _buildBalanceMetric(
-                  label: 'All wallets',
+                  label: AppStrings.current.text('all_wallets_0134de'),
                   value: '${wallets.length}',
                   onTap: _openIncomeAccounts,
                   semanticHint: 'Open wallet accounts',
@@ -96,9 +96,9 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
           const SizedBox(height: 13),
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Daily wallets',
+                  AppStrings.current.text('daily_wallets_5cc919'),
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
@@ -107,7 +107,7 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
                 ),
               ),
               Text(
-                '${visibleWallets.length} of ${wallets.length} shown',
+                AppStrings.current.text('of_shown_54e7c9', {'p0': visibleWallets.length, 'p1': wallets.length}),
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.55),
                   fontSize: 9.5,
@@ -125,8 +125,8 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
                 color: Colors.white.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: const Text(
-                'No wallets yet',
+              child: Text(
+                AppStrings.current.text('no_wallets_yet_f53201'),
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 11,
@@ -181,7 +181,7 @@ extension _DashboardHeroWidgetMethods on _HomeScreenState {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        label,
+                        AppStrings.current.display(label),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

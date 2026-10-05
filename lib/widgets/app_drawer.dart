@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,16 +16,17 @@ class AppDrawer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppStrings.of(context);
     final settings = ref.watch(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
 
     final displayName =
-        settings.userName.isNotEmpty ? settings.userName : 'Welcome!';
+        settings.userName.isNotEmpty ? settings.userName : AppStrings.current.display('Welcome!');
     final displayProfession = settings.userProfession.isNotEmpty
         ? settings.userProfession
-        : 'Student';
+        : AppStrings.current.display('Student');
 
     return SizedBox(
       width: (MediaQuery.sizeOf(context).width * 0.84)
@@ -73,7 +75,7 @@ class AppDrawer extends ConsumerWidget {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          'Explore',
+                          AppStrings.current.text('explore_b965ae'),
                           style: TextStyle(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 11,
@@ -197,7 +199,7 @@ class AppDrawer extends ConsumerWidget {
                   const SizedBox(width: 13),
                   Expanded(
                     child: Text(
-                      title,
+                      AppStrings.current.display(title),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -272,9 +274,9 @@ class AppDrawer extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Dark Mode',
+              AppStrings.current.text('dark_mode_e7f8b9'),
               maxLines: 1,
               style: TextStyle(
                 fontSize: 14,
@@ -317,6 +319,7 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(

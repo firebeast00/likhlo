@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:hive/hive.dart';
 import 'package:student_expense_manager/app/app_action.dart';
+import 'package:student_expense_manager/l10n/app_strings.dart';
 import 'package:student_expense_manager/models/expense_model.dart';
 import 'package:student_expense_manager/services/audio_feedback_service.dart';
 import 'package:student_expense_manager/services/deterministic_feedback_service.dart';
@@ -16,12 +17,20 @@ import 'package:student_expense_manager/services/voice_privacy_service.dart';
 class _RecordingTts extends FlutterTts {
   final spoken = <String>[];
   int stops = 0;
+  bool supportsUrdu = false;
+  final languages = <String>[];
+
+  @override
+  Future<dynamic> isLanguageAvailable(String language) async => supportsUrdu;
+  @override
+  Future<dynamic> isLanguageInstalled(String language) async => supportsUrdu;
   bool failSpeech = false;
   bool failConfiguration = false;
 
   @override
   Future<dynamic> setLanguage(String language) async {
     if (failConfiguration) throw StateError('TTS setup unavailable');
+    languages.add(language);
     return 1;
   }
   @override
@@ -116,6 +125,23 @@ void main() {
     expect(tts.spoken, isEmpty);
   });
 
+  test('disabled feedback and cancellation do not create a native TTS engine', () async {
+    await preferences.put(VoicePrivacySettings.spokenFeedbackKey, false);
+    var created = 0;
+    final lazy = AudioFeedbackService(ttsFactory: () {
+      created++;
+      return _RecordingTts();
+    });
+    await lazy.prepare();
+    await lazy.announceMessage('Dark mode is now enabled.');
+    await lazy.stop();
+    expect(created, 0);
+    await preferences.put(VoicePrivacySettings.spokenFeedbackKey, true);
+    await lazy.announceMessage('Dark mode is now enabled.');
+    expect(created, 1);
+    await lazy.stop();
+  });
+
   test('turning feedback off while audio is preparing prevents speech', () async {
     final audioCheckStarted = Completer<void>();
     final audioCheck = Completer<bool>();
@@ -163,6 +189,77 @@ void main() {
       ),
     );
     expect(tts.spoken, ['Biryani from Jazz Cash, 500 rupees expense saved.']);
+  });
+
+  test('Roman Urdu uses an installed Urdu voice and authored speech', () async {
+    final settings = await Hive.openBox('settings');
+    await settings.put('appLanguage', 'romanUrdu');
+    tts.supportsUrdu = true;
+    await service.announceNotification(
+      title: const AppMessage('rs_spent_3fb486', {
+        'p0': '1000', 'p1': AppLabel('this month'),
+      }),
+      message: const AppMessage('expense_2a0b6d', {
+        'p0': 4, 'p1': AppEnglishSuffix('s'), 'p2': '',
+      }),
+    );
+    expect(tts.languages.last, 'ur-PK');
+    expect(tts.spoken.single, contains('1000 روپے'));
+    expect(tts.spoken.single, contains('اس مہینے'));
+    expect(tts.spoken.single, contains('4 انٹریاں'));
+    await service.stop();
+    await settings.put('appLanguage', 'english');
+    await service.announceMessage('Dark mode is now enabled.');
+    expect(tts.languages.last, 'en-IN');
+    expect(tts.spoken.last, 'Dark mode is now enabled.');
+  });
+
+  test('missing Urdu voice keeps English speech and Roman Urdu written text', () async {
+    final settings = await Hive.openBox('settings');
+    await settings.put('appLanguage', 'romanUrdu');
+    const message = AppMessage('dark_mode_is_now_enabled_d0531a');
+    await service.announceMessage(message);
+    expect(message.render(AppLanguage.romanUrdu), 'Dark mode ab on hai.');
+    expect(tts.languages.last, 'en-IN');
+    expect(tts.spoken, ['Dark mode is now enabled.']);
+  });
+
+  test('a language change cancels a delayed old-language response', () async {
+    final settings = await Hive.openBox('settings');
+    final started = Completer<void>();
+    final audioCheck = Completer<bool>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(audioChannel, (_) {
+      started.complete();
+      return audioCheck.future;
+    });
+    final pending = service.announceMessage('Dark mode is now enabled.');
+    await started.future;
+    await settings.put('appLanguage', 'romanUrdu');
+    audioCheck.complete(false);
+    await pending;
+    expect(tts.spoken, isEmpty);
+  });
+
+  test('voice warm-up cannot change a pending English fallback to Urdu', () async {
+    final settings = await Hive.openBox('settings');
+    await settings.put('appLanguage', 'romanUrdu');
+    tts.supportsUrdu = true;
+    final started = Completer<void>();
+    final audioCheck = Completer<bool>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(audioChannel, (_) {
+      started.complete();
+      return audioCheck.future;
+    });
+    final pending = service.announceMessage('App response.');
+    await started.future;
+    await service.prepare();
+    expect(tts.languages.last, 'ur-PK');
+    audioCheck.complete(false);
+    await pending;
+    expect(tts.languages.last, 'en-IN');
+    expect(tts.spoken, ['App response.']);
   });
 
   test('device TTS errors remain best effort', () async {
