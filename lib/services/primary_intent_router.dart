@@ -16,6 +16,8 @@ enum RoutedSmartAppAction {
   darkModeOn,
   darkModeOff,
   darkModeToggle,
+  themeColorChange,
+  openDrawer,
   openMonthlyPdf,
   scanReceipt,
   openBackup,
@@ -364,6 +366,17 @@ class PrimaryIntentRouter {
 
   RoutedSmartAppAction? _appAction(String input) {
     if (RegExp(
+      r'\b(?:open|show|kholo|dikhao)\s+(?:the\s+)?(?:sidebar|side\s+bar|drawer|menu)|(?:sidebar|side\s+bar|drawer|menu)\s+(?:open|show|kholo|dikhao|karo|kar\s+do)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.openDrawer;
+    }
+
+    if (_isAccentThemeCommand(input)) {
+      return RoutedSmartAppAction.themeColorChange;
+    }
+
+    if (RegExp(
       r'\b(?:clear\s+(?:search|filters?)|reset\s+(?:search|filters?)|remove\s+filters?|show\s+all\s+(?:entries|transactions)|search\s+(?:off|band)|filters?\s+(?:off|band))\b',
       caseSensitive: false,
     ).hasMatch(input)) {
@@ -465,7 +478,7 @@ class PrimaryIntentRouter {
     }
 
     if (RegExp(
-      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme|change\s+theme|theme\s+change\s+karo|theme\s+badlo|mode\s+badlo)\b',
+      r'\b(?:toggle\s+(?:dark\s+)?mode|toggle\s+theme|mode\s+badlo)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.darkModeToggle;
@@ -490,6 +503,35 @@ class PrimaryIntentRouter {
       r'\b(?:this\s+month|current\s+month|last\s+month|previous\s+month|next\s+month|is\s+mahine|iss\s+mahine|pichl(?:a|ay|e)\s+mahina|pichl(?:ay|e)\s+mahine|agla\s+mahina|aglay\s+mahine|january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\b',
       caseSensitive: false,
     ).hasMatch(input);
+  }
+
+  bool _isAccentThemeCommand(String input) {
+    final mentionsTheme = RegExp(
+      r'\b(?:theme(?:\s+color)?|accent(?:\s+color)?)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    if (!mentionsTheme) return false;
+    if (RegExp(
+      r'\b(?:dark|light|night|day|normal\s+mode)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return false;
+    }
+    if (RegExp(
+      r'\b(?:show|view|list|dikhao|dikhado)\s+(?:themes?|theme\s+colors?|accent\s+colors?)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return false;
+    }
+    final hasNamedColor = RegExp(
+      r'\b(?:blue|green|emerald|orange|amber|yellow|red|violet|purple|pink|teal|slate|black)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    final hasChangeIntent = RegExp(
+      r'\b(?:change|changed|badlo|badal|set|use|karo|kar\s+do|random|koi\s+bhi|any|another|new)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    return hasNamedColor || hasChangeIntent;
   }
 
   bool _isBudgetPlannerControl(String input) {
@@ -574,7 +616,9 @@ class PrimaryIntentRouter {
     if (RegExp(r'\b(udhaar|udhar|debt|loan)\b').hasMatch(input)) {
       return 'Udhaar';
     }
-    if (RegExp(r'\b(settings|setting|preferences)\b').hasMatch(input)) {
+    if (RegExp(
+      r'\b(settings|setting|preferences|themes?|theme\s+colors?|accent\s+colors?)\b',
+    ).hasMatch(input)) {
       return 'Settings';
     }
     if (RegExp(r'\babout(?:\s+app)?\b').hasMatch(input)) return 'About';
