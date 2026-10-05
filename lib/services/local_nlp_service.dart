@@ -24,6 +24,17 @@ enum SmartEntryAppAction {
   darkModeToggle,
   openMonthlyPdf,
   scanReceipt,
+  openBackup,
+  persistentQuickEntryOn,
+  persistentQuickEntryOff,
+  smartRemindersOn,
+  smartRemindersOff,
+  spokenConfirmationsOn,
+  spokenConfirmationsOff,
+  smartEntryLanguageRomanUrdu,
+  smartEntryLanguageEnglish,
+  appLockOn,
+  appLockOff,
 }
 
 enum SmartEntryQueryMetric {
@@ -1387,6 +1398,28 @@ class LocalNlpService {
         return SmartEntryAppAction.openMonthlyPdf;
       case RoutedSmartAppAction.scanReceipt:
         return SmartEntryAppAction.scanReceipt;
+      case RoutedSmartAppAction.openBackup:
+        return SmartEntryAppAction.openBackup;
+      case RoutedSmartAppAction.persistentQuickEntryOn:
+        return SmartEntryAppAction.persistentQuickEntryOn;
+      case RoutedSmartAppAction.persistentQuickEntryOff:
+        return SmartEntryAppAction.persistentQuickEntryOff;
+      case RoutedSmartAppAction.smartRemindersOn:
+        return SmartEntryAppAction.smartRemindersOn;
+      case RoutedSmartAppAction.smartRemindersOff:
+        return SmartEntryAppAction.smartRemindersOff;
+      case RoutedSmartAppAction.spokenConfirmationsOn:
+        return SmartEntryAppAction.spokenConfirmationsOn;
+      case RoutedSmartAppAction.spokenConfirmationsOff:
+        return SmartEntryAppAction.spokenConfirmationsOff;
+      case RoutedSmartAppAction.smartEntryLanguageRomanUrdu:
+        return SmartEntryAppAction.smartEntryLanguageRomanUrdu;
+      case RoutedSmartAppAction.smartEntryLanguageEnglish:
+        return SmartEntryAppAction.smartEntryLanguageEnglish;
+      case RoutedSmartAppAction.appLockOn:
+        return SmartEntryAppAction.appLockOn;
+      case RoutedSmartAppAction.appLockOff:
+        return SmartEntryAppAction.appLockOff;
       case null:
         return null;
     }
