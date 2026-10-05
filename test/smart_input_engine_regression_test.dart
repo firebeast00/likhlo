@@ -162,6 +162,7 @@ void main() {
       final cases = [
         'budget 40k rakho',
         '5 hazar save karni hai',
+        'save 5k',
         'petrol max 4000',
         'hostel har month',
         'daily kitna kharch kar sakta hun',
