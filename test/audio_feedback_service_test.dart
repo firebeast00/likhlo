@@ -87,6 +87,25 @@ void main() {
     ]);
   });
 
+  test('notifications read totals and periods from the title as well as body', () async {
+    await service.announceNotification(
+      title: 'Rs. 1000 spent · this month',
+      message: '4 expenses.',
+    );
+    expect(tts.spoken, ['1000 rupees spent, this month. 4 expenses.']);
+  });
+
+  test('information, success and error notification wording can be spoken', () async {
+    for (final title in ['Information', 'Completed', 'Unable to continue']) {
+      await service.announceNotification(title: title, message: 'App response.');
+    }
+    expect(tts.spoken, [
+      'Information. App response.',
+      'Completed. App response.',
+      'Unable to continue. App response.',
+    ]);
+  });
+
   test('disabled feedback, blank messages and silent mode do not speak', () async {
     await preferences.put(VoicePrivacySettings.spokenFeedbackKey, false);
     await service.announceMessage('Dark mode is now enabled.');

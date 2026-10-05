@@ -1357,6 +1357,10 @@ class LocalNlpService {
     return SmartEntryTimeRange.allTime;
   }
 
+  // These words describe a read-only query's scope, never an entry title.
+  // Keep them separate so transaction-addition title extraction is unchanged.
+  static const _queryContextWords = {'hafte', 'mahina', 'per'};
+
   String? _navigationTarget(String input) {
     if (RegExp(r'\b(monthly\s+plan|smart\s+plan|budget\s+plan|budget|mahine\s+ka\s+plan)\b')
         .hasMatch(input)) {
@@ -1623,6 +1627,9 @@ class LocalNlpService {
           .where((word) =>
               word.length >= 4 &&
               !_stopWords.contains(word) &&
+              !((intent == SmartEntryIntent.query ||
+                      intent == SmartEntryIntent.searchEntries) &&
+                  _queryContextWords.contains(word)) &&
               !RegExp(r'^\d').hasMatch(word))
           .toSet()
           .take(8);
@@ -1656,6 +1663,15 @@ class LocalNlpService {
         RegExp('\\b${RegExp.escape(stopWord)}\\b'),
         ' ',
       );
+    }
+    if (intent == SmartEntryIntent.query ||
+        intent == SmartEntryIntent.searchEntries) {
+      for (final word in _queryContextWords) {
+        cleanTitle = cleanTitle.replaceAll(
+          RegExp('\\b${RegExp.escape(word)}\\b'),
+          ' ',
+        );
+      }
     }
 
     cleanTitle = cleanTitle

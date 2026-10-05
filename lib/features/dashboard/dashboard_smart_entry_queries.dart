@@ -116,6 +116,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         _showTransactionInfo(
           'The repeated entry was removed.',
           title: 'Repeat undone',
+          announce: false,
         );
       },
     );
@@ -325,7 +326,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         month: delegatedAction == AppActionType.openMonthlyPdf
             ? resolveMonthlyPdfTargetMonth(command.rawInput)
             : null,
-        spokenFeedback: _isProcessingVoiceCommand,
+        spokenFeedback: true,
       );
       _changeSection(AppSection.settings);
       return;
@@ -443,44 +444,14 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     }
 
     final referencedMonth = _resolveSmartQueryMonth(command.rawInput);
-    var entries = ref
-        .read(expenseProvider)
-        .allExpenses
-        .where((entry) => entry.category != 'Transfer');
-    if (referencedMonth != null) {
-      entries = entries.where(
-        (entry) =>
-            entry.date.year == referencedMonth.year &&
-            entry.date.month == referencedMonth.month,
-      );
-    } else {
-      entries = entries.where(
-        (entry) => matchesSmartEntryTimeRange(
-          entry.date,
-          command.timeRange,
-        ),
-      );
-    }
-    if (mentionedIds.isNotEmpty) {
-      final walletId = mentionedIds.single;
-      entries = entries.where((entry) => entry.walletId == walletId);
-    }
     final hasCategory = command.category != 'General' &&
-        command.confidenceByField['category']! >= 0.8;
-    if (hasCategory) {
-      entries = entries.where((entry) => entry.category == command.category);
-    } else if (metric != SmartEntryQueryMetric.summary) {
-      final title = _smartQueryTitleWithoutMonth(
-        command.title,
-        referencedMonth,
-      );
-      if (title.isNotEmpty) {
-        entries = entries.where(
-              (entry) => entry.title.toLowerCase().contains(title.toLowerCase()),
-        );
-      }
-    }
-    final matching = entries.toList(growable: false);
+        (command.confidenceByField['category'] ?? 0) >= 0.8;
+    final matching = selectSmartEntryQueryEntries(
+      ref.read(expenseProvider).allExpenses,
+      command,
+      referencedMonth: referencedMonth,
+      walletId: mentionedIds.isEmpty ? null : mentionedIds.single,
+    );
     final income = matching
         .where((entry) => entry.type == 'income')
         .fold<double>(0, (sum, entry) => sum + entry.amount);
@@ -712,26 +683,6 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       return DateTime(parsed.year - 1, parsed.month);
     }
     return parsed;
-  }
-
-  String _smartQueryTitleWithoutMonth(
-    String value,
-    DateTime? referencedMonth,
-  ) {
-    var normalized = _smartQueryTitle(value);
-    if (referencedMonth == null || normalized.isEmpty) return normalized;
-    normalized = normalized
-        .replaceAll(
-          RegExp(
-            r'\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\b',
-            caseSensitive: false,
-          ),
-          ' ',
-        )
-        .replaceAll(RegExp(r'\b20\d{2}\b'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    return normalized;
   }
 
   String _smartQueryTitle(String value) {

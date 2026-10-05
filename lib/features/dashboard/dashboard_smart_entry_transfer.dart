@@ -145,6 +145,7 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
         _showTransactionInfo(
           'The transfer was reversed.',
           title: 'Transfer undone',
+          announce: false,
         );
       },
     );

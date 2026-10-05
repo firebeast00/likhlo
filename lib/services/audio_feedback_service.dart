@@ -72,6 +72,20 @@ class AudioFeedbackService {
     );
   }
 
+  /// Reads both parts of an in-app notification. Query totals and periods
+  /// often live in the title, while counts and details live in the body.
+  Future<void> announceNotification({
+    required String title,
+    required String message,
+  }) => announceMessage(
+    '${title.trim()}. ${message.trim()}'
+        .replaceAll(' · ', ', ')
+        .replaceAllMapped(
+          RegExp(r'\bRs\.?\s*([0-9,]+(?:\.[0-9]+)?)', caseSensitive: false),
+          (match) => '${match.group(1)} rupees',
+        ),
+  );
+
   /// Cancels delayed feedback as well as speech already playing.
   Future<void> stop() async {
     ++_latestRequest;
