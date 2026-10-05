@@ -25,6 +25,7 @@ import '../features/smart_entry/smart_entry_batch_controller.dart';
 import '../features/smart_entry/transaction_batch_draft.dart';
 import 'batch_transaction_review_screen.dart';
 import '../features/voice/voice_entry_controller.dart';
+import '../features/voice/speech_network_recovery.dart';
 import '../features/feedback/feedback_coordinator.dart';
 import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
@@ -78,4 +79,3 @@ class HomeScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
-

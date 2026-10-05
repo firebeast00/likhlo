@@ -23,6 +23,7 @@ import '../services/voice_privacy_service.dart';
 import '../services/audio_feedback_service.dart';
 import '../services/udhar_ledger_link_service.dart';
 import '../widgets/month_selector_control.dart';
+import '../widgets/app_dimmer_slider.dart';
 import 'backup_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -635,12 +636,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Icon(Icons.brightness_7_rounded,
                             size: 18, color: Colors.grey.shade400),
                         Expanded(
-                          child: Slider(
+                          child: AppDimmerSlider(
                             value: settings.brightnessLevel,
-                            min: 0.0,
-                            max: 0.75, // Prevents pitch black screen
-                            activeColor: primaryColor,
-                            inactiveColor: primaryColor.withValues(alpha: 0.2),
+                            color: primaryColor,
+                            label: AppStrings.current.text('screen_dimmer_732fed'),
                             onChanged: (val) => ref
                                 .read(settingsProvider.notifier)
                                 .updateBrightness(val),

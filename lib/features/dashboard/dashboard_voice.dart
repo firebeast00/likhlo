@@ -20,6 +20,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     if (!mounted) return;
     _cancelSpeechTimers();
     _voiceEntry.session.reset();
+    _speechNetworkRecovery.reset();
     _handlingSpeechError = false;
     _restartingSpeech = false;
     _finalizingRecognizerStop = false;
@@ -104,6 +105,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
 
   Future<void> _startSpeechListening() async {
     if (!mounted) return;
+    final attempt = ++_speechAttempt;
     final localeId =
     _speechLocaleCandidates[_speechLocaleCandidateIndex];
     _recognizerReportedListening = false;
@@ -119,11 +121,12 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         options: SpeechRecognitionListenOptions(
           localeId: localeId,
           partialResults: true,
+          onDevice: _speechNetworkRecovery.onDevice,
           pauseFor: VoiceEntryController.pauseWindow,
           listenFor: VoiceEntryController.sessionLimit,
         ),
         onResult: (result) async {
-          if (!mounted) return;
+          if (!mounted || attempt != _speechAttempt) return;
           if (_voiceEntry.session.state != SpeechSessionState.listening &&
               _voiceEntry.session.state != SpeechSessionState.finalizing) {
             return;
@@ -410,8 +413,14 @@ extension _DashboardVoiceMethods on _HomeScreenState {
             normalized.contains('error_language_not_supported');
     final canTryAnotherLocale = languageFailure &&
         _speechLocaleCandidateIndex + 1 < _speechLocaleCandidates.length;
+    final retryOffline = _speechNetworkRecovery.tryOffline(
+      normalized,
+      isCloud: _voiceEntry.speech.isCloud,
+      hasDraft: _voiceEntry.session.latestDraft.isNotEmpty,
+      retryCount: _voiceEntry.session.retryCount,
+    );
     final decision = _voiceEntry.session.onRecognizerError(
-      retryable: recoverableEnd || canTryAnotherLocale,
+      retryable: recoverableEnd || canTryAnotherLocale || retryOffline,
     );
 
     if (decision.action == SpeechSessionAction.retry) {
@@ -545,10 +554,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     // final callback. Give it a chance to arrive. An incomplete transcript is
     // continued in a fresh recognizer cycle rather than promoted to a command.
     if (_finalizingRecognizerStop) return;
+    final attempt = _speechAttempt;
     _finalizingRecognizerStop = true;
     try {
       await Future<void>.delayed(const Duration(milliseconds: 150));
-      if (!mounted || _restartingSpeech) return;
+      if (!mounted || _restartingSpeech || attempt != _speechAttempt) return;
       final transcript = _voiceEntry.session.latestDraft;
       final completeness = _speechCompleteness(transcript);
       if (transcript.isNotEmpty) {

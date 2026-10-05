@@ -16,9 +16,13 @@ class AudioFeedbackService {
   static const MethodChannel _deviceAudioChannel = MethodChannel(
     'com.likhlo/audio_feedback',
   );
-  final FlutterTts _tts;
+  FlutterTts? _ttsInstance;
+  final FlutterTts Function()? _ttsFactory;
+  final bool _usesSharedTts;
+  FlutterTts get _tts => _ttsInstance ??=
+      _ttsFactory?.call() ?? (_sharedTts ??= FlutterTts());
   final DeterministicFeedbackService _messages;
-  static final FlutterTts _sharedTts = FlutterTts();
+  static FlutterTts? _sharedTts;
   static int _latestRequest = 0;
   static FlutterTts? _configuredTts;
   static AppLanguage? _configuredPreference;
@@ -27,9 +31,12 @@ class AudioFeedbackService {
 
   AudioFeedbackService({
     FlutterTts? tts,
+    FlutterTts Function()? ttsFactory,
     DeterministicFeedbackService messages =
         const DeterministicFeedbackService(),
-  }) : _tts = tts ?? _sharedTts,
+  }) : _ttsInstance = tts,
+       _ttsFactory = ttsFactory,
+       _usesSharedTts = tts == null && ttsFactory == null,
        _messages = messages;
 
   Future<void> prepare() async {
@@ -93,7 +100,8 @@ class AudioFeedbackService {
   Future<void> stop() async {
     ++_latestRequest;
     try {
-      if (identical(_configuredTts, _tts)) await _tts.stop();
+      final engine = _ttsInstance ?? (_usesSharedTts ? _sharedTts : null);
+      if (engine != null && identical(_configuredTts, engine)) await engine.stop();
     } catch (error) {
       debugPrint('Spoken confirmation stop unavailable: $error');
     }

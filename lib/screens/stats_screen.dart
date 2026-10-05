@@ -282,22 +282,28 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  AppStrings.current.text('spending_by_category_d4aadf'),
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  'Rs. ${stats.totalSpent.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    color: primaryColor,
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    AppStrings.current.text('spending_by_category_d4aadf'),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                   ),
-                ),
-              ],
+                  Text(
+                    'Rs. ${stats.totalSpent.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: primaryColor,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             Divider(color: Colors.grey.withValues(alpha: 0.15)),

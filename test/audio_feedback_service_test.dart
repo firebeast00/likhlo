@@ -125,6 +125,23 @@ void main() {
     expect(tts.spoken, isEmpty);
   });
 
+  test('disabled feedback and cancellation do not create a native TTS engine', () async {
+    await preferences.put(VoicePrivacySettings.spokenFeedbackKey, false);
+    var created = 0;
+    final lazy = AudioFeedbackService(ttsFactory: () {
+      created++;
+      return _RecordingTts();
+    });
+    await lazy.prepare();
+    await lazy.announceMessage('Dark mode is now enabled.');
+    await lazy.stop();
+    expect(created, 0);
+    await preferences.put(VoicePrivacySettings.spokenFeedbackKey, true);
+    await lazy.announceMessage('Dark mode is now enabled.');
+    expect(created, 1);
+    await lazy.stop();
+  });
+
   test('turning feedback off while audio is preparing prevents speech', () async {
     final audioCheckStarted = Completer<void>();
     final audioCheck = Completer<bool>();
