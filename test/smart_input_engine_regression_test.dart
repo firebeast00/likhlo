@@ -164,6 +164,7 @@ void main() {
         '5 hazar save karni hai',
         'save 5k',
         'petrol max 4000',
+        'shopping kam karo',
         'hostel har month',
         'daily kitna kharch kar sakta hun',
         'can I spend 5000 on shopping',
