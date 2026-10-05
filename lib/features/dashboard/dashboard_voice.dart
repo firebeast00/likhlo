@@ -16,6 +16,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       return;
     }
 
+    await AudioFeedbackService().stop();
+    if (!mounted) return;
     _cancelSpeechTimers();
     _voiceEntry.session.reset();
     _handlingSpeechError = false;

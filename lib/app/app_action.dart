@@ -25,6 +25,7 @@ class AppActionRequest {
   final AppActionType action;
   final DateTime? month;
   final String? text;
+  final bool spokenFeedback;
 
   DateTime? get targetMonth => month;
 
@@ -33,6 +34,7 @@ class AppActionRequest {
     required this.action,
     this.month,
     this.text,
+    this.spokenFeedback = false,
   });
 }
 
@@ -47,6 +49,7 @@ class AppActionController extends Notifier<AppActionRequest?> {
     DateTime? month,
     DateTime? targetMonth,
     String? text,
+    bool spokenFeedback = false,
   }) {
     _nextId++;
     final requestedMonth = month ?? targetMonth;
@@ -57,6 +60,7 @@ class AppActionController extends Notifier<AppActionRequest?> {
           ? null
           : DateTime(requestedMonth.year, requestedMonth.month),
       text: text,
+      spokenFeedback: spokenFeedback,
     );
   }
 

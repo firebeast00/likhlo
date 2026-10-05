@@ -7,7 +7,7 @@ import '../models/expense_model.dart';
 import 'deterministic_feedback_service.dart';
 import 'voice_privacy_service.dart';
 
-/// Plays deterministic confirmations after a ledger commit.
+/// Plays deterministic transaction and app-command feedback.
 ///
 /// Audio is deliberately best-effort: a device TTS error is logged locally
 /// and never changes, rolls back, or delays the committed transaction.
@@ -45,20 +45,46 @@ class AudioFeedbackService {
     required Expense entry,
     Expense? pairedEntry,
   }) async {
+    final message = _messages.message(
+      FinancialFeedbackData(
+        action: action,
+        title: entry.title,
+        amount: entry.amount,
+        source: action == FinancialFeedbackAction.transfer
+            ? _walletLabel(pairedEntry?.title ?? '', 'from')
+            : null,
+        destination: action == FinancialFeedbackAction.transfer
+            ? _walletLabel(entry.title, 'to')
+            : null,
+      ),
+    );
+    await announceMessage(message);
+  }
+
+  /// Speaks an existing app response using the same opt-in and silent-mode
+  /// checks as transaction confirmations. Never speaks a raw voice transcript.
+  Future<void> announceMessage(String message) async {
+    if (message.trim().isEmpty) return;
     final request = ++_latestRequest;
     await _announceLatest(
       request: request,
-      action: action,
-      entry: entry,
-      pairedEntry: pairedEntry,
+      message: message,
     );
+  }
+
+  /// Cancels delayed feedback as well as speech already playing.
+  Future<void> stop() async {
+    ++_latestRequest;
+    try {
+      if (identical(_configuredTts, _tts)) await _tts.stop();
+    } catch (error) {
+      debugPrint('Spoken confirmation stop unavailable: $error');
+    }
   }
 
   Future<void> _announceLatest({
     required int request,
-    required FinancialFeedbackAction action,
-    required Expense entry,
-    Expense? pairedEntry,
+    required String message,
   }) async {
     final stopwatch = Stopwatch()..start();
     try {
@@ -75,26 +101,18 @@ class AudioFeedbackService {
               .invokeMethod<bool>('isDeviceSilent')
               .then((value) => value ?? false)
           : Future<bool>.value(false);
-      final configurationFuture = _configureOnce();
-
-      final silentMode = await silentModeFuture;
+      final readiness = await Future.wait<Object?>([
+        silentModeFuture,
+        _configureOnce().then<Object?>((_) => null),
+      ]);
+      final silentMode = readiness.first == true;
       if (silentMode || request != _latestRequest) return;
-      await configurationFuture;
-      if (request != _latestRequest) return;
-
-      final message = _messages.message(
-        FinancialFeedbackData(
-          action: action,
-          title: entry.title,
-          amount: entry.amount,
-          source: action == FinancialFeedbackAction.transfer
-              ? _walletLabel(pairedEntry?.title ?? '', 'from')
-              : null,
-          destination: action == FinancialFeedbackAction.transfer
-              ? _walletLabel(entry.title, 'to')
-              : null,
-        ),
-      );
+      // The setting may have changed while the device was preparing speech.
+      if (!Hive.isBoxOpen('preferences') ||
+          !VoicePrivacySettings.read(Hive.box('preferences'))
+              .spokenFeedbackEnabled) {
+        return;
+      }
       if (request == _latestRequest) {
         await _tts.speak(
           message.replaceAll(
@@ -105,7 +123,7 @@ class AudioFeedbackService {
         assert(() {
           debugPrint(
             '[Audio feedback] speak_invoked_ms=${stopwatch.elapsedMilliseconds} '
-            'action=$action',
+            'request=$request',
           );
           return true;
         }());

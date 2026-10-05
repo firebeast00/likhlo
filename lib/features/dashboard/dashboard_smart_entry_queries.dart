@@ -207,6 +207,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       final scaffold = Scaffold.maybeOf(context);
       if (scaffold != null && scaffold.hasDrawer) {
         scaffold.openDrawer();
+        _announceVoiceMessage('App menu opened.');
       } else {
         _showTransactionInfo(
           'The app menu is not available on this screen.',
@@ -324,6 +325,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         month: delegatedAction == AppActionType.openMonthlyPdf
             ? resolveMonthlyPdfTargetMonth(command.rawInput)
             : null,
+        spokenFeedback: _isProcessingVoiceCommand,
       );
       _changeSection(AppSection.settings);
       return;
@@ -598,15 +600,18 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     }
     _smartInputCtrl.clear();
     if (target == 'Wallets') {
+      _announceVoiceMessage('Opening Wallets.');
       await _openIncomeAccounts();
       return;
     }
     if (target == 'Dashboard' || target == 'Home' || target == 'Main') {
       _openPrimaryLedgerTab(PrimaryLedgerTab.main);
+      _announceVoiceMessage('Dashboard opened.');
       return;
     }
     if (target == 'Udhaar' || target == 'Udhar') {
       _openPrimaryLedgerTab(PrimaryLedgerTab.udhar);
+      _announceVoiceMessage('Udhar opened.');
       if (RegExp(r'\b(udhar|udhaar|debt|loan)\b')
               .hasMatch(command.rawInput.toLowerCase()) &&
           RegExp(r'\d').hasMatch(command.rawInput)) {
@@ -624,6 +629,7 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         ref.read(appActionProvider.notifier).request(
           AppActionType.openStatsMonth,
           month: requestedMonth,
+          spokenFeedback: _isProcessingVoiceCommand,
         );
       } else if (section == AppSection.budget && requestedMonth != null) {
         ref.read(appActionProvider.notifier).request(
@@ -632,6 +638,9 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         );
       }
       _changeSection(section);
+      if (section != AppSection.stats || requestedMonth == null) {
+        _announceVoiceMessage('Opening ${section.label}.');
+      }
       return;
     }
     _showTransactionInfo(

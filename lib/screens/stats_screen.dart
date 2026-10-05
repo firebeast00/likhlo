@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../app/app_action.dart';
 import '../providers/settings_provider.dart';
 import '../providers/stats_provider.dart';
 import '../services/monthly_financial_summary_service.dart';
+import '../services/audio_feedback_service.dart';
 import '../widgets/month_selector_control.dart';
 
 class StatsScreen extends ConsumerStatefulWidget {
@@ -41,6 +43,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     final normalized = DateTime(requested.year, requested.month);
     final target = normalized.isAfter(currentMonth) ? currentMonth : normalized;
     _changeMonth(target);
+    if (request.spokenFeedback) {
+      unawaited(AudioFeedbackService().announceMessage(
+        'Showing ${DateFormat('MMMM yyyy').format(target)} Stats.',
+      ));
+    }
 
     if (normalized.isAfter(currentMonth)) {
       ScaffoldMessenger.of(context)

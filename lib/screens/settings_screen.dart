@@ -18,6 +18,7 @@ import '../services/biometric_service.dart';
 import '../services/notification_service.dart';
 import '../services/monthly_financial_summary_service.dart';
 import '../services/voice_privacy_service.dart';
+import '../services/audio_feedback_service.dart';
 import '../services/udhar_ledger_link_service.dart';
 import '../widgets/month_selector_control.dart';
 import 'backup_screen.dart';
@@ -50,7 +51,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await NotificationService().setPersistentStatusBarEnabled(enabled);
   }
 
-  Future<void> _setAppLock(bool enabled) async {
+  Future<void> _setAppLock(bool enabled, {bool spokenFeedback = false}) async {
     final result = await BiometricService().authenticate(
       reason: enabled
           ? 'Confirm your identity to enable Likhlo App Lock.'
@@ -62,10 +63,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(result.message)));
+      if (spokenFeedback) {
+        unawaited(AudioFeedbackService().announceMessage(result.message));
+      }
       setState(() {});
       return;
     }
     await _prefBox.put(BiometricService.preferenceKey, enabled);
+    if (mounted && spokenFeedback) {
+      unawaited(AudioFeedbackService().announceMessage(
+        enabled ? 'Likhlo App Lock is enabled.' : 'Likhlo App Lock is disabled.',
+      ));
+    }
     if (mounted) setState(() {});
   }
 
@@ -98,10 +107,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.read(appActionProvider.notifier).consume(request.id);
     if (!mounted) return;
 
+    void showResult(String message) {
+      _showNlpSettingsResult(message);
+      if (mounted && request.spokenFeedback) {
+        unawaited(AudioFeedbackService().announceMessage(message));
+      }
+    }
+
     switch (request.action) {
       case AppActionType.openMonthlyPdf:
         final requestedMonth = request.month;
         if (requestedMonth == null) {
+          if (request.spokenFeedback) {
+            unawaited(AudioFeedbackService().announceMessage(
+              'Choose a month for the PDF report.',
+            ));
+          }
           await _choosePdfMonthAndGenerate(context, ref);
           return;
         }
@@ -110,9 +131,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           requestedMonth.month,
         );
         if (mounted) setState(() {});
+        if (request.spokenFeedback) {
+          unawaited(AudioFeedbackService().announceMessage(
+            'Opening ${DateFormat('MMMM yyyy').format(_selectedPdfMonth)} PDF report.',
+          ));
+        }
         await _generatePdf(context, ref, _selectedPdfMonth);
         return;
       case AppActionType.openBackup:
+        if (request.spokenFeedback) {
+          unawaited(AudioFeedbackService().announceMessage('Opening Backup.'));
+        }
         await Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const BackupScreen()),
         );
@@ -131,7 +160,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (persistentCurrent != persistentEnabled) {
           await _setPersistentQuickLog(persistentEnabled);
         }
-        _showNlpSettingsResult(
+        showResult(
           persistentEnabled
               ? 'Persistent Quick Entry is enabled.'
               : 'Persistent Quick Entry is disabled.',
@@ -146,7 +175,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (remindersCurrent != remindersEnabled) {
           await _setSmartReminders(remindersEnabled);
         }
-        _showNlpSettingsResult(
+        showResult(
           remindersEnabled
               ? 'Smart Entry reminders are enabled.'
               : 'Smart Entry reminders are disabled.',
@@ -164,7 +193,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             spokenEnabled,
           );
         }
-        _showNlpSettingsResult(
+        if (!spokenEnabled) await AudioFeedbackService().stop();
+        showResult(
           spokenEnabled
               ? 'Spoken confirmations are enabled.'
               : 'Spoken confirmations are disabled.',
@@ -181,7 +211,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               .read(settingsProvider.notifier)
               .updateSmartEntryLanguage(language);
         }
-        _showNlpSettingsResult(
+        showResult(
           language == 'romanUrdu'
               ? 'Smart Entry language is now Roman Urdu.'
               : 'Smart Entry language is now English.',
@@ -196,9 +226,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ) ==
             true;
         if (lockCurrent != lockEnabled) {
-          await _setAppLock(lockEnabled);
+          await _setAppLock(
+            lockEnabled,
+            spokenFeedback: request.spokenFeedback,
+          );
         } else {
-          _showNlpSettingsResult(
+          showResult(
             lockEnabled
                 ? 'Likhlo App Lock is already enabled.'
                 : 'Likhlo App Lock is already disabled.',

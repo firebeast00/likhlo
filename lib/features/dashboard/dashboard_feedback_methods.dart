@@ -1,6 +1,11 @@
 part of '../../screens/home_screen.dart';
 
 extension _DashboardFeedbackMethods on _HomeScreenState {
+  void _announceVoiceMessage(String message) {
+    if (!mounted || !_isProcessingVoiceCommand) return;
+    unawaited(AudioFeedbackService().announceMessage(message));
+  }
+
   void _showTransactionError(
       String message, {
         String title = 'Unable to continue',
@@ -100,6 +105,11 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
       actionLabel: actionLabel,
       onAction: onAction,
     );
+    // Saved ledger entries already announce through TransactionExecutor.
+    if (tone == TransactionMessageTone.info ||
+        tone == TransactionMessageTone.error) {
+      _announceVoiceMessage(message);
+    }
   }
 
 
