@@ -203,30 +203,51 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       return;
     }
 
-    final delegatedAction = switch (action) {
-      SmartEntryAppAction.openMonthlyPdf => AppActionType.openMonthlyPdf,
-      SmartEntryAppAction.openBackup => AppActionType.openBackup,
-      SmartEntryAppAction.persistentQuickEntryOn =>
-        AppActionType.persistentQuickEntryOn,
-      SmartEntryAppAction.persistentQuickEntryOff =>
-        AppActionType.persistentQuickEntryOff,
-      SmartEntryAppAction.smartRemindersOn => AppActionType.smartRemindersOn,
-      SmartEntryAppAction.smartRemindersOff => AppActionType.smartRemindersOff,
-      SmartEntryAppAction.spokenConfirmationsOn =>
-        AppActionType.spokenConfirmationsOn,
-      SmartEntryAppAction.spokenConfirmationsOff =>
-        AppActionType.spokenConfirmationsOff,
-      SmartEntryAppAction.smartEntryLanguageRomanUrdu =>
-        AppActionType.smartEntryLanguageRomanUrdu,
-      SmartEntryAppAction.smartEntryLanguageEnglish =>
-        AppActionType.smartEntryLanguageEnglish,
-      SmartEntryAppAction.appLockOn => AppActionType.appLockOn,
-      SmartEntryAppAction.appLockOff => AppActionType.appLockOff,
-      SmartEntryAppAction.darkModeOn ||
-      SmartEntryAppAction.darkModeOff ||
-      SmartEntryAppAction.darkModeToggle ||
-      SmartEntryAppAction.scanReceipt => null,
-    };
+    AppActionType? delegatedAction;
+    switch (action) {
+      case SmartEntryAppAction.openMonthlyPdf:
+        delegatedAction = AppActionType.openMonthlyPdf;
+        break;
+      case SmartEntryAppAction.openBackup:
+        delegatedAction = AppActionType.openBackup;
+        break;
+      case SmartEntryAppAction.persistentQuickEntryOn:
+        delegatedAction = AppActionType.persistentQuickEntryOn;
+        break;
+      case SmartEntryAppAction.persistentQuickEntryOff:
+        delegatedAction = AppActionType.persistentQuickEntryOff;
+        break;
+      case SmartEntryAppAction.smartRemindersOn:
+        delegatedAction = AppActionType.smartRemindersOn;
+        break;
+      case SmartEntryAppAction.smartRemindersOff:
+        delegatedAction = AppActionType.smartRemindersOff;
+        break;
+      case SmartEntryAppAction.spokenConfirmationsOn:
+        delegatedAction = AppActionType.spokenConfirmationsOn;
+        break;
+      case SmartEntryAppAction.spokenConfirmationsOff:
+        delegatedAction = AppActionType.spokenConfirmationsOff;
+        break;
+      case SmartEntryAppAction.smartEntryLanguageRomanUrdu:
+        delegatedAction = AppActionType.smartEntryLanguageRomanUrdu;
+        break;
+      case SmartEntryAppAction.smartEntryLanguageEnglish:
+        delegatedAction = AppActionType.smartEntryLanguageEnglish;
+        break;
+      case SmartEntryAppAction.appLockOn:
+        delegatedAction = AppActionType.appLockOn;
+        break;
+      case SmartEntryAppAction.appLockOff:
+        delegatedAction = AppActionType.appLockOff;
+        break;
+      case SmartEntryAppAction.darkModeOn:
+      case SmartEntryAppAction.darkModeOff:
+      case SmartEntryAppAction.darkModeToggle:
+      case SmartEntryAppAction.scanReceipt:
+        delegatedAction = null;
+        break;
+    }
     if (delegatedAction != null) {
       ref.read(appActionProvider.notifier).request(delegatedAction);
       _changeSection(AppSection.settings);
