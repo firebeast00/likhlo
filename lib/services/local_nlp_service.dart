@@ -22,6 +22,8 @@ enum SmartEntryAppAction {
   darkModeOn,
   darkModeOff,
   darkModeToggle,
+  openMonthlyPdf,
+  scanReceipt,
 }
 
 enum SmartEntryQueryMetric {
@@ -1381,6 +1383,10 @@ class LocalNlpService {
         return SmartEntryAppAction.darkModeOff;
       case RoutedSmartAppAction.darkModeToggle:
         return SmartEntryAppAction.darkModeToggle;
+      case RoutedSmartAppAction.openMonthlyPdf:
+        return SmartEntryAppAction.openMonthlyPdf;
+      case RoutedSmartAppAction.scanReceipt:
+        return SmartEntryAppAction.scanReceipt;
       case null:
         return null;
     }
