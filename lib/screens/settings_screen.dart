@@ -100,7 +100,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     switch (request.action) {
       case AppActionType.openMonthlyPdf:
-        await _choosePdfMonthAndGenerate(context, ref);
+        final requestedMonth = request.targetMonth;
+        if (requestedMonth == null) {
+          await _choosePdfMonthAndGenerate(context, ref);
+          return;
+        }
+        _selectedPdfMonth = DateTime(
+          requestedMonth.year,
+          requestedMonth.month,
+        );
+        if (mounted) setState(() {});
+        await _generatePdf(context, ref, _selectedPdfMonth);
         return;
       case AppActionType.openBackup:
         await Navigator.of(context).push(
