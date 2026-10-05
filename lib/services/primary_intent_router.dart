@@ -30,6 +30,7 @@ enum RoutedSmartAppAction {
   appLockOn,
   appLockOff,
   runMonthlyPlanCommand,
+  clearSearchFilters,
 }
 
 class PrimaryIntentRoute {
@@ -362,6 +363,13 @@ class PrimaryIntentRouter {
   }
 
   RoutedSmartAppAction? _appAction(String input) {
+    if (RegExp(
+      r'\b(?:clear\s+(?:search|filters?)|reset\s+(?:search|filters?)|remove\s+filters?|show\s+all\s+(?:entries|transactions)|search\s+(?:off|band)|filters?\s+(?:off|band))\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.clearSearchFilters;
+    }
+
     if (_isBudgetPlannerControl(input)) {
       return RoutedSmartAppAction.runMonthlyPlanCommand;
     }
