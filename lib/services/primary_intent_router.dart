@@ -495,7 +495,7 @@ class PrimaryIntentRouter {
   bool _isBudgetPlannerControl(String input) {
     final hasAmount = _hasAmountSignal(input);
     final hasBudgetWord = RegExp(
-      r'\b(?:budget|saving|savings|save|bachat|buffer|safety|reserve|emergency)\b',
+      r'\b(?:budget|saving|savings|bachat|buffer|safety|reserve|emergency)\b',
       caseSensitive: false,
     ).hasMatch(input);
     final hasItemControl = RegExp(
@@ -509,8 +509,14 @@ class PrimaryIntentRouter {
         RegExp(r'\b(?:budget|spend|kharch)\b', caseSensitive: false)
             .hasMatch(input);
 
+    final hasExplicitSaveGoal = RegExp(
+      r'\bsave\b.{0,28}\b(?:karni|karna|bachana|goal|target|monthly|mahina|mahine)\b|\b(?:goal|target)\b.{0,20}\bsave\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+
     if (isBudgetQuestion) return true;
     if (hasBudgetWord && hasAmount) return true;
+    if (hasExplicitSaveGoal && hasAmount) return true;
     if (hasItemControl && (hasAmount || hasBudgetWord)) return true;
     if (RegExp(
       r'\b(?:har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
