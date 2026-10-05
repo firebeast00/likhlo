@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 
+import '../app/app_action.dart';
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/wallet_provider.dart';
@@ -29,6 +30,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late Box _prefBox;
   late DateTime _selectedPdfMonth;
+  int? _handledAppActionId;
 
   @override
   void initState() {
@@ -237,6 +239,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final pendingAction = ref.watch(appActionProvider);
+    if (pendingAction != null &&
+        pendingAction.action == AppActionType.openMonthlyPdf &&
+        _handledAppActionId != pendingAction.id) {
+      _handledAppActionId = pendingAction.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        ref.read(appActionProvider.notifier).consume(pendingAction.id);
+        await _choosePdfMonthAndGenerate(context, ref);
+      });
+    }
+
     final primaryColor = Color(settings.profileColorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
