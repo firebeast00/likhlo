@@ -377,11 +377,14 @@ void main() {
 
     test('existing transaction and search commands keep their paths', () {
       final expense = engine.parse('500 petrol', categories);
+      final savedExpense = engine.parse('save 500 burger', categories);
       final deletion = engine.parse('delete burger', categories);
       final search = engine.parse('petrol wali entries dikhao', categories);
 
       expect(expense.parsed.intent, SmartEntryIntent.addExpense);
       expect(expense.command, isA<AddSmartTransactionCommand>());
+      expect(savedExpense.parsed.intent, SmartEntryIntent.addExpense);
+      expect(savedExpense.command, isA<AddSmartTransactionCommand>());
       expect(deletion.parsed.intent, SmartEntryIntent.deleteEntry);
       expect(search.parsed.intent, SmartEntryIntent.searchEntries);
     });
