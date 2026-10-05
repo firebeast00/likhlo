@@ -367,7 +367,7 @@ class PrimaryIntentRouter {
     }
 
     if (RegExp(
-      r'\b(?:app\s+lock|likhlo\s+lock|lock\s+app)\s*(?:on|enable|karo|kar\s+do|lagao|laga\s+do)?\b',
+      r'\b(?:app\s+lock|likhlo\s+lock)\b.{0,24}\b(?:on|enable|karo|kar\s+do|lagao|laga\s+do)\b|\block\s+(?:the\s+)?app\b',
       caseSensitive: false,
     ).hasMatch(input) &&
         !RegExp(
