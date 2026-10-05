@@ -200,7 +200,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
-                                stats.monthLabels[index],
+                                AppStrings.current.dateLabel(stats.monthLabels[index]),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,

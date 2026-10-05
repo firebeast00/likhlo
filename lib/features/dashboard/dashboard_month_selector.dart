@@ -57,7 +57,7 @@ extension _DashboardMonthMethods on _HomeScreenState {
                         dialogContext,
                         DateTime(selectedYear, month, 1),
                       ),
-                      child: Text(DateFormat.MMM().format(DateTime(2000, month))),
+                      child: Text(AppStrings.current.dateLabel(DateFormat.MMM().format(DateTime(2000, month)))),
                     );
                   },
                 ),
@@ -93,7 +93,7 @@ extension _DashboardMonthMethods on _HomeScreenState {
             onPressed: _pickBudgetMonth,
             icon: const Icon(Icons.calendar_month_rounded, size: 18),
             label: Text(
-              DateFormat.yMMMM().format(_focusedMonth),
+              AppStrings.current.dateLabel(DateFormat.yMMMM().format(_focusedMonth)),
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,

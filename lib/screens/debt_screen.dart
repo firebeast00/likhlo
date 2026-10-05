@@ -887,7 +887,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                               child: Text(
                                 selectedDate == null
                                     ? AppStrings.current.text('due_date_optional_be5b29')
-                                    : AppStrings.current.text('due_483844', {'p0': DateFormat.yMMMd().format(selectedDate!)}),
+                                    : AppStrings.current.text('due_483844', {'p0': AppLabel(DateFormat.yMMMd().format(selectedDate!))}),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1174,7 +1174,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.calendar_today_outlined),
               title: Text(AppStrings.current.text('due_145caf')),
-              subtitle: Text(_dueLabel(debt)),
+              subtitle: Text(AppStrings.current.dateLabel(AppStrings.current.display(_dueLabel(debt)))),
             ),
             const SizedBox(height: 8),
             SizedBox(

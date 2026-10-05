@@ -179,7 +179,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                               children: [
                                 Icon(Icons.calendar_today_rounded, color: Colors.grey.shade500, size: 20),
                                 const SizedBox(width: 8),
-                                Expanded(child: Text(DateFormat.yMMMd().format(selectedDate), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                                Expanded(child: Text(AppStrings.current.dateLabel(DateFormat.yMMMd().format(selectedDate)), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis)),
                               ],
                             ),
                           ),

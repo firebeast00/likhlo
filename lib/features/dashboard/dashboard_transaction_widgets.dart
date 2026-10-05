@@ -305,7 +305,7 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
                     children: [
                       Text(e.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 4),
-                      Row(children: [Icon(Icons.schedule_rounded, size: 11, color: Colors.grey.shade500), const SizedBox(width: 4), Text(DateFormat.MMMEd().format(e.date), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))]),
+                      Row(children: [Icon(Icons.schedule_rounded, size: 11, color: Colors.grey.shade500), const SizedBox(width: 4), Text(AppStrings.current.dateLabel(DateFormat.MMMEd().format(e.date)), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))]),
                     ],
                   ),
                 ),

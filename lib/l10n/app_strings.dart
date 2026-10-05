@@ -78,13 +78,42 @@ class AppMessage {
 class AppLabel {
   final String value;
   const AppLabel(this.value);
-  String render(AppLanguage language, {bool spoken = false}) =>
-      AppMessage.resolve(value).render(language, spoken: spoken);
+  String render(AppLanguage language, {bool spoken = false}) {
+    final message = AppMessage.resolve(value);
+    return _dateWords(message.render(language, spoken: spoken), language, spoken);
+  }
 }
 
 class AppEnglishSuffix {
   final String value;
   const AppEnglishSuffix(this.value);
+}
+
+String _dateWords(String text, AppLanguage language, bool spoken) {
+  if (language == AppLanguage.english) return text;
+  const names = {
+    'January': ['Janwari', 'جنوری'], 'February': ['Farwari', 'فروری'],
+    'March': ['March', 'مارچ'], 'April': ['April', 'اپریل'],
+    'May': ['May', 'مئی'], 'June': ['June', 'جون'],
+    'July': ['July', 'جولائی'], 'August': ['August', 'اگست'],
+    'September': ['September', 'ستمبر'], 'October': ['October', 'اکتوبر'],
+    'November': ['November', 'نومبر'], 'December': ['December', 'دسمبر'],
+    'Monday': ['Peer', 'پیر'], 'Tuesday': ['Mangal', 'منگل'],
+    'Wednesday': ['Budh', 'بدھ'], 'Thursday': ['Jumerat', 'جمعرات'],
+    'Friday': ['Juma', 'جمعہ'], 'Saturday': ['Hafta', 'ہفتہ'],
+    'Sunday': ['Itwar', 'اتوار'],
+  };
+  return text.replaceAllMapped(RegExp(r'\b[A-Za-z]+\b'), (match) {
+    final word = match.group(0)!;
+    final direct = names[word];
+    if (direct != null) return direct[spoken ? 1 : 0];
+    for (final item in names.entries) {
+      if (item.key.substring(0, 3) == word) {
+        return item.value[spoken ? 1 : 0];
+      }
+    }
+    return word;
+  });
 }
 
 final _keysByEnglish = <String, String>{
@@ -126,6 +155,7 @@ class AppStrings {
       AppMessage(key, parameters).render(language);
 
   String display(Object value) => AppMessage.resolve(value).render(language);
+  String dateLabel(String value) => _dateWords(value, language, false);
 
   static const delegate = _AppStringsDelegate();
   static const supportedLocales = [

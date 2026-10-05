@@ -75,7 +75,7 @@ Future<DateTime?> showMonthYearPickerDialog(
                       final selected = month == selectedMonth;
                       return ChoiceChip(
                         label: Text(
-                          DateFormat.MMM().format(DateTime(2024, month)),
+                          AppStrings.current.dateLabel(DateFormat.MMM().format(DateTime(2024, month))),
                         ),
                         selected: selected,
                         onSelected: disabled
@@ -162,7 +162,7 @@ class MonthSelectorControl extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-                    DateFormat.yMMMM().format(selected),
+                    AppStrings.current.dateLabel(DateFormat.yMMMM().format(selected)),
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 15,

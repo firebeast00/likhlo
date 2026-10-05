@@ -848,7 +848,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     style:
                         TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                 subtitle: Text(
-                    AppStrings.current.text('choose_month_and_export_ccb888', {'p0': DateFormat.yMMMM().format(_selectedPdfMonth)}),
+                    AppStrings.current.text('choose_month_and_export_ccb888', {'p0': AppLabel(DateFormat.yMMMM().format(_selectedPdfMonth))}),
                     style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 trailing: Container(
                   padding: const EdgeInsets.all(8),
