@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../app/app_action.dart';
 import '../providers/settings_provider.dart';
 import '../providers/stats_provider.dart';
 import '../services/monthly_financial_summary_service.dart';
@@ -19,12 +20,38 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   late DateTime _selectedMonth;
   int _touchedIndex = -1;
   int _touchedBarIndex = -1;
+  int? _handledAppActionId;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _selectedMonth = DateTime(now.year, now.month);
+  }
+
+  void _handlePendingAppAction(AppActionRequest request) {
+    if (request.action != AppActionType.openStatsMonth) return;
+    ref.read(appActionProvider.notifier).consume(request.id);
+    if (!mounted) return;
+
+    final requested = request.month;
+    if (requested == null) return;
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
+    final normalized = DateTime(requested.year, requested.month);
+    final target = normalized.isAfter(currentMonth) ? currentMonth : normalized;
+    _changeMonth(target);
+
+    if (normalized.isAfter(currentMonth)) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Stats are available through the current month.'),
+          ),
+        );
+    }
   }
 
   void _changeMonth(DateTime value) {
@@ -39,6 +66,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pendingAction = ref.watch(appActionProvider);
+    if (pendingAction != null &&
+        pendingAction.action == AppActionType.openStatsMonth &&
+        _handledAppActionId != pendingAction.id) {
+      _handledAppActionId = pendingAction.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _handlePendingAppAction(pendingAction);
+      });
+    }
+
     final stats = ref.watch(statsProvider(_selectedMonth));
     final settings = ref.watch(settingsProvider);
     final primaryColor = Color(settings.profileColorValue);
