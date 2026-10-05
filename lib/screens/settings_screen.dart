@@ -100,7 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     switch (request.action) {
       case AppActionType.openMonthlyPdf:
-        final requestedMonth = request.targetMonth;
+        final requestedMonth = request.month;
         if (requestedMonth == null) {
           await _choosePdfMonthAndGenerate(context, ref);
           return;
@@ -116,6 +116,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         await Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const BackupScreen()),
         );
+        return;
+      case AppActionType.openStatsMonth:
+      case AppActionType.openMonthlyPlan:
+      case AppActionType.runMonthlyPlanCommand:
+        // These actions are handled by their destination screens.
         return;
       case AppActionType.persistentQuickEntryOn:
       case AppActionType.persistentQuickEntryOff:
