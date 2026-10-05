@@ -55,4 +55,43 @@ void main() {
     }
   });
 
+  test('PDF action channel preserves a normalized requested month', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(appActionProvider.notifier).request(
+      AppActionType.openMonthlyPdf,
+      targetMonth: DateTime(2026, 9, 18, 22, 45),
+    );
+    final request = container.read(appActionProvider);
+
+    expect(request?.action, AppActionType.openMonthlyPdf);
+    expect(request?.targetMonth, DateTime(2026, 9));
+  });
+
+  test('monthly PDF month resolver understands relative and named months', () {
+    final now = DateTime(2026, 10, 5);
+
+    expect(
+      resolveMonthlyPdfTargetMonth('show monthly PDF', now: now),
+      DateTime(2026, 10),
+    );
+    expect(
+      resolveMonthlyPdfTargetMonth('last month PDF', now: now),
+      DateTime(2026, 9),
+    );
+    expect(
+      resolveMonthlyPdfTargetMonth('September PDF', now: now),
+      DateTime(2026, 9),
+    );
+    expect(
+      resolveMonthlyPdfTargetMonth('December PDF', now: now),
+      DateTime(2025, 12),
+    );
+    expect(
+      resolveMonthlyPdfTargetMonth('open PDF', now: now),
+      isNull,
+    );
+  });
+
 }
