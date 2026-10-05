@@ -109,6 +109,25 @@ void main() {
       }
     });
 
+    test('clears transaction search filters as a read-only control', () {
+      for (final input in [
+        'clear search',
+        'reset filters',
+        'show all entries',
+        'search band karo',
+      ]) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl, reason: input);
+        expect(
+          plan.parsed.appAction,
+          SmartEntryAppAction.clearSearchFilters,
+          reason: input,
+        );
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: input);
+        expect(plan.parsed.amount, 0, reason: input);
+      }
+    });
+
     test('routes daily settings controls without creating transactions', () {
       final cases = <String, SmartEntryAppAction>{
         'open backup': SmartEntryAppAction.openBackup,
