@@ -92,6 +92,111 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _handlePendingAppAction(AppActionRequest request) async {
+    ref.read(appActionProvider.notifier).consume(request.id);
+    if (!mounted) return;
+
+    switch (request.action) {
+      case AppActionType.openMonthlyPdf:
+        await _choosePdfMonthAndGenerate(context, ref);
+        return;
+      case AppActionType.openBackup:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const BackupScreen()),
+        );
+        return;
+      case AppActionType.persistentQuickEntryOn:
+      case AppActionType.persistentQuickEntryOff:
+        final enabled =
+            request.action == AppActionType.persistentQuickEntryOn;
+        final current =
+            _prefBox.get('persistent_bar_enabled', defaultValue: true) == true;
+        if (current != enabled) await _setPersistentQuickLog(enabled);
+        _showNlpSettingsResult(
+          enabled
+              ? 'Persistent Quick Entry is enabled.'
+              : 'Persistent Quick Entry is disabled.',
+        );
+        return;
+      case AppActionType.smartRemindersOn:
+      case AppActionType.smartRemindersOff:
+        final enabled = request.action == AppActionType.smartRemindersOn;
+        final current =
+            _prefBox.get('daily_reminder_enabled', defaultValue: true) == true;
+        if (current != enabled) await _setSmartReminders(enabled);
+        _showNlpSettingsResult(
+          enabled
+              ? 'Smart Entry reminders are enabled.'
+              : 'Smart Entry reminders are disabled.',
+        );
+        return;
+      case AppActionType.spokenConfirmationsOn:
+      case AppActionType.spokenConfirmationsOff:
+        final enabled =
+            request.action == AppActionType.spokenConfirmationsOn;
+        final current = VoicePrivacySettings.read(_prefBox).spokenFeedbackEnabled;
+        if (current != enabled) {
+          await _setVoicePreference(
+            VoicePrivacySettings.spokenFeedbackKey,
+            enabled,
+          );
+        }
+        _showNlpSettingsResult(
+          enabled
+              ? 'Spoken confirmations are enabled.'
+              : 'Spoken confirmations are disabled.',
+        );
+        return;
+      case AppActionType.smartEntryLanguageRomanUrdu:
+      case AppActionType.smartEntryLanguageEnglish:
+        final language =
+            request.action == AppActionType.smartEntryLanguageRomanUrdu
+                ? 'romanUrdu'
+                : 'english';
+        if (ref.read(settingsProvider).smartEntryLanguage != language) {
+          await ref
+              .read(settingsProvider.notifier)
+              .updateSmartEntryLanguage(language);
+        }
+        _showNlpSettingsResult(
+          language == 'romanUrdu'
+              ? 'Smart Entry language is now Roman Urdu.'
+              : 'Smart Entry language is now English.',
+        );
+        return;
+      case AppActionType.appLockOn:
+      case AppActionType.appLockOff:
+        final enabled = request.action == AppActionType.appLockOn;
+        final current = _prefBox.get(
+              BiometricService.preferenceKey,
+              defaultValue: false,
+            ) ==
+            true;
+        if (current != enabled) {
+          await _setAppLock(enabled);
+        } else {
+          _showNlpSettingsResult(
+            enabled
+                ? 'Likhlo App Lock is already enabled.'
+                : 'Likhlo App Lock is already disabled.',
+          );
+        }
+        return;
+    }
+  }
+
+  void _showNlpSettingsResult(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+        ),
+      );
+  }
+
   // --- PROFILE EDIT DIALOG ---
   void _showEditProfileDialog(String currentName, String currentProfession) {
     final nameCtrl = TextEditingController(text: currentName);
@@ -240,14 +345,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final pendingAction = ref.watch(appActionProvider);
-    if (pendingAction != null &&
-        pendingAction.action == AppActionType.openMonthlyPdf &&
-        _handledAppActionId != pendingAction.id) {
+    if (pendingAction != null && _handledAppActionId != pendingAction.id) {
       _handledAppActionId = pendingAction.id;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        ref.read(appActionProvider.notifier).consume(pendingAction.id);
-        await _choosePdfMonthAndGenerate(context, ref);
+        unawaited(_handlePendingAppAction(pendingAction));
       });
     }
 
