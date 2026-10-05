@@ -61,12 +61,12 @@ void main() {
 
     container.read(appActionProvider.notifier).request(
       AppActionType.openMonthlyPdf,
-      targetMonth: DateTime(2026, 9, 18, 22, 45),
+      month: DateTime(2026, 9, 18, 22, 45),
     );
     final request = container.read(appActionProvider);
 
     expect(request?.action, AppActionType.openMonthlyPdf);
-    expect(request?.targetMonth, DateTime(2026, 9));
+    expect(request?.month, DateTime(2026, 9));
   });
 
   test('monthly PDF month resolver understands relative and named months', () {
