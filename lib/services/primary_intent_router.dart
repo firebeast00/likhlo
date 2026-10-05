@@ -18,6 +18,17 @@ enum RoutedSmartAppAction {
   darkModeToggle,
   openMonthlyPdf,
   scanReceipt,
+  openBackup,
+  persistentQuickEntryOn,
+  persistentQuickEntryOff,
+  smartRemindersOn,
+  smartRemindersOff,
+  spokenConfirmationsOn,
+  spokenConfirmationsOff,
+  smartEntryLanguageRomanUrdu,
+  smartEntryLanguageEnglish,
+  appLockOn,
+  appLockOff,
 }
 
 class PrimaryIntentRoute {
@@ -348,6 +359,82 @@ class PrimaryIntentRouter {
   }
 
   RoutedSmartAppAction? _appAction(String input) {
+    if (RegExp(
+      r'\b(?:open|show|kholo|dikhao)\s+(?:backup|backup\s+restore)|(?:backup|backup\s+restore)\s+(?:open|show|kholo|dikhao)|restore\s+backup\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.openBackup;
+    }
+
+    if (RegExp(
+      r'\b(?:app\s+lock|likhlo\s+lock|lock\s+app)\s*(?:on|enable|karo|kar\s+do|lagao|laga\s+do)?\b',
+      caseSensitive: false,
+    ).hasMatch(input) &&
+        !RegExp(
+          r'\b(?:off|disable|band|band\s+karo|hatao|remove)\b',
+          caseSensitive: false,
+        ).hasMatch(input)) {
+      return RoutedSmartAppAction.appLockOn;
+    }
+    if (RegExp(
+      r'\b(?:app\s+lock|likhlo\s+lock|lock\s+app)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao|remove)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:app\s+lock|likhlo\s+lock)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.appLockOff;
+    }
+
+    if (RegExp(
+      r'\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar\s+(?:entry|notification)|persistent\s+notification)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.persistentQuickEntryOff;
+    }
+    if (RegExp(
+      r'\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar\s+(?:entry|notification)|persistent\s+notification)\b.{0,24}\b(?:on|enable|chalu|chalao|karo|kar\s+do)\b|\b(?:enable|on|chalu)\b.{0,24}\b(?:persistent\s+(?:quick\s+)?entry|quick\s+entry\s+notification|status\s+bar)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.persistentQuickEntryOn;
+    }
+
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartRemindersOff;
+    }
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b.{0,24}\b(?:on|enable|chalu|chalao|karo|kar\s+do)\b|\b(?:enable|on|chalu)\b.{0,24}\b(?:smart\s+entry\s+reminders?|expense\s+reminders?|daily\s+reminders?)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartRemindersOn;
+    }
+
+    if (RegExp(
+      r'\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b.{0,24}\b(?:off|disable|band|band\s+karo|hatao)\b|\b(?:off|disable|band|band\s+karo)\b.{0,24}\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.spokenConfirmationsOff;
+    }
+    if (RegExp(
+      r'\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b.{0,24}\b(?:on|enable|chalu|chalao|karo|kar\s+do)\b|\b(?:enable|on|chalu)\b.{0,24}\b(?:spoken\s+confirmations?|voice\s+feedback|spoken\s+feedback)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.spokenConfirmationsOn;
+    }
+
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+language|entry\s+language|language)\b.{0,20}\b(?:roman\s+urdu|roman)\b|\b(?:roman\s+urdu|roman)\b.{0,20}\b(?:language|mode)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartEntryLanguageRomanUrdu;
+    }
+    if (RegExp(
+      r'\b(?:smart\s+entry\s+language|entry\s+language|language)\b.{0,20}\benglish\b|\benglish\b.{0,20}\b(?:language|mode)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return RoutedSmartAppAction.smartEntryLanguageEnglish;
+    }
+
     if (RegExp(
       r'\b(?:monthly\s+pdf|pdf\s+(?:report|statement|summary|dikhao|dikhado|kholo|open|show)|(?:open|show|view|dikhao|dikhado|kholo)\s+(?:monthly\s+)?pdf|monthly\s+report|financial\s+statement|mahine\s+(?:ki|ka)\s+pdf|is\s+mahine\s+(?:ki|ka)\s+pdf)\b',
       caseSensitive: false,
