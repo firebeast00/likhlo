@@ -24,6 +24,8 @@ class AppActionRequest {
   final DateTime? month;
   final String? text;
 
+  DateTime? get targetMonth => month;
+
   const AppActionRequest({
     required this.id,
     required this.action,
@@ -41,13 +43,14 @@ class AppActionController extends Notifier<AppActionRequest?> {
   void request(
     AppActionType action, {
     DateTime? month,
+    DateTime? targetMonth,
     String? text,
   }) {
     _nextId++;
     state = AppActionRequest(
       id: _nextId,
       action: action,
-      month: month,
+      month: month ?? targetMonth,
       text: text,
     );
   }
