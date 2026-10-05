@@ -56,6 +56,9 @@ void main() {
       'spoken confirmations on',
       'English language mode',
       'app lock on',
+      'budget 40k rakho',
+      'petrol max 4000',
+      'daily kitna kharch kar sakta hun',
     ];
 
     for (final input in inputs) {
