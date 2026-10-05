@@ -52,11 +52,12 @@ void main() {
   });
 
   group('daily read-only commands', () {
-    test('routes dark mode controls without creating transactions', () {
+    test('routes theme controls without creating transactions', () {
       final on = engine.parse('dark mode on', categories);
       final off = engine.parse('dark mode band krdo', categories);
       final light = engine.parse('light mode karo', categories);
       final toggle = engine.parse('toggle dark mode', categories);
+      final romanToggle = engine.parse('theme badlo', categories);
 
       expect(on.parsed.intent, SmartEntryIntent.appControl);
       expect(on.parsed.appAction, SmartEntryAppAction.darkModeOn);
@@ -71,6 +72,34 @@ void main() {
       expect(light.parsed.appAction, SmartEntryAppAction.darkModeOff);
       expect(toggle.parsed.intent, SmartEntryIntent.appControl);
       expect(toggle.parsed.appAction, SmartEntryAppAction.darkModeToggle);
+      expect(romanToggle.parsed.intent, SmartEntryIntent.appControl);
+      expect(romanToggle.parsed.appAction, SmartEntryAppAction.darkModeToggle);
+    });
+
+    test('routes monthly PDF and receipt scan as direct app controls', () {
+      for (final input in [
+        'show monthly PDF',
+        'mahine ki pdf dikhao',
+        'open pdf',
+      ]) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl);
+        expect(plan.parsed.appAction, SmartEntryAppAction.openMonthlyPdf);
+        expect(plan.command, isA<ReadOnlySmartCommand>());
+        expect(plan.parsed.amount, 0);
+      }
+
+      for (final input in [
+        'scan receipt',
+        'receipt scan karo',
+        'scan bill',
+      ]) {
+        final plan = engine.parse(input, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl);
+        expect(plan.parsed.appAction, SmartEntryAppAction.scanReceipt);
+        expect(plan.command, isA<ReadOnlySmartCommand>());
+        expect(plan.parsed.amount, 0);
+      }
     });
 
     test('understands monthly and daily summary phrases', () {
@@ -152,6 +181,26 @@ void main() {
       expect(category.parsed.timeRange, SmartEntryTimeRange.lastMonth);
     });
 
+    test('opens daily destinations from bare commands', () {
+      final cases = <String, String>{
+        'stats': 'Stats',
+        'wallets': 'Wallets',
+        'udhar': 'Udhaar',
+        'monthly plan': 'Monthly Plan',
+        'settings': 'Settings',
+        'trash': 'Trash',
+        'about': 'About',
+        'home': 'Dashboard',
+      };
+
+      for (final entry in cases.entries) {
+        final plan = engine.parse(entry.key, categories);
+        expect(plan.parsed.intent, SmartEntryIntent.navigate);
+        expect(plan.parsed.navigationTarget, entry.value);
+        expect(plan.command, isA<ReadOnlySmartCommand>());
+      }
+    });
+
     test('opens new navigation targets with Roman Urdu aliases', () {
       final plan =
           engine.parse('mahine ka plan dikhado', categories);
@@ -216,8 +265,8 @@ void main() {
       expect(transfer.normalizedText, contains('jazzcash'));
       expect(transfer.command, isA<TransferCommand>());
 
-      expect(pdf.parsed.intent, SmartEntryIntent.navigate);
-      expect(pdf.parsed.navigationTarget, 'Settings');
+      expect(pdf.parsed.intent, SmartEntryIntent.appControl);
+      expect(pdf.parsed.appAction, SmartEntryAppAction.openMonthlyPdf);
 
       expect(monthlyList.parsed.intent, SmartEntryIntent.searchEntries);
       expect(monthlyList.parsed.timeRange, SmartEntryTimeRange.thisMonth);
