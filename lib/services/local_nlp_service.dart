@@ -22,6 +22,8 @@ enum SmartEntryAppAction {
   darkModeOn,
   darkModeOff,
   darkModeToggle,
+  themeColorChange,
+  openDrawer,
   openMonthlyPdf,
   scanReceipt,
   openBackup,
@@ -1396,6 +1398,10 @@ class LocalNlpService {
         return SmartEntryAppAction.darkModeOff;
       case RoutedSmartAppAction.darkModeToggle:
         return SmartEntryAppAction.darkModeToggle;
+      case RoutedSmartAppAction.themeColorChange:
+        return SmartEntryAppAction.themeColorChange;
+      case RoutedSmartAppAction.openDrawer:
+        return SmartEntryAppAction.openDrawer;
       case RoutedSmartAppAction.openMonthlyPdf:
         return SmartEntryAppAction.openMonthlyPdf;
       case RoutedSmartAppAction.scanReceipt:

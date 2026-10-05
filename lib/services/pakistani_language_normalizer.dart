@@ -177,6 +177,7 @@ class PakistaniLanguageNormalizer {
       'daaldo': 'dalo', 'daal': 'dalo',
       'lakhs': 'lakh', 'lacs': 'lac', 'crores': 'crore',
       'dairh': 'derh', 'deirh': 'derh',
+      'octouber': 'october', 'octuber': 'october',
     };
     for (final entry in romanAliases.entries) {
       value = _replace(value, RegExp('\\b${entry.key}\\b'),
@@ -260,6 +261,19 @@ class PakistaniLanguageNormalizer {
       applied,
       'sadhe_scale',
     );
+
+    if (enableContextualAsrRepairs) {
+      final monthStatsPattern = RegExp(
+        r'\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec|this month|current month|last month|previous month)\s+(status|starts)\b',
+      );
+      if (monthStatsPattern.hasMatch(value)) {
+        value = value.replaceAllMapped(
+          monthStatsPattern,
+          (match) => '${match.group(1)} stats',
+        );
+        applied.add('stats_asr_context');
+      }
+    }
 
     final hasAmountContext = RegExp(
       r'\b(?:\d+(?:[,.]\d+)?|aik|ek|do|teen|tin|chaar|char|paanch|panch|chhay|saat|aath|nau|das|bees|tees|chalees|pachas|saath|sattar|assi|nabbe|hundred|sau|hazar|hazaar|thousand|lakh|crore)\b',
