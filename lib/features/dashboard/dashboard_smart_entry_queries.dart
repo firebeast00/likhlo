@@ -203,6 +203,36 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       return;
     }
 
+    if (action == SmartEntryAppAction.openDrawer) {
+      final scaffold = Scaffold.maybeOf(context);
+      if (scaffold != null && scaffold.hasDrawer) {
+        scaffold.openDrawer();
+      } else {
+        _showTransactionInfo(
+          'The app menu is not available on this screen.',
+          title: 'Menu unavailable',
+        );
+      }
+      return;
+    }
+
+    if (action == SmartEntryAppAction.themeColorChange) {
+      final selection = _themeColorSelection(command.rawInput);
+      ref
+          .read(settingsProvider.notifier)
+          .updateProfileColor(selection.key);
+      if (!mounted) return;
+      _showTransactionInfo(
+        selection.value == 'Random'
+            ? 'A new theme color was selected.'
+            : '${selection.value} theme color is now active.',
+        title: selection.value == 'Random'
+            ? 'Theme color changed'
+            : '${selection.value} theme',
+      );
+      return;
+    }
+
     if (action == SmartEntryAppAction.clearSearchFilters) {
       final hadFilters = _isSearching ||
           _searchQuery.isNotEmpty ||
@@ -280,6 +310,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.darkModeOn:
       case SmartEntryAppAction.darkModeOff:
       case SmartEntryAppAction.darkModeToggle:
+      case SmartEntryAppAction.themeColorChange:
+      case SmartEntryAppAction.openDrawer:
       case SmartEntryAppAction.scanReceipt:
       case SmartEntryAppAction.runMonthlyPlanCommand:
       case SmartEntryAppAction.clearSearchFilters:
@@ -312,6 +344,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       case SmartEntryAppAction.darkModeToggle:
         enableDark = !currentlyDark;
         break;
+      case SmartEntryAppAction.themeColorChange:
+      case SmartEntryAppAction.openDrawer:
       case SmartEntryAppAction.openMonthlyPdf:
       case SmartEntryAppAction.scanReceipt:
       case SmartEntryAppAction.openBackup:
@@ -406,14 +440,25 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       return;
     }
 
+    final referencedMonth = _resolveSmartQueryMonth(command.rawInput);
     var entries = ref
         .read(expenseProvider)
         .allExpenses
-        .where((entry) => entry.category != 'Transfer')
-        .where((entry) => matchesSmartEntryTimeRange(
-      entry.date,
-      command.timeRange,
-    ));
+        .where((entry) => entry.category != 'Transfer');
+    if (referencedMonth != null) {
+      entries = entries.where(
+        (entry) =>
+            entry.date.year == referencedMonth.year &&
+            entry.date.month == referencedMonth.month,
+      );
+    } else {
+      entries = entries.where(
+        (entry) => matchesSmartEntryTimeRange(
+          entry.date,
+          command.timeRange,
+        ),
+      );
+    }
     if (mentionedIds.isNotEmpty) {
       final walletId = mentionedIds.single;
       entries = entries.where((entry) => entry.walletId == walletId);
@@ -423,7 +468,10 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     if (hasCategory) {
       entries = entries.where((entry) => entry.category == command.category);
     } else if (metric != SmartEntryQueryMetric.summary) {
-      final title = _smartQueryTitle(command.title);
+      final title = _smartQueryTitleWithoutMonth(
+        command.title,
+        referencedMonth,
+      );
       if (title.isNotEmpty) {
         entries = entries.where(
               (entry) => entry.title.toLowerCase().contains(title.toLowerCase()),
@@ -437,7 +485,9 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final spending = matching
         .where((entry) => entry.type == 'expense')
         .fold<double>(0, (sum, entry) => sum + entry.amount);
-    final period = _smartTimeRangeLabel(command.timeRange);
+    final period = referencedMonth == null
+        ? _smartTimeRangeLabel(command.timeRange)
+        : DateFormat.yMMMM().format(referencedMonth);
     final subject = hasCategory ? ' · ${command.category}' : '';
 
     switch (metric) {
@@ -588,6 +638,91 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       'Try Home, Wallets, Udhaar, Monthly Plan, Stats, Settings, Trash, or About.',
       title: 'Screen not recognized',
     );
+  }
+
+  MapEntry<int, String> _themeColorSelection(String input) {
+    const palette = <String, int>{
+      'Blue': 0xFF3B82F6,
+      'Emerald': 0xFF10B981,
+      'Amber': 0xFFF59E0B,
+      'Red': 0xFFEF4444,
+      'Violet': 0xFF8B5CF6,
+      'Pink': 0xFFEC4899,
+      'Teal': 0xFF009688,
+      'Slate': 0xFF0F172A,
+    };
+    final text = input.toLowerCase();
+    const aliases = <String, String>{
+      'blue': 'Blue',
+      'green': 'Emerald',
+      'emerald': 'Emerald',
+      'orange': 'Amber',
+      'amber': 'Amber',
+      'yellow': 'Amber',
+      'red': 'Red',
+      'violet': 'Violet',
+      'purple': 'Violet',
+      'pink': 'Pink',
+      'teal': 'Teal',
+      'slate': 'Slate',
+      'black': 'Slate',
+    };
+    for (final alias in aliases.entries) {
+      if (RegExp('\\b${RegExp.escape(alias.key)}\\b').hasMatch(text)) {
+        final label = alias.value;
+        return MapEntry(palette[label]!, label);
+      }
+    }
+
+    final current = ref.read(settingsProvider).profileColorValue;
+    final alternatives = palette.entries
+        .where((entry) => entry.value != current)
+        .toList(growable: false);
+    final pool = alternatives.isEmpty
+        ? palette.entries.toList(growable: false)
+        : alternatives;
+    final index = DateTime.now().microsecondsSinceEpoch.remainder(pool.length);
+    final selected = pool[index];
+    return MapEntry(selected.value, 'Random');
+  }
+
+  DateTime? _resolveSmartQueryMonth(String input) {
+    final parsed = parseReferencedMonth(input);
+    if (parsed == null) return null;
+
+    final now = DateTime.now();
+    final current = DateTime(now.year, now.month);
+    final hasExplicitYear = RegExp(r'\b20\d{2}\b').hasMatch(input);
+    final hasNamedMonth = RegExp(
+      r'\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\b',
+      caseSensitive: false,
+    ).hasMatch(input);
+    if (!hasExplicitYear &&
+        hasNamedMonth &&
+        isReferencedMonthAfter(parsed, current)) {
+      return DateTime(parsed.year - 1, parsed.month);
+    }
+    return parsed;
+  }
+
+  String _smartQueryTitleWithoutMonth(
+    String value,
+    DateTime? referencedMonth,
+  ) {
+    var normalized = _smartQueryTitle(value);
+    if (referencedMonth == null || normalized.isEmpty) return normalized;
+    normalized = normalized
+        .replaceAll(
+          RegExp(
+            r'\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\b',
+            caseSensitive: false,
+          ),
+          ' ',
+        )
+        .replaceAll(RegExp(r'\b20\d{2}\b'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return normalized;
   }
 
   String _smartQueryTitle(String value) {
