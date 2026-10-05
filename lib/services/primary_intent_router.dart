@@ -436,7 +436,7 @@ class PrimaryIntentRouter {
     }
 
     if (RegExp(
-      r'\b(?:monthly\s+pdf|pdf\s+(?:report|statement|summary|dikhao|dikhado|kholo|open|show)|(?:open|show|view|dikhao|dikhado|kholo)\s+(?:monthly\s+)?pdf|monthly\s+report|financial\s+statement|mahine\s+(?:ki|ka)\s+pdf|is\s+mahine\s+(?:ki|ka)\s+pdf|(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)(?:\s+20\d{2})?\s+pdf)\b',
+      r'\b(?:monthly\s+pdf|(?:this|current|last|previous)\s+month\s+pdf|(?:pichlay|pichle)\s+mahine\s+(?:ki\s+)?pdf|pdf\s+(?:report|statement|summary|dikhao|dikhado|kholo|open|show)|(?:open|show|view|dikhao|dikhado|kholo)\s+(?:monthly\s+)?pdf|monthly\s+report|financial\s+statement|mahine\s+(?:ki|ka)\s+pdf|is\s+mahine\s+(?:ki|ka)\s+pdf|(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)(?:\s+20\d{2})?\s+pdf)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.openMonthlyPdf;
