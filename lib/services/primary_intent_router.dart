@@ -513,6 +513,66 @@ class PrimaryIntentRouter {
       r'\bsave\b.{0,28}\b(?:karni|karna|bachana|goal|target|monthly|mahina|mahine)\b|\b(?:goal|target)\b.{0,20}\bsave\b',
       caseSensitive: false,
     ).hasMatch(input);
+    final hasBareSaveGoal = RegExp(
+      r'^(?:save\s+\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?|\d+(?:\.\d+)?\s*(?:k|thousand|hazar|hazaar|lakh|lac)?\s+save)
+    if (hasBudgetWord && hasAmount) return true;
+    if ((hasExplicitSaveGoal || hasBareSaveGoal) && hasAmount) return true;
+    if (hasItemControl && (hasAmount || hasBudgetWord)) return true;
+    if (RegExp(
+      r'\b(?:har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
+      caseSensitive: false,
+    ).hasMatch(input)) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _isBareNavigationCommand(String input) {
+    return RegExp(
+      r'^(?:home|dashboard|main|main\s+screen|main\s+page|wallet|wallets|accounts|income\s+accounts|udhar|udhaar|debt|loan|monthly\s+plan|smart\s+plan|budget\s+plan|budget|stats|statistics|analytics|spending\s+trends|settings|setting|preferences|trash|deleted\s+(?:entries|transactions|items)|about|about\s+app)$',
+      caseSensitive: false,
+    ).hasMatch(input.trim());
+  }
+
+  String? _navigationTarget(String input) {
+    if (RegExp(
+      r'\b(monthly\s+pdf|pdf\s+(?:report|statement)|financial\s+statement|pdf)\b',
+    ).hasMatch(input)) {
+      return 'Settings';
+    }
+    if (RegExp(r'\b(monthly\s+plan|smart\s+plan|budget\s+plan|budget|mahine\s+ka\s+plan)\b')
+        .hasMatch(input)) {
+      return 'Monthly Plan';
+    }
+    if (RegExp(r'\b(trash|deleted\s+(?:entries|transactions|items))\b')
+        .hasMatch(input)) {
+      return 'Trash';
+    }
+    if (RegExp(r'\b(wallet|wallets|accounts|income\s+accounts)\b')
+        .hasMatch(input)) {
+      return 'Wallets';
+    }
+    if (RegExp(r'\b(stats|statistics|analytics|spending\s+trends)\b')
+        .hasMatch(input)) {
+      return 'Stats';
+    }
+    if (RegExp(r'\b(udhaar|udhar|debt|loan)\b').hasMatch(input)) {
+      return 'Udhaar';
+    }
+    if (RegExp(r'\b(settings|setting|preferences)\b').hasMatch(input)) {
+      return 'Settings';
+    }
+    if (RegExp(r'\babout(?:\s+app)?\b').hasMatch(input)) return 'About';
+    if (RegExp(r'\b(home|dashboard|main\s+screen|main\s+page)\b')
+        .hasMatch(input)) {
+      return 'Dashboard';
+    }
+    return null;
+  }
+}
+,
+      caseSensitive: false,
+    ).hasMatch(input.trim());
 
     if (isBudgetQuestion) return true;
     if (hasBudgetWord && hasAmount) return true;
