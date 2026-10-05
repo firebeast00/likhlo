@@ -81,12 +81,19 @@ void main() {
         'show monthly PDF',
         'mahine ki pdf dikhao',
         'open pdf',
+        'last month PDF',
+        'September PDF',
+        'September 2026 PDF',
       ]) {
         final plan = engine.parse(input, categories);
-        expect(plan.parsed.intent, SmartEntryIntent.appControl);
-        expect(plan.parsed.appAction, SmartEntryAppAction.openMonthlyPdf);
-        expect(plan.command, isA<ReadOnlySmartCommand>());
-        expect(plan.parsed.amount, 0);
+        expect(plan.parsed.intent, SmartEntryIntent.appControl, reason: input);
+        expect(
+          plan.parsed.appAction,
+          SmartEntryAppAction.openMonthlyPdf,
+          reason: input,
+        );
+        expect(plan.command, isA<ReadOnlySmartCommand>(), reason: input);
+        expect(plan.parsed.amount, 0, reason: input);
       }
 
       for (final input in [
