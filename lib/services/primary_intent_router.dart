@@ -349,7 +349,7 @@ class PrimaryIntentRouter {
 
   RoutedSmartAppAction? _appAction(String input) {
     if (RegExp(
-      r'\b(?:monthly\s+pdf|pdf\s+(?:report|statement|summary)|monthly\s+report|financial\s+statement|mahine\s+(?:ki|ka)\s+pdf|is\s+mahine\s+(?:ki|ka)\s+pdf)\b',
+      r'\b(?:monthly\s+pdf|pdf\s+(?:report|statement|summary|dikhao|dikhado|kholo|open|show)|(?:open|show|view|dikhao|dikhado|kholo)\s+(?:monthly\s+)?pdf|monthly\s+report|financial\s+statement|mahine\s+(?:ki|ka)\s+pdf|is\s+mahine\s+(?:ki|ka)\s+pdf)\b',
       caseSensitive: false,
     ).hasMatch(input)) {
       return RoutedSmartAppAction.openMonthlyPdf;
