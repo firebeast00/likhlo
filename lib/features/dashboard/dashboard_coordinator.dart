@@ -98,8 +98,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     });
 
     quickActions.setShortcutItems(<ShortcutItem>[
-      const ShortcutItem(type: 'action_voice_log', localizedTitle: 'Voice Log', icon: 'ic_mic'),
-      const ShortcutItem(type: 'action_add_expense', localizedTitle: 'Add Transaction', icon: 'ic_add'),
+      ShortcutItem(type: 'action_voice_log', localizedTitle: AppStrings.current.text('voice_log_250101'), icon: 'ic_mic'),
+      ShortcutItem(type: 'action_add_expense', localizedTitle: AppStrings.current.text('add_transaction_ea77fd'), icon: 'ic_add'),
     ]);
     _setupNativeQuickTile();
 
@@ -140,6 +140,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     ref.listen<PersistentNotificationSnapshot>(
       persistentNotificationSnapshotProvider,
       (_, next) {
@@ -252,7 +253,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         ),
                         borderRadius: BorderRadius.circular(26),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -262,7 +263,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                           ),
                           SizedBox(width: 8),
                           Text(
-                            'Add Transaction',
+                            AppStrings.current.text('add_transaction_ea77fd'),
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,

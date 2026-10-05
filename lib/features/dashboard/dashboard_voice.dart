@@ -5,8 +5,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     _dismissKeyboard();
     if (_isProcessingVoiceCommand) {
       _showTransactionInfo(
-        'Your previous voice command is still being processed.',
-        title: 'Please wait',
+        AppMessage('your_previous_voice_command_is_still_being_proce_4be015'),
+        title: AppMessage('please_wait_ee9e88'),
       );
       return;
     }
@@ -31,8 +31,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       if (!mounted) return;
       if (!available) {
         _showTransactionError(
-          'Speech recognition is not available. Enable the Google app or your phone\'s speech-recognition service, then allow microphone access.',
-          title: 'Voice recognition unavailable',
+          AppMessage('speech_recognition_is_not_available_enable_the_g_17bd68'),
+          title: AppMessage('voice_recognition_unavailable_1fa909'),
         );
         return;
       }
@@ -169,8 +169,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       _smartInputCtrl.clear();
       _setListening(false);
       _showTransactionError(
-        'Voice recognition could not start. Check microphone permission and the phone\'s speech-recognition service.',
-        title: 'Voice Log unavailable',
+        AppMessage('voice_recognition_could_not_start_check_micropho_db2292'),
+        title: AppMessage('voice_log_unavailable_9d7ecf'),
       );
     }
   }
@@ -441,23 +441,23 @@ extension _DashboardVoiceMethods on _HomeScreenState {
 
     if (networkFailure) {
       _showTransactionError(
-        'Voice recognition needs an internet connection on this phone. Connect to the internet or install an offline English language in Google voice typing. Typed Smart Entry still works.',
-        title: 'Voice service is offline',
+        AppMessage('voice_recognition_needs_an_internet_connection_o_2451e5'),
+        title: AppMessage('voice_service_is_offline_4130dd'),
       );
       return;
     }
 
     if (languageFailure) {
       _showTransactionError(
-        'No working speech language was found. Enable the Google app, select English in Google voice typing, and download its offline language pack.',
-        title: 'Speech language unavailable',
+        AppMessage('no_working_speech_language_was_found_enable_the__646a52'),
+        title: AppMessage('speech_language_unavailable_5e3d34'),
       );
       return;
     }
 
     _showTransactionError(
-      'Voice Log stopped before it received a final result. Please say the full command again.',
-      title: 'Voice Log stopped',
+      AppMessage('voice_log_stopped_before_it_received_a_final_res_3ba187'),
+      title: AppMessage('voice_log_stopped_c214bc'),
     );
   }
 
@@ -492,8 +492,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         _smartInputCtrl.clear();
         _voiceEntry.session.reset();
         _showTransactionError(
-          'The voice command was incomplete. Please tap the microphone and say the full command again.',
-          title: 'Voice command incomplete',
+          AppMessage('the_voice_command_was_incomplete_please_tap_the__e3c527'),
+          title: AppMessage('voice_command_incomplete_0baf1a'),
         );
         return;
       case SpeechSessionAction.none:
@@ -503,8 +503,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
           _smartInputCtrl.clear();
           _voiceEntry.session.reset();
           _showTransactionError(
-            'Voice recognition stopped before hearing any words. Tap the microphone and try again.',
-            title: 'Voice stopped too soon',
+            AppMessage('voice_recognition_stopped_before_hearing_any_wor_1b2943'),
+            title: AppMessage('voice_stopped_too_soon_1a2e53'),
           );
         }
         return;

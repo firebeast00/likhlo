@@ -1,14 +1,14 @@
 part of '../../screens/home_screen.dart';
 
 extension _DashboardFeedbackMethods on _HomeScreenState {
-  void _announceVoiceMessage(String message) {
+  void _announceVoiceMessage(Object message) {
     if (!mounted || !_isProcessingVoiceCommand) return;
     unawaited(AudioFeedbackService().announceMessage(message));
   }
 
   void _showTransactionError(
-      String message, {
-        String title = 'Unable to continue',
+      Object message, {
+        Object title = 'Unable to continue',
       }) {
     _showTopMessage(
       title: title,
@@ -18,9 +18,9 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
   }
 
   void _showTransactionSuccess(
-      String message, {
-        String title = 'Completed',
-        String? actionLabel,
+      Object message, {
+        Object title = 'Completed',
+        Object? actionLabel,
         Future<void> Function()? onAction,
         bool announce = true,
       }) {
@@ -35,8 +35,8 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
   }
 
   void _showTransactionInfo(
-      String message, {
-        String title = 'Information',
+      Object message, {
+        Object title = 'Information',
         bool announce = true,
       }) {
     _showTopMessage(
@@ -47,7 +47,7 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
     );
   }
 
-  void _showExpenseMessage(String message, {String title = 'Expense saved'}) {
+  void _showExpenseMessage(Object message, {Object title = 'Expense saved'}) {
     _showTopMessage(
       title: title,
       message: message,
@@ -55,7 +55,7 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
     );
   }
 
-  void _showIncomeMessage(String message, {String title = 'Income added'}) {
+  void _showIncomeMessage(Object message, {Object title = 'Income added'}) {
     _showTopMessage(
       title: title,
       message: message,
@@ -64,9 +64,9 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
   }
 
   void _showTransferMessage(
-    String message, {
-    String title = 'Transfer completed',
-    String? actionLabel,
+    Object message, {
+    Object title = 'Transfer completed',
+    Object? actionLabel,
     Future<void> Function()? onAction,
   }) {
     _showTopMessage(
@@ -79,9 +79,9 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
   }
 
   void _showDeletionMessage(
-    String message, {
-    String title = 'Moved to Trash',
-    String? actionLabel,
+    Object message, {
+    Object title = 'Moved to Trash',
+    Object? actionLabel,
     Future<void> Function()? onAction,
   }) {
     _showTopMessage(
@@ -94,20 +94,20 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
   }
 
   void _showTopMessage({
-    required String title,
-    required String message,
+    required Object title,
+    required Object message,
     required TransactionMessageTone tone,
-    String? actionLabel,
+    Object? actionLabel,
     Future<void> Function()? onAction,
     bool announce = true,
   }) {
     if (!mounted) return;
     _feedback.show(
       context,
-      title: title,
-      message: message,
+      title: AppStrings.current.display(title),
+      message: AppStrings.current.display(message),
       tone: tone,
-      actionLabel: actionLabel,
+      actionLabel: actionLabel == null ? null : AppStrings.current.display(actionLabel),
       onAction: onAction,
     );
     // Saved ledger entries already announce through TransactionExecutor.

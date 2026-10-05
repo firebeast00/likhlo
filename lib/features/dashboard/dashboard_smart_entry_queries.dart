@@ -22,8 +22,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     );
     if (mentionedIds.length > 1) {
       _showTransactionError(
-        'Mention only one wallet when selecting an entry to repeat.',
-        title: 'Multiple wallets detected',
+        AppMessage('mention_only_one_wallet_when_selecting_an_entry__e76615'),
+        title: AppMessage('multiple_wallets_detected_e80229'),
       );
       return;
     }
@@ -57,8 +57,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     );
     if (match.status == SmartEntryMatchStatus.notFound) {
       _showTransactionError(
-        'No safe matching entry was found. Add a title, amount, date, or wallet.',
-        title: 'Entry not found',
+        AppMessage('no_safe_matching_entry_was_found_add_a_title_amo_c374ba'),
+        title: AppMessage('entry_not_found_998d95'),
       );
       return;
     }
@@ -93,29 +93,29 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     if (!execution.succeeded) {
       _showTransactionError(
         source.type == 'expense'
-            ? 'The original wallet does not have enough balance to repeat this expense.'
-            : 'The original wallet is no longer available.',
-        title: 'Entry not repeated',
+            ? AppMessage('the_original_wallet_does_not_have_enough_balance_7dc949')
+            : AppMessage('the_original_wallet_is_no_longer_available_44ee95'),
+        title: AppMessage('entry_not_repeated_ce59a0'),
       );
       return;
     }
 
     _smartInputCtrl.clear();
     _showTopMessage(
-      title: source.type == 'income' ? 'Income repeated' : 'Expense repeated',
-      message: '${repeated.title} — Rs. ${repeated.amount.toStringAsFixed(0)}',
+      title: source.type == 'income' ? AppMessage('income_repeated_de54da') : AppMessage('expense_repeated_96bebf'),
+      message: AppMessage('rs_361275', {'p0': repeated.title, 'p1': repeated.amount.toStringAsFixed(0)}),
       tone: source.type == 'income'
           ? TransactionMessageTone.income
           : TransactionMessageTone.expense,
-      actionLabel: 'Undo',
+      actionLabel: AppMessage('undo_39fc72'),
       onAction: () async {
         await ref
             .read(transactionExecutorProvider)
             .execute(DeleteTransactionCommand(repeated.id));
         if (!mounted) return;
         _showTransactionInfo(
-          'The repeated entry was removed.',
-          title: 'Repeat undone',
+          AppMessage('the_repeated_entry_was_removed_d5e791'),
+          title: AppMessage('repeat_undone_981d9c'),
           announce: false,
         );
       },
@@ -155,15 +155,15 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
 
     if (metric == SmartEntryQueryMetric.udharReceivable) {
       _showTransactionInfo(
-        '${receivableEntries.length} active record${receivableEntries.length == 1 ? '' : 's'}.',
-        title: 'Rs. ${receivable.toStringAsFixed(0)} to receive',
+        AppMessage('active_record_d88f50', {'p0': receivableEntries.length, 'p1': AppEnglishSuffix(receivableEntries.length == 1 ? '' : 's')}),
+        title: AppMessage('rs_to_receive_fb9fc2', {'p0': receivable.toStringAsFixed(0)}),
       );
       return;
     }
     if (metric == SmartEntryQueryMetric.udharPayable) {
       _showTransactionInfo(
-        '${payableEntries.length} active record${payableEntries.length == 1 ? '' : 's'}.',
-        title: 'Rs. ${payable.toStringAsFixed(0)} to pay',
+        AppMessage('active_record_d88f50', {'p0': payableEntries.length, 'p1': AppEnglishSuffix(payableEntries.length == 1 ? '' : 's')}),
+        title: AppMessage('rs_to_pay_346fb7', {'p0': payable.toStringAsFixed(0)}),
       );
       return;
     }
@@ -178,10 +178,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     }).length;
 
     _showTransactionInfo(
-      'To receive Rs. ${receivable.toStringAsFixed(0)} · '
-      'To pay Rs. ${payable.toStringAsFixed(0)} · '
-      '${active.length} active · $overdue overdue.',
-      title: 'Udhar net Rs. ${(receivable - payable).toStringAsFixed(0)}',
+      AppMessage('to_receive_rs_to_pay_rs_active_overdue_ed8440', {'p0': receivable.toStringAsFixed(0), 'p1': payable.toStringAsFixed(0), 'p2': active.length, 'p3': overdue}),
+      title: AppMessage('udhar_net_rs_c3ca07', {'p0': (receivable - payable).toStringAsFixed(0)}),
     );
   }
 
@@ -191,8 +189,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final action = command.appAction;
     if (action == null) {
       _showTransactionInfo(
-        'Try dark mode, monthly PDF, scan receipt, reminders, spoken confirmations, backup, language, or app lock.',
-        title: 'App control not recognized',
+        AppMessage('try_dark_mode_monthly_pdf_scan_receipt_reminders_a70d88'),
+        title: AppMessage('app_control_not_recognized_031b39'),
       );
       return;
     }
@@ -208,11 +206,11 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       final scaffold = Scaffold.maybeOf(context);
       if (scaffold != null && scaffold.hasDrawer) {
         scaffold.openDrawer();
-        _announceVoiceMessage('App menu opened.');
+        _announceVoiceMessage(AppMessage('app_menu_opened_1299a3'));
       } else {
         _showTransactionInfo(
-          'The app menu is not available on this screen.',
-          title: 'Menu unavailable',
+          AppMessage('the_app_menu_is_not_available_on_this_screen_d11d51'),
+          title: AppMessage('menu_unavailable_cbb15e'),
         );
       }
       return;
@@ -226,11 +224,11 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       if (!mounted) return;
       _showTransactionInfo(
         selection.value == 'Random'
-            ? 'A new theme color was selected.'
-            : '${selection.value} theme color is now active.',
+            ? AppMessage('a_new_theme_color_was_selected_177be3')
+            : AppMessage('theme_color_is_now_active_713f50', {'p0': selection.value}),
         title: selection.value == 'Random'
-            ? 'Theme color changed'
-            : '${selection.value} theme',
+            ? AppMessage('theme_color_changed_4b05d6')
+            : AppMessage('theme_1a3211', {'p0': selection.value}),
       );
       return;
     }
@@ -254,9 +252,9 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       _categorySelectionNotifier.value = 'All';
       _showTransactionInfo(
         hadFilters
-            ? 'Search and transaction filters were cleared.'
-            : 'No transaction filters are active.',
-        title: hadFilters ? 'Filters cleared' : 'Nothing to clear',
+            ? AppMessage('search_and_transaction_filters_were_cleared_5b0ca8')
+            : AppMessage('no_transaction_filters_are_active_97e05d'),
+        title: hadFilters ? AppMessage('filters_cleared_4849be') : AppMessage('nothing_to_clear_ec219a'),
       );
       return;
     }
@@ -373,9 +371,9 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     if (!mounted) return;
     _showTransactionInfo(
       enableDark
-          ? 'Dark mode is now enabled.'
-          : 'Light mode is now enabled.',
-      title: enableDark ? 'Dark mode on' : 'Dark mode off',
+          ? AppMessage('dark_mode_is_now_enabled_d0531a')
+          : AppMessage('light_mode_is_now_enabled_38fa87'),
+      title: enableDark ? AppMessage('dark_mode_on_44cf93') : AppMessage('dark_mode_off_d3b1a8'),
     );
   }
 
@@ -383,8 +381,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final metric = command.queryMetric;
     if (metric == null) {
       _showTransactionInfo(
-        "Ask something like 'how much did I spend this month?'",
-        title: 'Question needs more detail',
+        AppMessage('ask_something_like_how_much_did_i_spend_this_mon_d4b5b9'),
+        title: AppMessage('question_needs_more_detail_0deb52'),
       );
       return;
     }
@@ -416,8 +414,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     );
     if (mentionedIds.length > 1) {
       _showTransactionError(
-        'Mention one wallet at a time for a precise answer.',
-        title: 'Multiple wallets detected',
+        AppMessage('mention_one_wallet_at_a_time_for_a_precise_answe_1b73fb'),
+        title: AppMessage('multiple_wallets_detected_e80229'),
       );
       return;
     }
@@ -426,8 +424,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       if (mentionedIds.isEmpty) {
         final total = ref.read(totalAvailableProvider);
         _showTransactionInfo(
-          'Rs. ${total.toStringAsFixed(0)} across ${wallets.length} wallet${wallets.length == 1 ? '' : 's'}.',
-          title: 'Total wallet balance',
+          AppMessage('rs_across_wallet_d86033', {'p0': total.toStringAsFixed(0), 'p1': wallets.length, 'p2': AppEnglishSuffix(wallets.length == 1 ? '' : 's')}),
+          title: AppMessage('total_wallet_balance_dc1cda'),
         );
       } else {
         final wallet = wallets.firstWhere(
@@ -435,8 +433,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
         );
         final balance = ref.read(walletBalanceProvider(wallet.id));
         _showTransactionInfo(
-          'Rs. ${balance.toStringAsFixed(0)} available.',
-          title: '${wallet.name} balance',
+          AppMessage('rs_available_69ca43', {'p0': balance.toStringAsFixed(0)}),
+          title: AppMessage('balance_bc2b71', {'p0': wallet.name}),
         );
       }
       _smartInputCtrl.clear();
@@ -466,20 +464,20 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     switch (metric) {
       case SmartEntryQueryMetric.spending:
         _showTransactionInfo(
-          '${matching.where((entry) => entry.type == 'expense').length} expense${matching.where((entry) => entry.type == 'expense').length == 1 ? '' : 's'}$subject.',
-          title: 'Rs. ${spending.toStringAsFixed(0)} spent · $period',
+          AppMessage('expense_2a0b6d', {'p0': matching.where((entry) => entry.type == 'expense').length, 'p1': AppEnglishSuffix(matching.where((entry) => entry.type == 'expense').length == 1 ? '' : 's'), 'p2': subject}),
+          title: AppMessage('rs_spent_3fb486', {'p0': spending.toStringAsFixed(0), 'p1': AppLabel(period)}),
         );
         break;
       case SmartEntryQueryMetric.income:
         _showTransactionInfo(
-          '${matching.where((entry) => entry.type == 'income').length} income entr${matching.where((entry) => entry.type == 'income').length == 1 ? 'y' : 'ies'}$subject.',
-          title: 'Rs. ${income.toStringAsFixed(0)} received · $period',
+          AppMessage('income_entr_596b1b', {'p0': matching.where((entry) => entry.type == 'income').length, 'p1': AppEnglishSuffix(matching.where((entry) => entry.type == 'income').length == 1 ? 'y' : 'ies'), 'p2': subject}),
+          title: AppMessage('rs_received_91524c', {'p0': income.toStringAsFixed(0), 'p1': AppLabel(period)}),
         );
         break;
       case SmartEntryQueryMetric.net:
         _showTransactionInfo(
-          'Income Rs. ${income.toStringAsFixed(0)} · Expenses Rs. ${spending.toStringAsFixed(0)}.',
-          title: 'Net Rs. ${(income - spending).toStringAsFixed(0)} · $period',
+          AppMessage('income_rs_expenses_rs_bf056a', {'p0': income.toStringAsFixed(0), 'p1': spending.toStringAsFixed(0)}),
+          title: AppMessage('net_rs_692f91', {'p0': (income - spending).toStringAsFixed(0), 'p1': AppLabel(period)}),
         );
         break;
       case SmartEntryQueryMetric.transactionCount:
@@ -488,8 +486,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
             ? matching.length
             : matching.where((entry) => entry.type == type).length;
         _showTransactionInfo(
-          '${type == null ? 'Income and expense' : type == 'income' ? 'Income' : 'Expense'} records$subject.',
-          title: '$count transactions · $period',
+          AppMessage('records_eab69c', {'p0': type == null ? 'Income and expense' : type == 'income' ? 'Income' : 'Expense', 'p1': subject}),
+          title: AppMessage('transactions_3cd4cc', {'p0': count, 'p1': AppLabel(period)}),
         );
         break;
       case SmartEntryQueryMetric.summary:
@@ -513,10 +511,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
             ? 'No expense category yet.'
             : 'Top: ${topCategory.key} Rs. ${topCategory.value.toStringAsFixed(0)}.';
         _showTransactionInfo(
-          'Income Rs. ${income.toStringAsFixed(0)} · Spent Rs. ${spending.toStringAsFixed(0)} · '
-          'Net Rs. ${(income - spending).toStringAsFixed(0)} · '
-          '${matching.length} entr${matching.length == 1 ? 'y' : 'ies'}. $topText',
-          title: 'Financial summary · $period',
+          AppMessage('income_rs_spent_rs_net_rs_entr_032470', {'p0': income.toStringAsFixed(0), 'p1': spending.toStringAsFixed(0), 'p2': (income - spending).toStringAsFixed(0), 'p3': matching.length, 'p4': AppEnglishSuffix(matching.length == 1 ? 'y' : 'ies'), 'p5': AppLabel(topText)}),
+          title: AppMessage('financial_summary_e8c7e7', {'p0': AppLabel(period)}),
         );
         break;
       case SmartEntryQueryMetric.balance:
@@ -553,8 +549,8 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     _primaryTabsController.select(PrimaryLedgerTab.main);
     _smartInputCtrl.clear();
     _showTransactionInfo(
-      'Close search to return to the normal monthly view.',
-      title: 'Transaction filters applied',
+      AppMessage('close_search_to_return_to_the_normal_monthly_vie_aaab1c'),
+      title: AppMessage('transaction_filters_applied_2e8692'),
     );
   }
 
@@ -564,31 +560,31 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final target = command.navigationTarget;
     if (target == null) {
       _showTransactionInfo(
-        'Try Home, Wallets, Udhaar, Monthly Plan, Stats, Settings, Trash, or About.',
-        title: 'Screen not recognized',
+        AppMessage('try_home_wallets_udhaar_monthly_plan_stats_setti_4c294f'),
+        title: AppMessage('screen_not_recognized_946e3d'),
       );
       return;
     }
     _smartInputCtrl.clear();
     if (target == 'Wallets') {
-      _announceVoiceMessage('Opening Wallets.');
+      _announceVoiceMessage(AppMessage('opening_wallets_a26f50'));
       await _openIncomeAccounts();
       return;
     }
     if (target == 'Dashboard' || target == 'Home' || target == 'Main') {
       _openPrimaryLedgerTab(PrimaryLedgerTab.main);
-      _announceVoiceMessage('Dashboard opened.');
+      _announceVoiceMessage(AppMessage('dashboard_opened_004ce9'));
       return;
     }
     if (target == 'Udhaar' || target == 'Udhar') {
       _openPrimaryLedgerTab(PrimaryLedgerTab.udhar);
-      _announceVoiceMessage('Udhar opened.');
+      _announceVoiceMessage(AppMessage('udhar_opened_558358'));
       if (RegExp(r'\b(udhar|udhaar|debt|loan)\b')
               .hasMatch(command.rawInput.toLowerCase()) &&
           RegExp(r'\d').hasMatch(command.rawInput)) {
         _showTransactionInfo(
-          'This was not saved as a normal expense. Use Quick Udhar here to review and save the debt entry.',
-          title: 'Udhar command detected',
+          AppMessage('this_was_not_saved_as_a_normal_expense_use_quick_02786f'),
+          title: AppMessage('udhar_command_detected_6ba7b1'),
         );
       }
       return;
@@ -610,13 +606,13 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
       }
       _changeSection(section);
       if (section != AppSection.stats || requestedMonth == null) {
-        _announceVoiceMessage('Opening ${section.label}.');
+        _announceVoiceMessage(AppMessage('opening_7e01ca', {'p0': AppLabel(section.label)}));
       }
       return;
     }
     _showTransactionInfo(
-      'Try Home, Wallets, Udhaar, Monthly Plan, Stats, Settings, Trash, or About.',
-      title: 'Screen not recognized',
+      AppMessage('try_home_wallets_udhaar_monthly_plan_stats_setti_4c294f'),
+      title: AppMessage('screen_not_recognized_946e3d'),
     );
   }
 

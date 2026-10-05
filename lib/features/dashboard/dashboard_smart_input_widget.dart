@@ -59,7 +59,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _isListening ? 'Listening now' : 'Smart Entry',
+                          _isListening ? AppStrings.current.text('listening_now_dbfe77') : AppStrings.current.text('smart_entry_2ac121'),
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -68,7 +68,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                         const SizedBox(height: 2),
                         Text(
                           _isListening
-                              ? 'Speak naturally — it saves automatically'
+                              ? AppStrings.current.text('speak_naturally_it_saves_automatically_35800d')
                               : defaultAccountLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -96,7 +96,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                 )
               else
                 IconButton(
-                  tooltip: 'Select default Smart Entry wallet',
+                  tooltip: AppStrings.current.text('select_default_smart_entry_wallet_f54e86'),
                   visualDensity: VisualDensity.compact,
                   onPressed: _showSmartEntryAccountPicker,
                   icon: Icon(
@@ -124,10 +124,10 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
               onSubmitted: _processNLP,
               decoration: InputDecoration(
                 hintText: _isListening
-                    ? 'Listening…'
+                    ? AppStrings.current.text('listening_6c19a4')
                     : smartEntryLanguage == 'romanUrdu'
-                        ? 'Misal: 500 biryani par kharch kiya'
-                        : 'e.g. 500 biryani from JazzCash',
+                        ? AppStrings.current.text('misal_500_biryani_par_kharch_kiya_6fef97')
+                        : AppStrings.current.text('e_g_500_biryani_from_jazzcash_ed8442'),
                 hintStyle: TextStyle(
                   color: Colors.grey.shade500,
                   fontSize: 12,
@@ -142,7 +142,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Scan receipt',
+                      tooltip: AppStrings.current.text('scan_receipt_08a533'),
                       visualDensity: VisualDensity.compact,
                       constraints:
                       const BoxConstraints.tightFor(width: 38, height: 40),
@@ -165,7 +165,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                     ),
                     IconButton(
                       tooltip:
-                      _isListening ? 'Stop listening' : 'Voice input',
+                      _isListening ? AppStrings.current.text('stop_listening_e13421') : AppStrings.current.text('voice_input_c0b2ce'),
                       visualDensity: VisualDensity.compact,
                       constraints:
                       const BoxConstraints.tightFor(width: 38, height: 40),
@@ -187,7 +187,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        tooltip: 'Save Smart Entry',
+                        tooltip: AppStrings.current.text('save_smart_entry_ec5c33'),
                         padding: EdgeInsets.zero,
                         onPressed: () =>
                             _processNLP(_smartInputCtrl.text),

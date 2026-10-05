@@ -14,8 +14,8 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
     _dismissKeyboard();
     if (existing?.category == 'Transfer') {
       _showTransactionInfo(
-        'Delete this transfer and create it again if its details need to change.',
-        title: 'Transfers cannot be edited',
+        AppMessage('delete_this_transfer_and_create_it_again_if_its__f61a0b'),
+        title: AppMessage('transfers_cannot_be_edited_557173'),
       );
       return null;
     }
@@ -105,8 +105,8 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Review before saving',
+                                Text(
+                                  AppStrings.current.text('review_before_saving_6f92b7'),
                                   style: TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w800,
@@ -114,7 +114,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  reviewMessage,
+                                  AppStrings.current.display(reviewMessage),
                                   style: TextStyle(
                                     color: Theme.of(context)
                                         .colorScheme
@@ -148,7 +148,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                   if (transactionType != 'transfer')
                     _buildModernInput(titleCtrl, "Title", Icons.title_rounded, primaryColor)
                   else
-                    const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text("Moving money between wallets", style: TextStyle(color: Colors.grey, fontSize: 13)))),
+                    Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text(AppStrings.current.text('moving_money_between_wallets_2919b3'), style: TextStyle(color: Colors.grey, fontSize: 13)))),
 
                   const SizedBox(height: 12),
                   _buildModernInput(amountCtrl, "Amount", Icons.attach_money_rounded, primaryColor, isNumber: true),
@@ -197,7 +197,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                                 value: categories.contains(selectedCategory) ? selectedCategory : (categories.isNotEmpty ? categories.first : "General"),
                                 isExpanded: true,
                                 icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey.shade500),
-                                items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis))).toList(),
+                                items: categories.map((c) => DropdownMenuItem(value: c, child: Text(AppStrings.current.display(c), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis))).toList(),
                                 onChanged: (v) => setModalState(() => selectedCategory = v!),
                               ),
                             ),
@@ -215,11 +215,11 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                       onPressed: () async {
                         final amt = double.tryParse(amountCtrl.text.trim());
                         if (amt == null || !amt.isFinite || amt <= 0) {
-                          _showTransactionError('Enter a valid amount above zero.');
+                          _showTransactionError(AppMessage('enter_a_valid_amount_above_zero_8262af'));
                           return;
                         }
                         if (wallets.isEmpty) {
-                          _showTransactionError('Create a wallet first.');
+                          _showTransactionError(AppMessage('create_a_wallet_first_16db9a'));
                           return;
                         }
 
@@ -238,8 +238,8 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                                 .firstWhere((w) => w.id == selectedWalletId)
                                 .name;
                             _showTransactionError(
-                              'Available in $accountName: Rs. ${available.toStringAsFixed(0)}. Required: Rs. ${amt.toStringAsFixed(0)}. Add money to this wallet or enter a smaller amount.',
-                              title: 'Insufficient balance',
+                              AppMessage('available_in_rs_required_rs_add_money_to_this_wa_96b697', {'p0': accountName, 'p1': available.toStringAsFixed(0), 'p2': amt.toStringAsFixed(0)}),
+                              title: AppMessage('insufficient_balance_1a1823'),
                             );
                             return;
                           }
@@ -248,11 +248,11 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                         Expense? preferenceEntry;
                         if (transactionType == 'transfer') {
                           if (wallets.length < 2) {
-                            _showTransactionError('Create at least two wallets to transfer money.');
+                            _showTransactionError(AppMessage('create_at_least_two_wallets_to_transfer_money_c80e1c'));
                             return;
                           }
                           if (selectedWalletId == transferToWalletId) {
-                            _showTransactionError('Choose two different wallets.');
+                            _showTransactionError(AppMessage('choose_two_different_wallets_32b992'));
                             return;
                           }
                           final available = ref
@@ -260,8 +260,8 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                               .getBalanceForWallet(selectedWalletId);
                           if (amt > available) {
                             _showTransactionError(
-                              'Available in the source wallet: Rs. ${available.toStringAsFixed(0)}. Enter a smaller amount or add money first.',
-                              title: 'Insufficient balance',
+                              AppMessage('available_in_the_source_wallet_rs_enter_a_smalle_ac724e', {'p0': available.toStringAsFixed(0)}),
+                              title: AppMessage('insufficient_balance_1a1823'),
                             );
                             return;
                           }
@@ -277,8 +277,8 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                           ));
                           if (!transferResult.succeeded) {
                             _showTransactionError(
-                              'The source wallet no longer has enough money for this transfer.',
-                              title: 'Transfer not saved',
+                              AppMessage('the_source_wallet_no_longer_has_enough_money_for_63c806'),
+                              title: AppMessage('transfer_not_saved_ff0de3'),
                             );
                             return;
                           }
@@ -289,7 +289,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                             if (transactionType == 'income') {
                               finalTitle = 'Income / Allowance';
                             } else {
-                              _showTransactionError('Enter a transaction title.');
+                              _showTransactionError(AppMessage('enter_a_transaction_title_817c58'));
                               return;
                             }
                           }
@@ -302,8 +302,8 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                                 .execute(CreateTransactionCommand(newEntry));
                             if (!createResult.succeeded) {
                               _showTransactionError(
-                                'Check the selected wallet balance and try again.',
-                                title: 'Transaction not saved',
+                                AppMessage('check_the_selected_wallet_balance_and_try_again_b1bee5'),
+                                title: AppMessage('transaction_not_saved_16554e'),
                               );
                               return;
                             }
@@ -317,7 +317,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                               updated: editedEntry,
                             ));
                             if (!updateResult.succeeded) {
-                              _showTransactionError('This transaction no longer exists.');
+                              _showTransactionError(AppMessage('this_transaction_no_longer_exists_11cb0e'));
                               return;
                             }
                             preferenceEntry = editedEntry;
@@ -335,15 +335,15 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                             notificationTitle, notificationDetail));
                           if (transactionType == 'transfer') {
                             _showTransferMessage(
-                              'Money was moved between the selected wallets.',
+                              AppMessage('money_was_moved_between_the_selected_wallets_a92dc6'),
                             );
                           } else if (transactionType == 'income') {
                             _showIncomeMessage(
-                              'The income was added to the selected wallet.',
+                              AppMessage('the_income_was_added_to_the_selected_wallet_36d17e'),
                             );
                           } else {
                             _showExpenseMessage(
-                              'The expense was saved to the selected wallet.',
+                              AppMessage('the_expense_was_saved_to_the_selected_wallet_2f0ad9'),
                             );
                           }
                         }
@@ -354,7 +354,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                         }
                         unawaited(_refreshSmartEntryReminders());
                       },
-                      child: Text(transactionType == 'transfer' ? "Complete Transfer" : "Save Transaction", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      child: Text(transactionType == 'transfer' ? AppStrings.current.text('complete_transfer_bf7f6e') : AppStrings.current.text('save_transaction_a3f812'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
                   )
                 ],
@@ -374,7 +374,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(color: isActive ? color.withValues(alpha: 0.15) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
-          child: Center(child: Text(label, style: TextStyle(color: isActive ? color : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))),
+          child: Center(child: Text(AppStrings.current.display(label), style: TextStyle(color: isActive ? color : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))),
         ),
       ),
     );

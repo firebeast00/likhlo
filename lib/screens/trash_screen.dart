@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -19,6 +20,7 @@ class TrashScreen extends ConsumerStatefulWidget {
 class _TrashScreenState extends ConsumerState<TrashScreen> {
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final deleted = ref.watch(expenseProvider).deletedExpenses;
     final deletedIds = deleted.map((entry) => entry.id).toSet();
     final visible = visibleTransactions(deleted).where((entry) {
@@ -40,19 +42,19 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final primary = Theme.of(context).colorScheme.primary;
 
     if (totalCount == 0) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.delete_sweep_outlined, size: 58, color: Colors.grey),
             SizedBox(height: 12),
             Text(
-              'Trash is empty',
+              AppStrings.current.text('trash_is_empty_49b796'),
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
             SizedBox(height: 5),
             Text(
-              'Deleted entries are kept for 30 days.',
+              AppStrings.current.text('deleted_entries_are_kept_for_30_days_aa3bcc'),
               style: TextStyle(color: Colors.grey),
             ),
           ],
@@ -68,7 +70,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
             children: [
               Expanded(
                 child: Text(
-                  '$totalCount deleted ${totalCount == 1 ? 'entry' : 'entries'}',
+                  AppStrings.current.text('deleted_998369', {'p0': totalCount, 'p1': totalCount == 1 ? 'entry' : 'entries'}),
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -80,7 +82,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                   orphanDebts,
                 ),
                 icon: const Icon(Icons.delete_forever_outlined, size: 19),
-                label: const Text('Empty Trash'),
+                label: Text(AppStrings.current.text('empty_trash_cb42d7')),
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
               ),
             ],
@@ -152,12 +154,12 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Restore',
+                        tooltip: AppStrings.current.text('restore_3cbe6d'),
                         onPressed: () => _restore(context, ref, entry),
                         icon: Icon(Icons.restore_rounded, color: primary),
                       ),
                       IconButton(
-                        tooltip: 'Delete permanently',
+                        tooltip: AppStrings.current.text('delete_permanently_e63b51'),
                         onPressed: () => _permanentlyDelete(context, ref, entry),
                         icon: const Icon(
                           Icons.delete_forever_outlined,
@@ -208,19 +210,19 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Delete permanently?'),
-            content: const Text(
-              'This entry and any linked Udhaar record cannot be recovered.',
+            title: Text(AppStrings.current.text('delete_permanently_afd1aa')),
+            content: Text(
+              AppStrings.current.text('this_entry_and_any_linked_udhaar_record_cannot_b_a5449d'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Delete permanently'),
+                child: Text(AppStrings.current.text('delete_permanently_e63b51')),
               ),
             ],
           ),
@@ -249,19 +251,19 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Empty Trash?'),
+            title: Text(AppStrings.current.text('empty_trash_ad55b6')),
             content: Text(
-              'Permanently delete all ${deleted.length + orphanDebts.length} entries? This cannot be undone.',
+              AppStrings.current.text('permanently_delete_all_entries_this_cannot_be_un_3bf5c2', {'p0': deleted.length + orphanDebts.length}),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Empty Trash'),
+                child: Text(AppStrings.current.text('empty_trash_cb42d7')),
               ),
             ],
           ),
@@ -306,7 +308,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: 'Restore',
+              tooltip: AppStrings.current.text('restore_3cbe6d'),
               icon: Icon(Icons.restore_rounded, color: primary),
               onPressed: () async {
                 await Hive.box<DebtEntry>('debts').put(
@@ -317,7 +319,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
               },
             ),
             IconButton(
-              tooltip: 'Delete permanently',
+              tooltip: AppStrings.current.text('delete_permanently_e63b51'),
               icon: const Icon(Icons.delete_forever_outlined, color: Colors.red),
               onPressed: () async {
                 final confirmed = await _confirmPermanentDelete(context);
@@ -336,16 +338,16 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
     return await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Delete permanently?'),
-            content: const Text('This record cannot be recovered.'),
+            title: Text(AppStrings.current.text('delete_permanently_afd1aa')),
+            content: Text(AppStrings.current.text('this_record_cannot_be_recovered_3c1744')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Delete permanently'),
+                child: Text(AppStrings.current.text('delete_permanently_e63b51')),
               ),
             ],
           ),
@@ -383,7 +385,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(AppStrings.current.display(message)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: error ? Colors.red.shade700 : Colors.green.shade700,
         ),

@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'package:quick_actions/quick_actions.dart';
 
 import '../app/app_action.dart';
 import '../providers/settings_provider.dart';
@@ -43,6 +45,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _selectedPdfMonth = DateTime(now.year, now.month);
   }
 
+  bool _changingAppLanguage = false;
+
+  Future<void> _setAppLanguage(String value) async {
+    if (_changingAppLanguage) return;
+    setState(() => _changingAppLanguage = true);
+    try {
+      await AudioFeedbackService().stop();
+      await ref.read(settingsProvider.notifier).updateAppLanguage(value);
+      if (!mounted) return;
+      final confirmation = value == 'romanUrdu'
+          ? 'App language is now Roman Urdu.'
+          : 'App language is now English.';
+      _showNlpSettingsResult(confirmation);
+      unawaited(AudioFeedbackService().announceMessage(confirmation));
+      // Notification/plugin work is best effort and cannot change saved data.
+      unawaited(NotificationService().refreshLocalizedContent());
+      unawaited(const QuickActions().setShortcutItems([
+        ShortcutItem(type: 'action_voice_log',
+          localizedTitle: AppStrings.current.display('Voice Log'), icon: 'ic_mic'),
+        ShortcutItem(type: 'action_add_expense',
+          localizedTitle: AppStrings.current.display('Add Transaction'), icon: 'ic_add'),
+      ]).catchError((Object error) {
+        debugPrint('Localized shortcuts unavailable: $error');
+      }));
+    } finally {
+      if (mounted) setState(() => _changingAppLanguage = false);
+    }
+  }
+
+  Future<void> _previewVoice() async {
+    if (!VoicePrivacySettings.read(_prefBox).spokenFeedbackEnabled) {
+      _showNlpSettingsResult('Enable Spoken Confirmations to preview the voice.');
+      return;
+    }
+    await AudioFeedbackService().stop();
+    await AudioFeedbackService().announceMessage('This is your spoken feedback voice.');
+  }
+
   Future<void> _setPersistentQuickLog(bool enabled) async {
     final preferenceWrite =
         _prefBox.put('persistent_bar_enabled', enabled);
@@ -62,7 +102,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!result.authenticated) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(result.message)));
+        ..showSnackBar(SnackBar(content: Text(AppStrings.current.display(result.message))));
       if (spokenFeedback) {
         unawaited(AudioFeedbackService().announceMessage(result.message));
       }
@@ -248,7 +288,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ..showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text(message),
+          content: Text(AppStrings.current.display(message)),
         ),
       );
   }
@@ -264,7 +304,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text("Edit Profile",
+        title: Text(AppStrings.current.text('edit_profile_cd280a'),
             style: TextStyle(fontWeight: FontWeight.w800)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -273,7 +313,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               controller: nameCtrl,
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
-                labelText: "Full Name",
+                labelText: AppStrings.current.text('full_name_64346b'),
                 prefixIcon: Icon(Icons.person_rounded, color: primaryColor),
                 filled: true,
                 fillColor: Theme.of(context).scaffoldBackgroundColor,
@@ -287,7 +327,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               controller: profCtrl,
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
-                labelText: "Profession / Role",
+                labelText: AppStrings.current.text('profession_role_467818'),
                 prefixIcon: Icon(Icons.work_rounded, color: primaryColor),
                 filled: true,
                 fillColor: Theme.of(context).scaffoldBackgroundColor,
@@ -305,7 +345,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Expanded(
                 child: TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text("Cancel",
+                  child: Text(AppStrings.current.text('cancel_77dfd2'),
                       style: TextStyle(
                           color: Colors.grey, fontWeight: FontWeight.bold)),
                 ),
@@ -330,7 +370,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         .updateUserProfession(profCtrl.text);
                     Navigator.pop(ctx);
                   },
-                  child: const Text("Save",
+                  child: Text(AppStrings.current.text('save_efc007'),
                       style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -359,7 +399,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text("Theme Color",
+        title: Text(AppStrings.current.text('theme_color_29ddb7'),
             style: TextStyle(fontWeight: FontWeight.w800)),
         content: Wrap(
           spacing: 16,
@@ -399,6 +439,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final settings = ref.watch(settingsProvider);
     final pendingAction = ref.watch(appActionProvider);
     if (pendingAction != null && _handledAppActionId != pendingAction.id) {
@@ -413,10 +454,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final String displayName =
-        (settings.userName.isNotEmpty) ? settings.userName : "Set up profile";
+        (settings.userName.isNotEmpty) ? settings.userName : AppStrings.current.display('Set up profile');
     final String displayProf = (settings.userProfession.isNotEmpty)
         ? settings.userProfession
-        : "Tap to add details";
+        : AppStrings.current.display('Tap to add details');
 
     // Read Hive states for Notification toggles
     final bool persistentEnabled =
@@ -435,7 +476,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         children: [
-          const Text("Preferences",
+          Text(AppStrings.current.text('preferences_9dfd34'),
               style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
@@ -515,9 +556,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 32),
 
           // 2. 🎨 APPEARANCE
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(left: 8, bottom: 12),
-            child: Text("Appearance",
+            child: Text(AppStrings.current.text('appearance_41def7'),
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -527,8 +568,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             isDark: isDark,
             children: [
               _buildSwitchTile(
-                title: "Dark Mode",
-                subtitle: "Sleek theme for night use",
+                title: AppStrings.current.text('dark_mode_e7f8b9'),
+                subtitle: AppStrings.current.text('sleek_theme_for_night_use_8d3602'),
                 icon:
                     isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
                 iconColor: Colors.indigo,
@@ -542,10 +583,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: _buildIconBox(Icons.color_lens_rounded, primaryColor),
-                title: const Text("Theme Color",
+                title: Text(AppStrings.current.text('theme_color_29ddb7'),
                     style:
                         TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text("Customize app accent",
+                subtitle: Text(AppStrings.current.text('customize_app_accent_0c03d5'),
                     style: TextStyle(fontSize: 13, color: Colors.grey)),
                 trailing: Container(
                   width: 30,
@@ -572,15 +613,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         _buildIconBox(
                             Icons.brightness_medium_rounded, Colors.orange),
                         const SizedBox(width: 16),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Screen Dimmer",
+                              Text(AppStrings.current.text('screen_dimmer_732fed'),
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 15)),
-                              Text("Dims the entire app interface",
+                              Text(AppStrings.current.text('dims_the_entire_app_interface_50aa9f'),
                                   style: TextStyle(
                                       fontSize: 13, color: Colors.grey)),
                             ],
@@ -617,9 +658,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 32),
 
           // 3. 🔔 NOTIFICATIONS & ALERTS
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(left: 8, bottom: 12),
-            child: Text("Notifications & Alerts",
+            child: Text(AppStrings.current.text('notifications_alerts_8ac4aa'),
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -629,8 +670,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             isDark: isDark,
             children: [
               _buildSwitchTile(
-                title: "Persistent Quick Entry",
-                subtitle: "Voice and direct text entry from the status bar",
+                title: AppStrings.current.text('persistent_quick_entry_f95553'),
+                subtitle: AppStrings.current.text('voice_and_direct_text_entry_from_the_status_bar_e28e69'),
                 icon: Icons.space_dashboard_rounded,
                 iconColor: Colors.teal,
                 value: persistentEnabled,
@@ -638,8 +679,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _buildDivider(),
               _buildSwitchTile(
-                title: "Smart Entry Reminders",
-                subtitle: "Receive daily nudges to log your expenses",
+                title: AppStrings.current.text('smart_entry_reminders_e9e662'),
+                subtitle: AppStrings.current.text('receive_daily_nudges_to_log_your_expenses_0dba02'),
                 icon: Icons.notifications_active_rounded,
                 iconColor: Colors.amber.shade600,
                 value: remindersEnabled,
@@ -649,10 +690,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 32),
 
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(left: 8, bottom: 12),
             child: Text(
-              "Voice & Privacy",
+              AppStrings.current.text('voice_privacy_d87a87'),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -664,15 +705,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             isDark: isDark,
             children: [
               ListTile(
+                leading: const Icon(Icons.language_rounded),
+                title: Text(AppStrings.current.display('App language')),
+                subtitle: Text(AppStrings.current.display(
+                  'English or Roman Urdu for app text and notifications')),
+                trailing: DropdownButton<String>(
+                  value: settings.appLanguage,
+                  underline: const SizedBox.shrink(),
+                  items: const [
+                    DropdownMenuItem(value: 'english', child: Text('English')),
+                    DropdownMenuItem(value: 'romanUrdu', child: Text('Roman Urdu')),
+                  ],
+                  onChanged: _changingAppLanguage ? null : (value) {
+                    if (value != null) unawaited(_setAppLanguage(value));
+                  },
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.volume_up_rounded),
+                title: Text(AppStrings.current.display('Preview voice')),
+                subtitle: Text(AppStrings.current.display(
+                  'English voice is used if an Urdu voice or spoken translation is unavailable.')),
+                onTap: _previewVoice,
+              ),
+              _buildDivider(),
+              ListTile(
                 leading: const Icon(Icons.language_rounded, color: Colors.teal),
-                title: const Text('Smart Entry language'),
-                subtitle: const Text('Typing aur voice ki zaban. Both languages remain supported.'),
+                title: Text(AppStrings.current.text('smart_entry_language_ca86c2')),
+                subtitle: Text(AppStrings.current.text('typing_aur_voice_ki_zaban_both_languages_remain__5e25cb')),
                 trailing: DropdownButton<String>(
                   value: ref.watch(settingsProvider).smartEntryLanguage,
                   underline: const SizedBox.shrink(),
-                  items: const [
-                    DropdownMenuItem(value: 'romanUrdu', child: Text('Roman Urdu')),
-                    DropdownMenuItem(value: 'english', child: Text('English')),
+                  items: [
+                    DropdownMenuItem(value: 'romanUrdu', child: Text(AppStrings.current.text('roman_urdu_24aeea'))),
+                    DropdownMenuItem(value: 'english', child: Text(AppStrings.current.text('english_649df0'))),
                   ],
                   onChanged: (value) async {
                     if (value == null) return;
@@ -682,9 +748,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _buildDivider(),
               _buildSwitchTile(
-                title: "Likhlo App Lock",
+                title: AppStrings.current.text('likhlo_app_lock_2ef137'),
                 subtitle:
-                    "Require fingerprint, Face ID, or device passcode after leaving the app",
+                    AppStrings.current.text('require_fingerprint_face_id_or_device_passcode_a_eee4b0'),
                 icon: Icons.lock_outline_rounded,
                 iconColor: Colors.indigo,
                 value: appLockEnabled,
@@ -692,9 +758,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _buildDivider(),
               _buildSwitchTile(
-                title: "Cloud Voice Pilot",
+                title: AppStrings.current.text('cloud_voice_pilot_fcb911'),
                 subtitle:
-                    "Allow cloud speech only when a secure gateway is configured",
+                    AppStrings.current.text('allow_cloud_speech_only_when_a_secure_gateway_is_60fcf1'),
                 icon: Icons.cloud_outlined,
                 iconColor: Colors.blue,
                 value: voicePrivacy.cloudSpeechEnabled,
@@ -705,9 +771,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _buildDivider(),
               _buildSwitchTile(
-                title: "Anonymous Voice Diagnostics",
+                title: AppStrings.current.text('anonymous_voice_diagnostics_4da485'),
                 subtitle:
-                    "Share timing and error categories, never audio or transcripts",
+                    AppStrings.current.text('share_timing_and_error_categories_never_audio_or_f7281d'),
                 icon: Icons.analytics_outlined,
                 iconColor: Colors.purple,
                 value: voicePrivacy.diagnosticsOptIn,
@@ -718,9 +784,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _buildDivider(),
               _buildSwitchTile(
-                title: "Spoken Confirmations",
+                title: AppStrings.current.text('spoken_confirmations_8da677'),
                 subtitle:
-                    "Use fixed transaction wording when voice feedback is available",
+                    AppStrings.current.text('use_fixed_transaction_wording_when_voice_feedbac_c1498b'),
                 icon: Icons.volume_up_outlined,
                 iconColor: Colors.green,
                 value: voicePrivacy.spokenFeedbackEnabled,
@@ -734,9 +800,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 32),
 
           // 4. 📂 EXPORT REPORT
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(left: 8, bottom: 12),
-            child: Text("Data & Reports",
+            child: Text(AppStrings.current.text('data_reports_386d2e'),
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -754,15 +820,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Icons.backup_rounded,
                   Colors.blue.shade600,
                 ),
-                title: const Text(
-                  "Backup & Restore",
+                title: Text(
+                  AppStrings.current.text('backup_restore_3bdd40'),
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
                   ),
                 ),
-                subtitle: const Text(
-                  "Create or restore an encrypted Likhlo backup",
+                subtitle: Text(
+                  AppStrings.current.text('create_or_restore_an_encrypted_likhlo_backup_2ad7ac'),
                   style: TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded),
@@ -778,11 +844,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 leading: _buildIconBox(
                     Icons.picture_as_pdf_rounded, Colors.red.shade400),
-                title: const Text("Export Monthly PDF",
+                title: Text(AppStrings.current.text('export_monthly_pdf_f024ee'),
                     style:
                         TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                 subtitle: Text(
-                    '${DateFormat.yMMMM().format(_selectedPdfMonth)} · choose month and export',
+                    AppStrings.current.text('choose_month_and_export_ccb888', {'p0': DateFormat.yMMMM().format(_selectedPdfMonth)}),
                     style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 trailing: Container(
                   padding: const EdgeInsets.all(8),
@@ -847,9 +913,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return SwitchListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       secondary: _buildIconBox(icon, iconColor),
-      title: Text(title,
+      title: Text(AppStrings.current.display(title),
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-      subtitle: Text(subtitle,
+      subtitle: Text(AppStrings.current.display(subtitle),
           style: const TextStyle(fontSize: 13, color: Colors.grey)),
       activeThumbColor: Color(ref.read(settingsProvider).profileColorValue),
       value: value,
@@ -1144,7 +1210,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  title,
+                  AppStrings.current.display(title),
                   style: const pw.TextStyle(
                     fontSize: 8.5,
                     color: mutedText,
@@ -1162,7 +1228,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (subtitle != null) ...[
                   pw.SizedBox(height: 2),
                   pw.Text(
-                    subtitle,
+                    AppStrings.current.display(subtitle),
                     style: const pw.TextStyle(
                       fontSize: 7.5,
                       color: mutedText,
@@ -1191,7 +1257,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
           ),
           child: pw.Text(
-            label,
+            AppStrings.current.display(label),
             style: pw.TextStyle(
               color: foreground,
               fontSize: fontSize,
@@ -1208,7 +1274,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return pw.Padding(
           padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
           child: pw.Text(
-            text,
+            AppStrings.current.display(text),
             textAlign: align,
             style: pw.TextStyle(
               color: PdfColors.white,
@@ -1308,7 +1374,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         pw.SizedBox(width: 4),
                         pw.Flexible(
                           child: pw.Text(
-                            shortTitle(entry.category, max: 18),
+                            shortTitle(AppStrings.current.display(entry.category), max: 18),
                             maxLines: 1,
                             style: pw.TextStyle(
                               color: catColor,
@@ -1436,11 +1502,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  'Likhlo Monthly Summary',
+                  AppStrings.current.text('likhlo_monthly_summary_3c9ad8'),
                   style: const pw.TextStyle(fontSize: 7.5, color: mutedText),
                 ),
                 pw.Text(
-                  'Page ${context.pageNumber} of ${context.pagesCount}',
+                  AppStrings.current.text('page_of_6e848e', {'p0': context.pageNumber, 'p1': context.pagesCount}),
                   style: const pw.TextStyle(fontSize: 7.5, color: mutedText),
                 ),
               ],
@@ -1463,7 +1529,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'LIKHLO',
+                          AppStrings.current.text('likhlo_b062c4'),
                           style: pw.TextStyle(
                             fontSize: 27,
                             fontWeight: pw.FontWeight.bold,
@@ -1472,7 +1538,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         pw.SizedBox(height: 3),
                         pw.Text(
-                          'Monthly Financial Summary',
+                          AppStrings.current.text('monthly_financial_summary_29a988'),
                           style: const pw.TextStyle(
                             fontSize: 13,
                             color: pageText,
@@ -1480,8 +1546,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         pw.SizedBox(height: 3),
                         pw.Text(
-                          '${expenses.length} ledger entries'
-                          '${udharEntries.isNotEmpty ? ' + ${udharEntries.length} Udhar records' : ''}',
+                          AppStrings.current.text('ledger_entries_3f5f01', {'p0': expenses.length, 'p1': udharEntries.isNotEmpty ? ' + ${udharEntries.length} Udhar records' : '', 'p2': udharEntries.length}),
                           style: const pw.TextStyle(
                             fontSize: 8.5,
                             color: mutedText,
@@ -1495,7 +1560,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         pw.Text(
                           settings.userName.isNotEmpty
                               ? settings.userName
-                              : 'Student Account',
+                              : AppStrings.current.text('student_account_78d744'),
                           style: pw.TextStyle(
                             fontWeight: pw.FontWeight.bold,
                             fontSize: 12,
@@ -1541,7 +1606,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     pw.Text(
-                      'Spending by category',
+                      AppStrings.current.text('spending_by_category_d4aadf'),
                       style: pw.TextStyle(
                         fontSize: 12,
                         fontWeight: pw.FontWeight.bold,
@@ -1549,7 +1614,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                     pw.Text(
-                      '${categories.length} categories',
+                      AppStrings.current.text('categories_7326ba', {'p0': categories.length}),
                       style: const pw.TextStyle(
                         fontSize: 8,
                         color: mutedText,
@@ -1587,7 +1652,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                             pw.SizedBox(width: 4),
                             pw.Text(
-                              '${shortTitle(category.key, max: 18)}  Rs. ${category.value.toStringAsFixed(0)}',
+                              AppStrings.current.text('rs_3921b4', {'p0': AppLabel(shortTitle(category.key, max: 18)), 'p1': category.value.toStringAsFixed(0)}),
                               style: pw.TextStyle(
                                 fontSize: 7.5,
                                 color: categoryColor(category.key),
@@ -1605,7 +1670,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(
-                    'Transaction History',
+                    AppStrings.current.text('transaction_history_4ed32a'),
                     style: pw.TextStyle(
                       fontSize: 15,
                       fontWeight: pw.FontWeight.bold,
@@ -1613,7 +1678,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   pw.Text(
-                    '${expenses.length} entries',
+                    AppStrings.current.text('entries_f8a4e0', {'p0': expenses.length}),
                     style: const pw.TextStyle(
                       fontSize: 8,
                       color: mutedText,
@@ -1637,7 +1702,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   padding: const pw.EdgeInsets.all(14),
                   color: softSurface,
                   child: pw.Text(
-                    'No ledger transactions available.',
+                    AppStrings.current.text('no_ledger_transactions_available_1abd8e'),
                     style: const pw.TextStyle(fontSize: 9, color: mutedText),
                   ),
                 )
@@ -1660,7 +1725,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
                             pw.Text(
-                              'Udhar / Debt',
+                              AppStrings.current.text('udhar_debt_44bce8'),
                               style: pw.TextStyle(
                                 fontSize: 14,
                                 fontWeight: pw.FontWeight.bold,
@@ -1669,7 +1734,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                             pw.SizedBox(height: 2),
                             pw.Text(
-                              'Udhar activity linked to this month. Status reflects the current debt state.',
+                              AppStrings.current.text('udhar_activity_linked_to_this_month_status_refle_1265dd'),
                               style: const pw.TextStyle(
                                 fontSize: 8,
                                 color: mutedText,
@@ -1679,7 +1744,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       pw.Text(
-                        '${activeUdhar.length} active',
+                        AppStrings.current.text('active_c24984', {'p0': activeUdhar.length}),
                         style: pw.TextStyle(
                           fontSize: 9,
                           fontWeight: pw.FontWeight.bold,
@@ -1711,7 +1776,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               pw.SizedBox(height: 14),
               pw.Center(
                 child: pw.Text(
-                  'Generated securely via Likhlo Expense Manager.',
+                  AppStrings.current.text('generated_securely_via_likhlo_expense_manager_686e4a'),
                   style: const pw.TextStyle(
                     fontSize: 8,
                     color: mutedText,
@@ -1732,8 +1797,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       debugPrint('PDF export failed: $error');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not export the report. Please try again.'),
+        SnackBar(
+          content: Text(AppStrings.current.text('could_not_export_the_report_please_try_again_1182f1')),
         ),
       );
     }

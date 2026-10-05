@@ -70,17 +70,17 @@ extension _DashboardSmartEntryMatchingMethods on _HomeScreenState {
                           children: [
                             Text(
                               deleting
-                                  ? 'Choose entry to delete'
+                                  ? AppStrings.current.text('choose_entry_to_delete_fafeb7')
                                   : repeating
-                                  ? 'Choose entry to repeat'
-                                  : 'Choose entry to edit',
+                                  ? AppStrings.current.text('choose_entry_to_repeat_05a271')
+                                  : AppStrings.current.text('choose_entry_to_edit_8765a3'),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'Several entries match your command.',
+                              AppStrings.current.text('several_entries_match_your_command_e9a6dd'),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),

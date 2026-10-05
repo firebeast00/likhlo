@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -126,7 +127,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Create a wallet first.')),
+        SnackBar(content: Text(AppStrings.current.text('create_a_wallet_first_16db9a'))),
       );
       return;
     }
@@ -147,12 +148,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Default Quick Udhar wallet',
+                  AppStrings.current.text('default_quick_udhar_wallet_b85f12'),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -175,12 +176,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         color: Theme.of(sheetContext).colorScheme.primary,
                       ),
                     ),
-                    title: const Text(
-                      'Automatic',
+                    title: Text(
+                      AppStrings.current.text('automatic_ac9041'),
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    subtitle: const Text(
-                      'Use Cash first; an explicitly named wallet still wins',
+                    subtitle: Text(
+                      AppStrings.current.text('use_cash_first_an_explicitly_named_wallet_still__b1776a'),
                     ),
                     trailing: selectedId == null
                         ? const Icon(Icons.check_circle_rounded)
@@ -212,7 +213,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       subtitle: Text(
-                        '${wallet.isBackup ? 'Reserve wallet' : 'Available'} · Rs. ${walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}',
+                        AppStrings.current.text('rs_be0230', {'p0': wallet.isBackup ? 'Reserve wallet' : 'Available', 'p1': walletNotifier.getBalanceForWallet(wallet.id).toStringAsFixed(0)}),
                       ),
                       trailing: selectedId == wallet.id
                           ? const Icon(Icons.check_circle_rounded)
@@ -265,8 +266,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             setState(() => _isListening = false);
             _smartInputCtrl.clear();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Voice recognition stopped. Please try again.'),
+              SnackBar(
+                content: Text(AppStrings.current.text('voice_recognition_stopped_please_try_again_010e48')),
               ),
             );
           }
@@ -320,9 +321,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              "Speech recognition unavailable.",
+              AppStrings.current.text('speech_recognition_unavailable_5e1738'),
               style: TextStyle(fontSize: 13),
             ),
           ),
@@ -452,9 +453,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     );
     if (draft == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            "Say an amount and person, e.g. 'Ali ko 500 udhaar diya'.",
+            AppStrings.current.text('say_an_amount_and_person_e_g_ali_ko_500_udhaar_d_4cec2a'),
           ),
         ),
       );
@@ -523,8 +524,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     } catch (_) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Receipt scan failed. Try another photo.'),
+          SnackBar(
+            content: Text(AppStrings.current.text('receipt_scan_failed_try_another_photo_73a1b5')),
           ),
         );
     } finally {
@@ -549,8 +550,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         !wallets.any((wallet) => wallet.id == walletId)) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Enter a person, valid amount and wallet.'),
+          SnackBar(
+            content: Text(AppStrings.current.text('enter_a_person_valid_amount_and_wallet_274c96')),
           ),
         );
       return false;
@@ -564,7 +565,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Insufficient balance. Available: Rs. ${available.toStringAsFixed(0)}.',
+                AppStrings.current.text('insufficient_balance_available_rs_c0000f', {'p0': available.toStringAsFixed(0)}),
               ),
             ),
           );
@@ -606,7 +607,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result.reason ?? 'Udhaar could not be saved.'),
+              content: Text(AppStrings.current.display(result.reason ?? AppStrings.current.text('udhaar_could_not_be_saved_68ebc3'))),
             ),
           );
         }
@@ -617,7 +618,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           NotificationService().scheduleNotification(
             key,
             'Udhaar Due Today! 💰',
-            '${type == 'lent' ? 'Collect' : 'Pay'} Rs. ${amount.toStringAsFixed(0)} ${type == 'lent' ? 'from' : 'to'} $person',
+            type == 'lent'
+                ? 'Collect Rs. ${amount.toStringAsFixed(0)} from $person.'
+                : 'Pay Rs. ${amount.toStringAsFixed(0)} to $person.',
             dueDate,
           ),
         );
@@ -629,7 +632,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Udhaar recorded: Rs. ${amount.toStringAsFixed(0)} · $person · $walletName',
+              AppStrings.current.text('udhaar_recorded_rs_d8137b', {'p0': amount.toStringAsFixed(0), 'p1': person, 'p2': walletName}),
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -640,8 +643,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       if (key != null) await debtBox.delete(key);
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Udhaar could not be saved. Try again.'),
+          SnackBar(
+            content: Text(AppStrings.current.text('udhaar_could_not_be_saved_try_again_07468f')),
           ),
         );
       return false;
@@ -688,7 +691,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         if (!result.succeeded) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(result.reason ?? 'Udhaar could not be settled.'),
+              content: Text(AppStrings.current.display(result.reason ?? AppStrings.current.text('udhaar_could_not_be_settled_112eec'))),
             ));
           }
           return false;
@@ -710,7 +713,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Udhaar could not be settled.')),
+          SnackBar(content: Text(AppStrings.current.text('udhaar_could_not_be_settled_112eec'))),
         );
       }
       return false;
@@ -755,8 +758,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Add Udhar',
+                    Text(
+                      AppStrings.current.text('add_udhar_b02fb6'),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
@@ -764,7 +767,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Record money you gave or received as a loan.',
+                      AppStrings.current.text('record_money_you_gave_or_received_as_a_loan_bf8eee'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 18),
@@ -772,15 +775,15 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       width: double.infinity,
                       child: SegmentedButton<String>(
                         showSelectedIcon: false,
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: 'lent',
-                            label: Text('I Gave'),
+                            label: Text(AppStrings.current.text('i_gave_3efbfc')),
                             icon: Icon(Icons.arrow_upward_rounded),
                           ),
                           ButtonSegment(
                             value: 'borrowed',
-                            label: Text('I Took'),
+                            label: Text(AppStrings.current.text('i_took_69ea8d')),
                             icon: Icon(Icons.arrow_downward_rounded),
                           ),
                         ],
@@ -817,8 +820,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                           : null,
                       decoration: InputDecoration(
                         labelText: type == 'lent'
-                            ? 'Paid from'
-                            : 'Received in',
+                            ? AppStrings.current.text('paid_from_1daaef')
+                            : AppStrings.current.text('received_in_5adc08'),
                         prefixIcon: const Icon(
                           Icons.account_balance_wallet_outlined,
                         ),
@@ -883,8 +886,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             Expanded(
                               child: Text(
                                 selectedDate == null
-                                    ? 'Due date (optional)'
-                                    : 'Due ${DateFormat.yMMMd().format(selectedDate!)}',
+                                    ? AppStrings.current.text('due_date_optional_be5b29')
+                                    : AppStrings.current.text('due_483844', {'p0': DateFormat.yMMMd().format(selectedDate!)}),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -892,7 +895,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                             ),
                             if (selectedDate != null)
                               IconButton(
-                                tooltip: 'Clear due date',
+                                tooltip: AppStrings.current.text('clear_due_date_b96659'),
                                 visualDensity: VisualDensity.compact,
                                 onPressed: () {
                                   setModalState(() => selectedDate = null);
@@ -921,9 +924,9 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                 if (walletId == null) {
                                   ScaffoldMessenger.of(sheetContext)
                                       .showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content:
-                                          Text('Choose a wallet first.'),
+                                          Text(AppStrings.current.text('choose_a_wallet_first_0ea8ab')),
                                     ),
                                   );
                                   return;
@@ -952,8 +955,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                 }
                               },
                         icon: const Icon(Icons.check_rounded),
-                        label: const Text(
-                          'Save record',
+                        label: Text(
+                          AppStrings.current.text('save_record_506b9b'),
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -1100,7 +1103,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(
-            'Settled Udhaar with ${debt.borrowerName}',
+            AppStrings.current.text('settled_udhaar_with_7b396c', {'p0': debt.borrowerName}),
           ),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
@@ -1154,23 +1157,23 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.swap_horiz_rounded),
-              title: Text(isLent ? 'You will receive' : 'You owe'),
+              title: Text(isLent ? AppStrings.current.text('you_will_receive_4eef2e') : AppStrings.current.text('you_owe_811b81')),
               subtitle: Text(
                 isLent
-                    ? 'You gave money to this person'
-                    : 'You received money from this person',
+                    ? AppStrings.current.text('you_gave_money_to_this_person_7e151d')
+                    : AppStrings.current.text('you_received_money_from_this_person_2d1c37'),
               ),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.account_balance_wallet_outlined),
-              title: Text(isLent ? 'Paid from' : 'Received in'),
+              title: Text(isLent ? AppStrings.current.text('paid_from_1daaef') : AppStrings.current.text('received_in_5adc08')),
               subtitle: Text(walletLabel),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.calendar_today_outlined),
-              title: const Text('Due'),
+              title: Text(AppStrings.current.text('due_145caf')),
               subtitle: Text(_dueLabel(debt)),
             ),
             const SizedBox(height: 8),
@@ -1187,7 +1190,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         }
                       },
                 icon: const Icon(Icons.check_circle_outline_rounded),
-                label: const Text('Mark settled'),
+                label: Text(AppStrings.current.text('mark_settled_014b7c')),
               ),
             ),
           ],
@@ -1256,8 +1259,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             ),
             child: Text(
               net >= 0
-                  ? 'Net receivable · Rs. ${net.toStringAsFixed(0)}'
-                  : 'Net payable · Rs. ${net.abs().toStringAsFixed(0)}',
+                  ? AppStrings.current.text('net_receivable_rs_09b02c', {'p0': net.toStringAsFixed(0)})
+                  : AppStrings.current.text('net_payable_rs_d22be0', {'p0': net.abs().toStringAsFixed(0)}),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
@@ -1281,7 +1284,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                label,
+                AppStrings.current.display(label),
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 11,
@@ -1340,8 +1343,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Quick Udhar',
+                    Text(
+                      AppStrings.current.text('quick_udhar_94a696'),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
@@ -1350,8 +1353,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                     const SizedBox(height: 2),
                     Text(
                       _isListening
-                          ? 'Listening now…'
-                          : 'Type or speak naturally · saves instantly when clear',
+                          ? AppStrings.current.text('listening_now_7320c5')
+                          : AppStrings.current.text('type_or_speak_naturally_saves_instantly_when_cle_ba20f8'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -1365,7 +1368,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   size: 17,
                 ),
                 label: Text(
-                  quickLabel,
+                  AppStrings.current.display(quickLabel),
                   overflow: TextOverflow.ellipsis,
                 ),
                 style: OutlinedButton.styleFrom(
@@ -1376,7 +1379,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ),
           const SizedBox(height: 5),
           Text(
-            subtitle,
+            AppStrings.current.display(subtitle),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: primaryColor,
                   fontWeight: FontWeight.w600,
@@ -1401,10 +1404,10 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
               onSubmitted: _processNLP,
               decoration: InputDecoration(
                 hintText: _isListening
-                    ? 'Listening…'
+                    ? AppStrings.current.text('listening_6c19a4')
                     : language == 'romanUrdu'
-                        ? 'Misal: Ali ko 500 udhaar diya'
-                        : 'e.g. Borrowed 500 from Sara',
+                        ? AppStrings.current.text('misal_ali_ko_500_udhaar_diya_3aff61')
+                        : AppStrings.current.text('e_g_borrowed_500_from_sara_70d6bf'),
                 hintStyle: TextStyle(
                   color: Colors.grey.shade500,
                   fontSize: 12,
@@ -1418,7 +1421,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Voice input',
+                      tooltip: AppStrings.current.text('voice_input_c0b2ce'),
                       visualDensity: VisualDensity.compact,
                       constraints:
                           const BoxConstraints.tightFor(width: 38, height: 40),
@@ -1440,7 +1443,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        tooltip: 'Save Quick Udhar',
+                        tooltip: AppStrings.current.text('save_quick_udhar_1145fe'),
                         padding: EdgeInsets.zero,
                         onPressed: () =>
                             _processNLP(_smartInputCtrl.text),
@@ -1467,7 +1470,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.document_scanner_outlined, size: 18),
-              label: const Text('Scan receipt'),
+              label: Text(AppStrings.current.text('scan_receipt_08a533')),
             ),
           ),
         ],
@@ -1490,7 +1493,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         children: [
           for (final filter in filters.entries) ...[
             ChoiceChip(
-              label: Text(filter.value),
+              label: Text(AppStrings.current.display(filter.value)),
               selected: _udharFilter == filter.key,
               onSelected: (_) {
                 setState(() => _udharFilter = filter.key);
@@ -1531,7 +1534,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    title,
+                    AppStrings.current.display(title),
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
@@ -1539,7 +1542,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                   ),
                 ),
                 Text(
-                  '${items.length} · Rs. ${total.toStringAsFixed(0)}',
+                  AppStrings.current.text('rs_be0230', {'p0': items.length, 'p1': total.toStringAsFixed(0)}),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -1589,13 +1592,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           color: Colors.green,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             Icon(Icons.check_circle_rounded, color: Colors.white),
             SizedBox(width: 8),
             Text(
-              'Mark settled',
+              AppStrings.current.text('mark_settled_014b7c'),
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -1707,7 +1710,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                         Icons.check_circle_outline_rounded,
                         size: 17,
                       ),
-                      label: const Text('Settle'),
+                      label: Text(AppStrings.current.text('settle_3ebe66')),
                     ),
                   ],
                 ),
@@ -1721,6 +1724,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     ref.watch(expenseProvider);
     final debts = debtBox.values
         .where(
@@ -1785,8 +1789,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                     const SizedBox(height: 12),
                     Text(
                       debts.isEmpty
-                          ? 'No active Udhar. You are all settled.'
-                          : 'No Udhar records match this filter.',
+                          ? AppStrings.current.text('no_active_udhar_you_are_all_settled_f8e202')
+                          : AppStrings.current.text('no_udhar_records_match_this_filter_91440a'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.grey.shade500,
@@ -1800,14 +1804,14 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           )
         else ...[
           _buildDebtSection(
-            title: 'You will receive',
+            title: AppStrings.current.text('you_will_receive_4eef2e'),
             items: receive,
             wallets: wallets,
             primaryColor: primaryColor,
             isDark: isDark,
           ),
           _buildDebtSection(
-            title: 'You owe',
+            title: AppStrings.current.text('you_owe_811b81'),
             items: owe,
             wallets: wallets,
             primaryColor: primaryColor,
@@ -1820,7 +1824,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
     final addButton = FloatingActionButton.extended(
       icon: const Icon(Icons.add_rounded),
-      label: const Text('Add Udhar'),
+      label: Text(AppStrings.current.text('add_udhar_b02fb6')),
       backgroundColor: primaryColor,
       foregroundColor: Colors.white,
       elevation: 3,

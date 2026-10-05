@@ -1,3 +1,5 @@
+import '../l10n/app_strings.dart';
+
 enum FinancialFeedbackAction { expense, income, transfer, edit, delete, repeat }
 
 class FinancialFeedbackData {
@@ -39,6 +41,27 @@ class DeterministicFeedbackService {
         return '${data.title}, $amount rupees entry deleted.';
       case FinancialFeedbackAction.repeat:
         return '${data.title}, $amount rupees entry repeated.';
+    }
+  }
+
+  AppMessage localizedMessage(FinancialFeedbackData data) {
+    final amount = _formatAmount(data.amount);
+    switch (data.action) {
+      case FinancialFeedbackAction.expense:
+        return AppMessage('rupees_expense_saved_c7486b', {'p0': data.title, 'p1': amount});
+      case FinancialFeedbackAction.income:
+        return AppMessage('rupees_income_added_78878f', {'p0': data.title, 'p1': amount});
+      case FinancialFeedbackAction.transfer:
+        if (data.source == null || data.destination == null) {
+          return AppMessage('rupees_transferred_34226d', {'p0': amount});
+        }
+        return AppMessage('rupees_transferred_from_to_617a7c', {'p0': amount, 'p1': data.source, 'p2': data.destination});
+      case FinancialFeedbackAction.edit:
+        return AppMessage('updated_to_rupees_0e6360', {'p0': data.title, 'p1': amount});
+      case FinancialFeedbackAction.delete:
+        return AppMessage('rupees_entry_deleted_763218', {'p0': data.title, 'p1': amount});
+      case FinancialFeedbackAction.repeat:
+        return AppMessage('rupees_entry_repeated_f17ed0', {'p0': data.title, 'p1': amount});
     }
   }
 

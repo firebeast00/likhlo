@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,7 +146,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(AppStrings.current.display(message)),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.red.shade700,
         ),
@@ -154,6 +155,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final settings = ref.watch(settingsProvider);
     final wallets = ref.watch(walletProvider);
     final primaryColor = Color(settings.profileColorValue);
@@ -185,8 +187,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       children: [
         _stepIcon(Icons.person_pin_circle_rounded, primaryColor),
         const SizedBox(height: 28),
-        const Text(
-          'Welcome to Likhlo!',
+        Text(
+          AppStrings.current.text('welcome_to_likhlo_59777c'),
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w900,
@@ -195,7 +197,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'First, tell us a little about yourself.',
+          AppStrings.current.text('first_tell_us_a_little_about_yourself_a232ea'),
           style: TextStyle(
             fontSize: 14,
             color: Colors.grey.shade500,
@@ -241,21 +243,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: IconButton(
-            tooltip: 'Back',
+            tooltip: AppStrings.current.text('back_b52b36'),
             onPressed: _saving ? null : () => setState(() => _step = 0),
             icon: const Icon(Icons.arrow_back_rounded),
           ),
         ),
         _stepIcon(Icons.account_balance_wallet_rounded, primaryColor),
         const SizedBox(height: 22),
-        const Text(
-          'Set up your money',
+        Text(
+          AppStrings.current.text('set_up_your_money_15a172'),
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 6),
         Text(
-          'Optional — you can change all of this later.',
+          AppStrings.current.text('optional_you_can_change_all_of_this_later_92e4a4'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
         ),
@@ -299,7 +301,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ? _incomeWalletId
                 : wallets.first.id,
             decoration: InputDecoration(
-              labelText: 'Income wallet',
+              labelText: AppStrings.current.text('income_wallet_61f7ff'),
               prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
               filled: true,
               fillColor: Theme.of(context).cardColor,
@@ -340,7 +342,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         TextButton(
           onPressed:
               _saving ? null : () => _finishOnboarding(skipMoneySetup: true),
-          child: const Text('Skip for now'),
+          child: Text(AppStrings.current.text('skip_for_now_6fc096')),
         ),
       ],
     );
@@ -358,7 +360,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _sectionLabel(String text) => Text(
-        text,
+        AppStrings.current.display(text),
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
       );
 
@@ -408,7 +410,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ),
         icon: Icon(icon),
-        label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        label: Text(AppStrings.current.display(label), style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

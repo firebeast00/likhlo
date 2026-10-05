@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 /// Keeps Udhaar's instant-entry controls visually consistent with Main.
@@ -29,6 +30,7 @@ class UdharSmartEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -70,14 +72,14 @@ class UdharSmartEntryCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(listening ? 'Listening now' : 'Smart Entry',
+                        Text(listening ? AppStrings.current.text('listening_now_dbfe77') : AppStrings.current.text('smart_entry_2ac121'),
                             style: const TextStyle(
                                 fontSize: 14, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 2),
                         Text(
                           listening
-                              ? 'Say who, how much and whether you gave or took'
-                              : 'Wallet: $walletName · Tap to change',
+                              ? AppStrings.current.text('say_who_how_much_and_whether_you_gave_or_took_1c38ab')
+                              : AppStrings.current.text('wallet_tap_to_change_d3f3e7', {'p0': walletName}),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -95,7 +97,7 @@ class UdharSmartEntryCard extends StatelessWidget {
                 const Icon(Icons.circle, size: 10, color: Colors.red)
               else
                 IconButton(
-                  tooltip: 'Select Udhaar wallet',
+                  tooltip: AppStrings.current.text('select_udhaar_wallet_27c9ae'),
                   onPressed: onChooseWallet,
                   icon: Icon(Icons.tune_rounded, color: color, size: 20),
                 ),
@@ -114,7 +116,7 @@ class UdharSmartEntryCard extends StatelessWidget {
               onSubmitted: onSave,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
-                hintText: listening ? 'Listening…' : 'e.g. Ali ko 500 udhaar diya',
+                hintText: listening ? AppStrings.current.text('listening_6c19a4') : AppStrings.current.text('e_g_ali_ko_500_udhaar_diya_b1a7c5'),
                 hintStyle: const TextStyle(fontSize: 12),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.only(left: 15, top: 17, bottom: 17),
@@ -123,7 +125,7 @@ class UdharSmartEntryCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Scan receipt',
+                      tooltip: AppStrings.current.text('scan_receipt_08a533'),
                       constraints: const BoxConstraints.tightFor(width: 38, height: 40),
                       onPressed: scanning ? null : onScan,
                       icon: scanning
@@ -137,7 +139,7 @@ class UdharSmartEntryCard extends StatelessWidget {
                               size: 20, color: color),
                     ),
                     IconButton(
-                      tooltip: listening ? 'Stop listening' : 'Voice input',
+                      tooltip: listening ? AppStrings.current.text('stop_listening_e13421') : AppStrings.current.text('voice_input_c0b2ce'),
                       constraints: const BoxConstraints.tightFor(width: 38, height: 40),
                       onPressed: saving ? null : onVoice,
                       icon: Icon(
@@ -152,7 +154,7 @@ class UdharSmartEntryCard extends StatelessWidget {
                       margin: const EdgeInsets.only(right: 5),
                       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                       child: IconButton(
-                        tooltip: 'Save Udhaar entry',
+                        tooltip: AppStrings.current.text('save_udhaar_entry_5e7f15'),
                         padding: EdgeInsets.zero,
                         onPressed: saving ? null : () => onSave(controller.text),
                         icon: const Icon(Icons.arrow_upward_rounded,

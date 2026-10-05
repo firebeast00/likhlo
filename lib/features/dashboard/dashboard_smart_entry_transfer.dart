@@ -6,8 +6,8 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
       ) async {
     if (command.amount <= 0) {
       _showTransactionError(
-        "Include an amount, for example: 'transfer 500 Cash to JazzCash'.",
-        title: 'Transfer amount required',
+        AppMessage('include_an_amount_for_example_transfer_500_cash__529a65'),
+        title: AppMessage('transfer_amount_required_954377'),
       );
       return;
     }
@@ -15,8 +15,8 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
     final wallets = ref.read(walletProvider);
     if (wallets.length < 2) {
       _showTransactionError(
-        'Create at least two wallets before making a transfer.',
-        title: 'Two wallets required',
+        AppMessage('create_at_least_two_wallets_before_making_a_tran_955aed'),
+        title: AppMessage('two_wallets_required_b3126b'),
       );
       return;
     }
@@ -40,8 +40,8 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
     );
     if (resolution == null) {
       _showTransactionError(
-        "Name both wallets, for example: 'transfer 500 Cash to JazzCash'.",
-        title: 'Source and destination required',
+        AppMessage('name_both_wallets_for_example_transfer_500_cash__f77376'),
+        title: AppMessage('source_and_destination_required_3885f6'),
       );
       return;
     }
@@ -61,8 +61,8 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
     );
     if (!transferConfidence.canAutoExecute) {
       _showTransactionError(
-        'I found both wallets but the transfer direction is not clear. Say “Cash se JazzCash me” or “Cash to JazzCash”.',
-        title: 'Confirm transfer direction',
+        AppMessage('i_found_both_wallets_but_the_transfer_direction__2e2ccb'),
+        title: AppMessage('confirm_transfer_direction_c1e278'),
       );
       return;
     }
@@ -75,8 +75,8 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
     );
     if (source.id == destination.id) {
       _showTransactionError(
-        'Choose two different wallets.',
-        title: 'Invalid transfer',
+        AppMessage('choose_two_different_wallets_32b992'),
+        title: AppMessage('invalid_transfer_d8d151'),
       );
       return;
     }
@@ -84,9 +84,8 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
     final available = walletNotifier.getBalanceForWallet(source.id);
     if (command.amount > available + 0.000001) {
       _showTransactionError(
-        'Available in ${source.name}: Rs. ${available.toStringAsFixed(0)}. '
-            'Required: Rs. ${command.amount.toStringAsFixed(0)}.',
-        title: 'Insufficient balance',
+        AppMessage('available_in_rs_required_rs_9a7b7b', {'p0': source.name, 'p1': available.toStringAsFixed(0), 'p2': command.amount.toStringAsFixed(0)}),
+        title: AppMessage('insufficient_balance_1a1823'),
       );
       return;
     }
@@ -123,8 +122,8 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
     if (!mounted) return;
     if (!execution.succeeded) {
       _showTransactionError(
-        'The source wallet changed or no longer has enough money.',
-        title: 'Transfer not saved',
+        AppMessage('the_source_wallet_changed_or_no_longer_has_enoug_8a6366'),
+        title: AppMessage('transfer_not_saved_ff0de3'),
       );
       return;
     }
@@ -134,17 +133,17 @@ extension _DashboardSmartEntryTransferMethods on _HomeScreenState {
       command.amount == command.amount.truncateToDouble() ? 0 : 2,
     );
     _showTransferMessage(
-      'Rs. $transferAmount · ${source.name} → ${destination.name}',
-      title: 'Transfer completed',
-      actionLabel: 'Undo',
+      AppMessage('rs_b100db', {'p0': transferAmount, 'p1': source.name, 'p2': destination.name}),
+      title: AppMessage('transfer_completed_9fca88'),
+      actionLabel: AppMessage('undo_39fc72'),
       onAction: () async {
         await ref
             .read(transactionExecutorProvider)
             .execute(DeleteTransferCommand(transferId));
         if (!mounted) return;
         _showTransactionInfo(
-          'The transfer was reversed.',
-          title: 'Transfer undone',
+          AppMessage('the_transfer_was_reversed_6d1d88'),
+          title: AppMessage('transfer_undone_e53f3d'),
           announce: false,
         );
       },

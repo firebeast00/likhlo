@@ -38,8 +38,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       if (batchAttempt.status == SmartEntryBatchStatus.poisoned) {
         _showTransactionError(
           batchAttempt.reason ??
-              'One of the detected entries could not be safely interpreted. Nothing was saved.',
-          title: 'Multiple entries not saved',
+              AppMessage('one_of_the_detected_entries_could_not_be_safely__876c93'),
+          title: AppMessage('multiple_entries_not_saved_4eb2b6'),
         );
         return false;
       }
@@ -48,8 +48,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           batchAttempt.draft != null) {
         if (wallets.isEmpty) {
           _showTransactionError(
-            'Create a Cash or JazzCash wallet before using Smart Entry.',
-            title: 'Wallet required',
+            AppMessage('create_a_cash_or_jazzcash_wallet_before_using_sm_8358f6'),
+            title: AppMessage('wallet_required_2f5332'),
           );
           return false;
         }
@@ -67,8 +67,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           _smartInputCtrl.clear();
           FocusScope.of(context).unfocus();
           _showTransactionSuccess(
-            'The reviewed entries were saved together.',
-            title: 'Entries saved',
+            AppMessage('the_reviewed_entries_were_saved_together_e40eed'),
+            title: AppMessage('entries_saved_9ed5ce'),
             announce: false,
           );
           unawaited(HapticFeedback.lightImpact());
@@ -140,8 +140,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     final amount = result['amount'];
     if (amount is! num || !amount.isFinite || amount <= 0) {
       _showTransactionError(
-        "Include an amount, for example: '500 biryani' or '1.5k petrol from JazzCash'.",
-        title: 'Amount not detected',
+        AppMessage('include_an_amount_for_example_500_biryani_or_1_5_011d46'),
+        title: AppMessage('amount_not_detected_d9d89a'),
       );
       return false;
     }
@@ -149,8 +149,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     final wallets = ref.read(walletProvider);
     if (wallets.isEmpty) {
       _showTransactionError(
-        'Create a Cash or JazzCash wallet before using Smart Entry.',
-        title: 'Wallet required',
+        AppMessage('create_a_cash_or_jazzcash_wallet_before_using_sm_8358f6'),
+        title: AppMessage('wallet_required_2f5332'),
       );
       return false;
     }
@@ -240,8 +240,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       if (!mounted) return false;
       if (!execution.succeeded) {
         _showTransactionError(
-          'The selected wallet changed or no longer has enough balance. Try the entry again.',
-          title: 'Smart Entry not saved',
+          AppMessage('the_selected_wallet_changed_or_no_longer_has_eno_34f20d'),
+          title: AppMessage('smart_entry_not_saved_b8ec80'),
         );
         return false;
       }
@@ -249,13 +249,13 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       _smartInputCtrl.clear();
       FocusScope.of(context).unfocus();
       _showTopMessage(
-        title: type == 'income' ? 'Income added' : 'Expense saved',
+        title: type == 'income' ? AppMessage('income_added_fa12b0') : AppMessage('expense_saved_a7f2ed'),
         message:
-            '${entry.title} — Rs. ${entry.amount.toStringAsFixed(0)} · ${wallet.name}',
+            AppMessage('rs_370e31', {'p0': entry.title, 'p1': entry.amount.toStringAsFixed(0), 'p2': wallet.name}),
         tone: type == 'income'
             ? TransactionMessageTone.income
             : TransactionMessageTone.expense,
-        actionLabel: 'Undo',
+        actionLabel: AppMessage('undo_39fc72'),
         onAction: () async {
           final deleteResult = await ref
               .read(transactionExecutorProvider)
@@ -263,8 +263,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           if (!mounted) return;
           if (deleteResult.succeeded) {
             _showTransactionInfo(
-              'The instant Smart Entry was removed.',
-              title: 'Entry undone',
+              AppMessage('the_instant_smart_entry_was_removed_0941a9'),
+              title: AppMessage('entry_undone_60fe48'),
               announce: false,
             );
           }
@@ -317,9 +317,9 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     if (confirmed == true && mounted) {
       _smartInputCtrl.clear();
       if (type == 'income') {
-        _showIncomeMessage('The Smart Entry was saved to the selected wallet.');
+        _showIncomeMessage(AppMessage('the_smart_entry_was_saved_to_the_selected_wallet_a313b9'));
       } else {
-        _showExpenseMessage('The Smart Entry was saved to the selected wallet.');
+        _showExpenseMessage(AppMessage('the_smart_entry_was_saved_to_the_selected_wallet_a313b9'));
       }
     }
     if (mounted) FocusScope.of(context).unfocus();

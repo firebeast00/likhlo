@@ -9,15 +9,15 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
     final deleting = mutation.deleting;
     if (!deleting && mutation.patch.isEmpty) {
       _showTransactionError(
-        "Say what to change, for example: 'change burger amount to 600' or 'headphones ka naam Kurch karo'.",
-        title: 'Change required',
+        AppMessage('say_what_to_change_for_example_change_burger_amo_64942a'),
+        title: AppMessage('change_required_76a96b'),
       );
       return;
     }
     if (mutation.patch.amount != null && mutation.patch.amount! <= 0) {
       _showTransactionError(
-        'The new amount must be greater than zero.',
-        title: 'Invalid amount',
+        AppMessage('the_new_amount_must_be_greater_than_zero_10e92d'),
+        title: AppMessage('invalid_amount_a2f6ca'),
       );
       return;
     }
@@ -42,8 +42,8 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
     );
     if (mentionedWalletIds.length > 1) {
       _showTransactionError(
-        'Mention only one wallet so the correct entry can be identified.',
-        title: 'Multiple wallets detected',
+        AppMessage('mention_only_one_wallet_so_the_correct_entry_can_ab7e95'),
+        title: AppMessage('multiple_wallets_detected_e80229'),
       );
       return;
     }
@@ -96,9 +96,9 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
     if (match.status == SmartEntryMatchStatus.notFound) {
       _showTransactionError(
         deleting
-            ? 'No safe matching entry was found. Add a title, amount, date, or wallet.'
-            : 'No safe matching entry was found. Name the entry you want to edit.',
-        title: 'Entry not found',
+            ? AppMessage('no_safe_matching_entry_was_found_add_a_title_amo_c374ba')
+            : AppMessage('no_safe_matching_entry_was_found_name_the_entry__ed32d9'),
+        title: AppMessage('entry_not_found_998d95'),
       );
       return;
     }
@@ -113,8 +113,8 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
       );
       if (!confidence.canAutoExecute) {
         _showTransactionError(
-          'The matching entry is not certain enough to change automatically. Add its amount, date, or wallet.',
-          title: 'Review target entry',
+          AppMessage('the_matching_entry_is_not_certain_enough_to_chan_0675f1'),
+          title: AppMessage('review_target_entry_6a2f72'),
         );
         return;
       }
@@ -143,8 +143,8 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
         walletNotifier.getBalanceForWallet(target.walletId);
         if (available + 0.000001 < target.amount) {
           _showTransactionError(
-            'Deleting this income would make the wallet balance negative.',
-            title: 'Income cannot be deleted',
+            AppMessage('deleting_this_income_would_make_the_wallet_balan_993f82'),
+            title: AppMessage('income_cannot_be_deleted_3705f4'),
           );
           return;
         }
@@ -156,8 +156,8 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
       if (!mounted) return;
       if (!deleteResult.succeeded) {
         _showTransactionError(
-          'The entry changed before it could be deleted. Try again.',
-          title: 'Entry not deleted',
+          AppMessage('the_entry_changed_before_it_could_be_deleted_try_063808'),
+          title: AppMessage('entry_not_deleted_20151f'),
         );
         return;
       }
@@ -167,9 +167,9 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
       final deletedAmount =
       deletedEntry.amount.toStringAsFixed(0);
       _showDeletionMessage(
-        '${deletedEntry.title} — Rs. $deletedAmount',
-        title: 'Entry moved to Trash',
-        actionLabel: 'Undo',
+        AppMessage('rs_361275', {'p0': deletedEntry.title, 'p1': deletedAmount}),
+        title: AppMessage('entry_moved_to_trash_4ff9bd'),
+        actionLabel: AppMessage('undo_39fc72'),
         onAction: () async {
           final restoreResult = await ref
               .read(transactionExecutorProvider)
@@ -177,14 +177,14 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
           if (!mounted) return;
           if (restoreResult.succeeded) {
             _showTransactionInfo(
-              'The deleted entry was restored.',
-              title: 'Deletion undone',
+              AppMessage('the_deleted_entry_was_restored_c688ef'),
+              title: AppMessage('deletion_undone_1d6e39'),
               announce: false,
             );
           } else {
             _showTransactionError(
-              'The entry could not be restored because the wallet changed.',
-              title: 'Undo failed',
+              AppMessage('the_entry_could_not_be_restored_because_the_wall_f5ba51'),
+              title: AppMessage('undo_failed_2311b4'),
             );
           }
         },
@@ -203,8 +203,8 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
       );
       if (matches.isEmpty) {
         _showTransactionError(
-          'Choose an existing category: ${categories.join(', ')}.',
-          title: 'Category not found',
+          AppMessage('choose_an_existing_category_e42e1e', {'p0': categories.join(', ')}),
+          title: AppMessage('category_not_found_19c290'),
         );
         return;
       }
@@ -225,8 +225,8 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
         updatedEntry.date == originalEntry.date &&
         updatedEntry.walletId == originalEntry.walletId) {
       _showTransactionInfo(
-        'The entry already has these details.',
-        title: 'No change needed',
+        AppMessage('the_entry_already_has_these_details_2b9c79'),
+        title: AppMessage('no_change_needed_8a26a1'),
       );
       return;
     }
@@ -240,18 +240,18 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
     if (!mounted) return;
     if (!updateResult.succeeded) {
       _showTransactionError(
-        'The wallet cannot support this change, or the entry changed. Review its balance and try again.',
-        title: 'Entry not updated',
+        AppMessage('the_wallet_cannot_support_this_change_or_the_ent_dccbfc'),
+        title: AppMessage('entry_not_updated_4104d8'),
       );
       return;
     }
 
     _smartInputCtrl.clear();
     _showTransactionSuccess(
-      '${updatedEntry.title} · Rs. ${updatedEntry.amount.toStringAsFixed(0)} · ${updatedEntry.category}',
-      title: 'Entry updated',
+      AppMessage('rs_03d36d', {'p0': updatedEntry.title, 'p1': updatedEntry.amount.toStringAsFixed(0), 'p2': updatedEntry.category}),
+      title: AppMessage('entry_updated_53550c'),
       announce: false,
-      actionLabel: 'Undo',
+      actionLabel: AppMessage('undo_39fc72'),
       onAction: () async {
         final restoreResult = await ref
             .read(transactionExecutorProvider)
@@ -262,14 +262,14 @@ extension _DashboardSmartEntryMutationMethods on _HomeScreenState {
         if (!mounted) return;
         if (restoreResult.succeeded) {
           _showTransactionInfo(
-            'The previous amount was restored.',
-            title: 'Edit undone',
+            AppMessage('the_previous_amount_was_restored_dc306f'),
+            title: AppMessage('edit_undone_c701f8'),
             announce: false,
           );
         } else {
           _showTransactionError(
-            'The previous amount could not be restored because the wallet changed.',
-            title: 'Undo failed',
+            AppMessage('the_previous_amount_could_not_be_restored_becaus_d3b46f'),
+            title: AppMessage('undo_failed_2311b4'),
           );
         }
       },

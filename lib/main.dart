@@ -1,3 +1,5 @@
+import 'l10n/app_strings.dart';
+import 'l10n/material_strings.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -87,6 +89,7 @@ class LikhloApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppStrings.of(context);
     if (startupError != null) {
       return MaterialApp(
         title: 'Likhlo',
@@ -100,6 +103,7 @@ class LikhloApp extends ConsumerWidget {
         (settings) => (settings.themeMode, settings.profileColorValue),
       ),
     );
+    final language = ref.watch(settingsProvider.select((settings) => settings.appLanguage));
     final themeMode = themeSettings.$1;
     final primaryColor = Color(themeSettings.$2);
 
@@ -112,6 +116,13 @@ class LikhloApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Likhlo',
       debugShowCheckedModeBanner: false,
+      locale: AppLanguage.parse(language).locale,
+      supportedLocales: AppStrings.supportedLocales,
+      localizationsDelegates: const [
+        AppStrings.delegate,
+        AppMaterialDelegate(),
+        AppWidgetsDelegate(),
+      ],
       scrollBehavior: const _LikhloScrollBehavior(),
       themeAnimationDuration: Duration.zero,
       themeMode: themeMode == 'system'
@@ -184,6 +195,7 @@ class _AppContentWithDimmer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppStrings.of(context);
     final brightnessLevel = ref.watch(
       settingsProvider.select((settings) => settings.brightnessLevel),
     );
@@ -213,6 +225,7 @@ class StartupRecoveryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -222,21 +235,21 @@ class StartupRecoveryScreen extends StatelessWidget {
             children: [
               const Icon(Icons.storage_rounded, size: 64, color: Colors.orange),
               const SizedBox(height: 20),
-              const Text(
-                'Likhlo could not open local storage',
+              Text(
+                AppStrings.current.text('likhlo_could_not_open_local_storage_5dabd7'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Your data has not been deleted. Close and reopen the app. If the problem continues, back up the app data before reinstalling.',
+              Text(
+                AppStrings.current.text('your_data_has_not_been_deleted_close_and_reopen__ec7722'),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: () => SystemNavigator.pop(),
                 icon: const Icon(Icons.restart_alt_rounded),
-                label: const Text('Close and restart'),
+                label: Text(AppStrings.current.text('close_and_restart_8b7c03')),
               ),
             ],
           ),

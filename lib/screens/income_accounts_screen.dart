@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,7 +41,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
         child: StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             scrollable: true,
-            title: Text(existing == null ? 'New wallet' : 'Update wallet'),
+            title: Text(existing == null ? AppStrings.current.text('new_wallet_325723') : AppStrings.current.text('update_wallet_fd811d')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -48,7 +49,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                   controller: controller,
                   textCapitalization: TextCapitalization.words,
                   decoration: InputDecoration(
-                    labelText: 'Wallet name',
+                    labelText: AppStrings.current.text('wallet_name_33ba81'),
                     errorText: nameError,
                     prefixIcon:
                         const Icon(Icons.account_balance_wallet_outlined),
@@ -70,8 +71,8 @@ class IncomeAccountsScreen extends ConsumerWidget {
                     ),
                   ],
                   decoration: InputDecoration(
-                    labelText: 'Current balance',
-                    hintText: 'Amount currently available',
+                    labelText: AppStrings.current.text('current_balance_a234f7'),
+                    hintText: AppStrings.current.text('amount_currently_available_87bcc0'),
                     prefixText: 'Rs. ',
                     errorText: balanceError,
                   ),
@@ -82,16 +83,16 @@ class IncomeAccountsScreen extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'This amount is included automatically in the total shown on the Home screen.',
+                Text(
+                  AppStrings.current.text('this_amount_is_included_automatically_in_the_tot_1e4c27'),
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Reserve wallet'),
+                  title: Text(AppStrings.current.text('reserve_wallet_686caf')),
                   subtitle:
-                      const Text('Mark money that you prefer to keep aside.'),
+                      Text(AppStrings.current.text('mark_money_that_you_prefer_to_keep_aside_1ac728')),
                   value: isBackup,
                   onChanged: (value) => setDialogState(() => isBackup = value),
                 ),
@@ -100,7 +101,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 onPressed: () async {
@@ -145,7 +146,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                   }
                   Navigator.pop(dialogContext);
                 },
-                child: Text(existing == null ? 'Create' : 'Update'),
+                child: Text(existing == null ? AppStrings.current.text('create_6e157c') : AppStrings.current.text('update_fb91e2')),
               ),
             ],
           ),
@@ -171,16 +172,16 @@ class IncomeAccountsScreen extends ConsumerWidget {
         controllers: [titleController, amountController],
         child: StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Add income'),
+            title: Text(AppStrings.current.text('add_income_4d6cdd')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: titleController,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Income title',
-                    hintText: 'Salary, allowance, freelance…',
+                  decoration: InputDecoration(
+                    labelText: AppStrings.current.text('income_title_a0661e'),
+                    hintText: AppStrings.current.text('salary_allowance_freelance_051ac3'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -194,7 +195,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                     ),
                   ],
                   decoration: InputDecoration(
-                    labelText: 'Amount',
+                    labelText: AppStrings.current.text('amount_43dc85'),
                     prefixText: 'Rs. ',
                     errorText: error,
                   ),
@@ -202,7 +203,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: walletId,
-                  decoration: const InputDecoration(labelText: 'Wallet'),
+                  decoration: InputDecoration(labelText: AppStrings.current.text('wallet_b60862')),
                   items: wallets
                       .map(
                         (wallet) => DropdownMenuItem(
@@ -218,8 +219,8 @@ class IncomeAccountsScreen extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'This income increases the selected wallet and the total available balance.',
+                Text(
+                  AppStrings.current.text('this_income_increases_the_selected_wallet_and_th_3f8261'),
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
@@ -227,7 +228,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 onPressed: () async {
@@ -261,7 +262,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                   }
                   Navigator.pop(dialogContext);
                 },
-                child: const Text('Add income'),
+                child: Text(AppStrings.current.text('add_income_4d6cdd')),
               ),
             ],
           ),
@@ -278,18 +279,18 @@ class IncomeAccountsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Clear wallet balance?'),
+            title: Text(AppStrings.current.text('clear_wallet_balance_989625')),
             content: Text(
-              'Set ${wallet.name} to Rs. 0? Transaction history will remain available.',
+              AppStrings.current.text('set_to_rs_0_transaction_history_will_remain_avai_61a4b0', {'p0': wallet.name}),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Clear balance'),
+                child: Text(AppStrings.current.text('clear_balance_204c15')),
               ),
             ],
           ),
@@ -309,7 +310,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
     final wallets = ref.read(walletProvider);
     if (wallets.length <= 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('At least one wallet is required.')),
+        SnackBar(content: Text(AppStrings.current.text('at_least_one_wallet_is_required_ad359c'))),
       );
       return;
     }
@@ -322,19 +323,19 @@ class IncomeAccountsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Delete wallet?'),
+            title: Text(AppStrings.current.text('delete_wallet_d09dab')),
             content: Text(
-              'Delete ${wallet.name}? Its transaction history and opening adjustment will move to ${fallback.name}.',
+              AppStrings.current.text('delete_its_transaction_history_and_opening_adjus_be1766', {'p0': wallet.name, 'p1': fallback.name}),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Delete'),
+                child: Text(AppStrings.current.text('delete_f6fdbe')),
               ),
             ],
           ),
@@ -356,16 +357,17 @@ class IncomeAccountsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    AppStrings.of(context);
     final wallets = ref.watch(walletProvider);
     ref.watch(expenseProvider);
     final primaryColor = Color(ref.watch(settingsProvider).profileColorValue);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Wallets'),
+        title: Text(AppStrings.current.text('wallets_98d5a1')),
         actions: [
           IconButton(
-            tooltip: 'Create wallet',
+            tooltip: AppStrings.current.text('create_wallet_f4a4e0'),
             onPressed: () => _showAccountDialog(context, ref),
             icon: const Icon(Icons.add_rounded),
           ),
@@ -398,7 +400,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
                 wallet.name,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-              subtitle: Text(wallet.isBackup ? 'Reserve wallet' : 'Wallet'),
+              subtitle: Text(wallet.isBackup ? AppStrings.current.text('reserve_wallet_686caf') : AppStrings.current.text('wallet_b60862')),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -419,12 +421,12 @@ class IncomeAccountsScreen extends ConsumerWidget {
                         _deleteAccount(context, ref, wallet);
                       }
                     },
-                    itemBuilder: (_) => const [
+                    itemBuilder: (_) => [
                       PopupMenuItem(
-                          value: 'edit', child: Text('Rename / update')),
+                          value: 'edit', child: Text(AppStrings.current.text('rename_update_9ef904'))),
                       PopupMenuItem(
-                          value: 'clear', child: Text('Clear balance')),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                          value: 'clear', child: Text(AppStrings.current.text('clear_balance_204c15'))),
+                      PopupMenuItem(value: 'delete', child: Text(AppStrings.current.text('delete_f6fdbe'))),
                     ],
                   ),
                 ],
@@ -436,7 +438,7 @@ class IncomeAccountsScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addIncome(context, ref),
         icon: const Icon(Icons.south_west_rounded),
-        label: const Text('Add income'),
+        label: Text(AppStrings.current.text('add_income_4d6cdd')),
       ),
     );
   }

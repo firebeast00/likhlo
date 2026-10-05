@@ -1,3 +1,4 @@
+import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -28,7 +29,7 @@ Future<DateTime?> showMonthYearPickerDialog(
       return StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Select month'),
+            title: Text(AppStrings.current.text('select_month_4342f7')),
             content: SizedBox(
               width: 340,
               child: Column(
@@ -36,8 +37,8 @@ Future<DateTime?> showMonthYearPickerDialog(
                 children: [
                   DropdownButtonFormField<int>(
                     value: selectedYear,
-                    decoration: const InputDecoration(
-                      labelText: 'Year',
+                    decoration: InputDecoration(
+                      labelText: AppStrings.current.text('year_879e32'),
                       border: OutlineInputBorder(),
                     ),
                     items: [
@@ -91,14 +92,14 @@ Future<DateTime?> showMonthYearPickerDialog(
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
+                child: Text(AppStrings.current.text('cancel_77dfd2')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(
                   dialogContext,
                   DateTime(selectedYear, selectedMonth),
                 ),
-                child: const Text('Select'),
+                child: Text(AppStrings.current.text('select_859822')),
               ),
             ],
           );
@@ -122,6 +123,7 @@ class MonthSelectorControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppStrings.of(context);
     final selected = normalizeMonth(selectedMonth);
     final maximum = normalizeMonth(maxMonth ?? DateTime.now());
     final minimum = DateTime(2000, 1);
@@ -143,7 +145,7 @@ class MonthSelectorControl extends StatelessWidget {
     return Row(
       children: [
         IconButton(
-          tooltip: 'Previous month',
+          tooltip: AppStrings.current.text('previous_month_46a299'),
           onPressed: canGoPrevious
               ? () => onChanged(
                     DateTime(selected.year, selected.month - 1),
@@ -168,7 +170,7 @@ class MonthSelectorControl extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Tap to choose month',
+                    AppStrings.current.text('tap_to_choose_month_f4d52f'),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 11,
@@ -180,7 +182,7 @@ class MonthSelectorControl extends StatelessWidget {
           ),
         ),
         IconButton(
-          tooltip: 'Next month',
+          tooltip: AppStrings.current.text('next_month_8abf7c'),
           onPressed: canGoNext
               ? () => onChanged(
                     DateTime(selected.year, selected.month + 1),
