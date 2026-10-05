@@ -491,7 +491,7 @@ class PrimaryIntentRouter {
       caseSensitive: false,
     ).hasMatch(input);
     final hasItemControl = RegExp(
-      r'\b(?:max|maximum|limit|target|reduce|lower|less|kam|increase|raise|more|zyada|recurring|repeat|har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
+      r'\b(?:max|maximum|limit|target|reduce|lower|less|kam|increase|raise|more|zyada|recurring|har\s+month|har\s+mahina|yaad\s+rakh|remember|one[- ]time|dobara\s+nahi)\b',
       caseSensitive: false,
     ).hasMatch(input);
     final isBudgetQuestion = RegExp(
