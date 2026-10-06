@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'voice_diagnostic_observer.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
@@ -53,9 +54,14 @@ String encodeVoiceDiagnosticExport(Map<String, dynamic> report) =>
     const JsonEncoder.withIndent('  ').convert(report);
 
 class VoiceDiagnosticsService extends ChangeNotifier {
-  static final instance = VoiceDiagnosticsService(HiveVoiceDiagnosticStorage());
-  static const enabledKey = 'voice_transcript_diagnostics_enabled_v1';
-  static const _zoneKey = #voiceDiagnosticCommand;
+  static final instance = _createInstance();
+  static VoiceDiagnosticsService _createInstance() {
+    final service = VoiceDiagnosticsService(HiveVoiceDiagnosticStorage());
+    VoiceDiagnosticObserver.sink = (id, name, data) => service.stage(name, data, id: id);
+    return service;
+  }
+  static const enabledKey = VoiceDiagnosticObserver.enabledKey;
+  static const historyKey = VoiceDiagnosticObserver.historyKey;
   static const retention = Duration(days: 30);
   static const maxRecords = 2000;
   static const maxBytes = 10 * 1024 * 1024;
@@ -70,6 +76,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
   final DateTime Function() clock;
   final int recordLimit;
   final int byteLimit;
+  final bool useIsolates;
   final Map<String, Map<String, dynamic>> _records = {};
   final Map<String, int> _sizes = {};
   final Set<String> _dirty = {};
@@ -87,10 +94,11 @@ class VoiceDiagnosticsService extends ChangeNotifier {
     bool enabled = false,
     this.recordLimit = maxRecords,
     this.byteLimit = maxBytes,
+    this.useIsolates = true,
   }) : clock = clock ?? DateTime.now, _enabled = enabled;
 
   bool get enabled => _enabled;
-  String? get currentId => Zone.current[_zoneKey] as String?;
+  String? get currentId => VoiceDiagnosticObserver.currentId;
   List<Map<String, dynamic>> get records {
     final sorted = _records.values.toList()
       ..sort((a, b) => (b['started_at'] as String).compareTo(a['started_at'] as String));
@@ -110,7 +118,8 @@ class VoiceDiagnosticsService extends ChangeNotifier {
       if (Hive.isBoxOpen('preferences')) {
         _enabled = Hive.box('preferences').get(enabledKey, defaultValue: false) == true;
       }
-      if (_enabled) unawaited(initialize());
+      VoiceDiagnosticObserver.enabled = _enabled;
+      if (_enabled || Hive.isBoxOpen('preferences') && Hive.box('preferences').get(historyKey) == true) unawaited(initialize());
     } catch (_) {
       storageError = 'preferences_unavailable';
     }
@@ -121,7 +130,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
   Future<void> _load() async {
     try {
       final values = await storage.load();
-      final loaded = await compute(_decodeRecords, values);
+      final loaded = useIsolates ? await compute(_decodeRecords, values) : _decodeRecords(values);
       for (final entry in loaded.entries) {
         if (_deleted.contains(entry.key) || _records.containsKey(entry.key)) continue;
         final record = entry.value;
@@ -148,6 +157,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
     // Preference errors are reported to this screen, never to a voice command.
     if (Hive.isBoxOpen('preferences')) {
       await Hive.box('preferences').put(enabledKey, value);
+      if (value) await Hive.box('preferences').put(historyKey, true);
     }
     if (!value) {
       for (final id in _records.keys.toList()) {
@@ -155,6 +165,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
       }
     }
     _enabled = value;
+    if (identical(this, instance)) VoiceDiagnosticObserver.enabled = value;
     await initialize();
     _notify();
   }
@@ -187,7 +198,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
   }
 
   T run<T>(String? id, T Function() action) =>
-      runZoned(action, zoneValues: {_zoneKey: id});
+      VoiceDiagnosticObserver.run(id, action);
 
   void event(String? id, String stage, Map<String, dynamic> data) {
     if (!_enabled || id == null) return;
@@ -231,6 +242,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
   void submitted(String? id, String transcript) {
     if (!_enabled || id == null || !_records.containsKey(id)) return;
     if (terminalOutcomes.contains(_records[id]!['outcome'])) return;
+    if (transcript.length > maxTextLength) _records[id]!['text_truncated'] = true;
     _records[id]!['submitted_transcript'] = _text(transcript);
     _records[id]!['outcome'] = 'processing';
     _changed(id);
@@ -352,7 +364,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
       try {
         final snapshots = {for (final id in _dirty) if (_records.containsKey(id)) id: _copy(_records[id]!)};
         _dirty.removeAll(snapshots.keys);
-        final encoded = await compute(_encodeRecords, snapshots);
+        final encoded = useIsolates ? await compute(_encodeRecords, snapshots) : _encodeRecords(snapshots);
         for (final entry in encoded.entries) {
           _sizes[entry.key] = utf8.encode(entry.value).length;
         }

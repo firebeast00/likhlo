@@ -24,7 +24,6 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
   final selected = <String>{};
   String filter = 'all';
   String period = 'all';
-  bool busy = false;
 
   @override
   void initState() {

@@ -1,5 +1,5 @@
 import 'local_nlp_service.dart';
-import 'voice_diagnostics_service.dart';
+import 'voice_diagnostic_observer.dart';
 import 'pakistani_language_normalizer.dart';
 
 class UdharInput {
@@ -34,10 +34,12 @@ class UdharInputService {
         .replaceAll('لیے', 'liye');
     final normalization = PakistaniLanguageNormalizer().normalize(debtText);
     final normalized = normalization.normalized;
-    VoiceDiagnosticsService.instance.stage('normalization', {
+    if (VoiceDiagnosticObserver.active) {
+    VoiceDiagnosticObserver.stage('normalization', {
       'original': text, 'debt_script_input': debtText, 'normalized': normalized,
       'applied_rules': normalization.appliedRules,
     });
+    }
     // Main Smart Entry's negation/alternative safeguards also apply to Udhaar.
     if (RegExp(r'\b(nahi|nahin|mat|dont|don\x27t|ya|or)\b')
         .hasMatch(normalized)) {
@@ -97,13 +99,15 @@ class UdharInputService {
     if (person.isNotEmpty) {
       person = person[0].toUpperCase() + person.substring(1);
     }
-    VoiceDiagnosticsService.instance.stage('parse', {
+    if (VoiceDiagnosticObserver.active) {
+    VoiceDiagnosticObserver.stage('parse', {
       'intent': borrowed ? 'udhar_borrowed' : 'udhar_lent',
       'person': person, 'amount': parsed.amount, 'confidence': parsed.confidence,
       'confidence_by_field': parsed.confidenceByField,
       'can_save_immediately': (borrowed != lent) && person.isNotEmpty &&
           (parsed.confidenceByField['amount'] ?? 0) >= 0.9,
     });
+    }
     return UdharInput(
       person: person,
       amount: parsed.amount,

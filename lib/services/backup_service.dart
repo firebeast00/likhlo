@@ -9,6 +9,7 @@ import '../models/wallet_model.dart';
 import '../models/workspace_model.dart';
 import 'backup_codec.dart';
 import 'biometric_service.dart';
+import 'voice_diagnostic_observer.dart';
 
 class BackupPreview {
   final DateTime createdAt;
@@ -84,6 +85,8 @@ class BackupService {
             'automatic_backup_last_success_v1',
             'automatic_backup_last_fingerprint_v1',
             BiometricService.preferenceKey,
+            VoiceDiagnosticObserver.enabledKey,
+            VoiceDiagnosticObserver.historyKey,
           },
         ),
       },
@@ -238,6 +241,8 @@ class BackupService {
           defaultValue: false,
         ) ==
         true;
+    final localDiagnosticEnabled = boxes.preferences.get(VoiceDiagnosticObserver.enabledKey, defaultValue: false) == true;
+    final localDiagnosticHistory = boxes.preferences.get(VoiceDiagnosticObserver.historyKey, defaultValue: false) == true;
     final localAutomaticBackupDate =
         boxes.preferences.get('automatic_backup_last_success_v1');
     final localAutomaticBackupFingerprint =
@@ -261,6 +266,9 @@ class BackupService {
     await boxes.preferences.clear();
     await boxes.preferences.putAll(backup.preferences);
     await boxes.preferences.delete('selected_workspace_id_v1');
+    // Transcript consent belongs to this device, never to an imported backup.
+    await boxes.preferences.put(VoiceDiagnosticObserver.enabledKey, localDiagnosticEnabled);
+    await boxes.preferences.put(VoiceDiagnosticObserver.historyKey, localDiagnosticHistory);
     await boxes.preferences.put(
       BiometricService.preferenceKey,
       localAppLockEnabled,

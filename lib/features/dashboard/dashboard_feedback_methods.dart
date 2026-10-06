@@ -102,6 +102,7 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
     bool announce = true,
   }) {
     if (!mounted) return;
+    if (VoiceDiagnosticsService.instance.enabled && VoiceDiagnosticsService.instance.currentId != null) {
     final responseTitle = AppMessage.resolve(title);
     final responseBody = AppMessage.resolve(message);
     VoiceDiagnosticsService.instance.stage('response', {
@@ -110,6 +111,7 @@ extension _DashboardFeedbackMethods on _HomeScreenState {
       'title': AppStrings.current.display(title), 'message': AppStrings.current.display(message),
       'tone': tone.name,
     });
+    }
     _feedback.show(
       context,
       title: AppStrings.current.display(title),

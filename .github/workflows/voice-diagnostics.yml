@@ -26,10 +26,10 @@ jobs:
       - id: dependencies
         run: flutter pub get
       - name: Format new diagnostics files
-        run: dart format lib/services/voice_diagnostics_service.dart lib/screens/voice_diagnostics_screen.dart test/voice_diagnostics*_test.dart
+        run: dart format lib/services/voice_diagnostics_service.dart lib/services/voice_diagnostic_observer.dart lib/screens/voice_diagnostics_screen.dart test/voice_diagnostics*_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Focused diagnostics tests
-        run: flutter test test/voice_diagnostics_service_test.dart test/voice_diagnostics_screen_test.dart
+        run: flutter test test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart
       - if: ${{ always() && steps.dependencies.outcome == 'success' }}
         name: Compare full suite with current app baseline
         shell: bash
@@ -40,11 +40,17 @@ jobs:
           set +e
           flutter test --reporter json > "$RUNNER_TEMP/baseline-tests.json"
           baseline_status=$?
+          dart run tool/semantic_benchmark.dart > "$RUNNER_TEMP/baseline-benchmark.txt"
+          baseline_benchmark_status=$?
           cd "$GITHUB_WORKSPACE"
           flutter test --reporter json > "$RUNNER_TEMP/head-tests.json"
           head_status=$?
+          dart run tool/semantic_benchmark.dart > "$RUNNER_TEMP/head-benchmark.txt"
+          head_benchmark_status=$?
           set -e
           echo "Full suite exit codes: baseline=$baseline_status head=$head_status"
+          echo "Parser benchmark exit codes: baseline=$baseline_benchmark_status head=$head_benchmark_status"
+          python3 -c 'from pathlib import Path; import sys; a,b=[Path(p).read_text() for p in sys.argv[1:]]; assert "Samples:" in a and "Samples:" in b, "Parser benchmark did not run"; new={x for x in b.splitlines() if x.startswith("- ")}-{x for x in a.splitlines() if x.startswith("- ")}; assert not new, str(new); print("No new parser benchmark failures")' "$RUNNER_TEMP/baseline-benchmark.txt" "$RUNNER_TEMP/head-benchmark.txt"
           python3 tool/compare_flutter_tests.py "$RUNNER_TEMP/baseline-tests.json" "$RUNNER_TEMP/head-tests.json"
       - if: always()
         uses: actions/upload-artifact@v4

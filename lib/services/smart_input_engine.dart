@@ -1,5 +1,5 @@
 import 'local_nlp_service.dart';
-import 'voice_diagnostics_service.dart';
+import 'voice_diagnostic_observer.dart';
 import 'pakistani_language_normalizer.dart';
 import 'smart_command.dart';
 
@@ -52,11 +52,12 @@ class SmartInputEngine {
       accounts: accounts,
     );
     final command = _toTypedCommand(parsed, source);
-    VoiceDiagnosticsService.instance.stage('normalization', {
+    if (VoiceDiagnosticObserver.active) {
+    VoiceDiagnosticObserver.stage('normalization', {
       'original': input, 'normalized': normalization.normalized,
       'applied_rules': normalization.appliedRules,
     });
-    VoiceDiagnosticsService.instance.stage('parse', {
+    VoiceDiagnosticObserver.stage('parse', {
       'intent': parsed.intent.wireName, ...parsed.toLegacyMap(),
       'query_metric': parsed.queryMetric?.name, 'time_range': parsed.timeRange.name,
       'navigation_target': parsed.navigationTarget, 'app_action': parsed.appAction?.name,
@@ -67,6 +68,7 @@ class SmartInputEngine {
       if (command is MutationCommand) 'patch': {'title': command.patch.title, 'amount': command.patch.amount,
         'category': command.patch.category, 'date': command.patch.date, 'wallet_id': command.patch.walletId},
     });
+    }
     return SmartInputPlan(
       originalText: input,
       normalization: normalization,

@@ -7,7 +7,7 @@ import 'voice_diagnostics_service_test.dart' show MemoryDiagnosticStorage;
 
 void main() {
   testWidgets('tester reviews a completed command as misunderstood without changing action', (tester) async {
-    final service = VoiceDiagnosticsService(MemoryDiagnosticStorage(), enabled: true);
+    final service = VoiceDiagnosticsService(MemoryDiagnosticStorage(), enabled: true, useIsolates: false);
     await tester.runAsync(() => service.initialize());
     final id = service.begin(entryPoint: 'test')!;
     service.event(id, 'recognition', {'text': '500 chai'}); service.finish(id, 'completed');
@@ -19,6 +19,7 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), 'sau chai');
     await tester.enterText(find.byType(TextField).at(1), '100 expense for chai');
     await tester.ensureVisible(find.text('Save review'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save review'));
     await tester.runAsync(() => service.flush()); await tester.pumpAndSettle();
     expect(service.record(id)!['review']['assessment'], 'wrong');
