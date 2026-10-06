@@ -5,7 +5,7 @@ on:
   pull_request:
     paths: ['lib/**', 'test/**', 'tool/**', 'pubspec*', '.github/workflows/voice-diagnostics.yml']
 concurrency:
-  group: diagnostics-${{ github.head_ref || github.ref_name }}
+  group: voice-diagnostics-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   verify:
@@ -29,8 +29,8 @@ jobs:
         run: dart format lib/services/voice_diagnostics_service.dart lib/services/voice_diagnostic_observer.dart lib/screens/voice_diagnostics_screen.dart test/voice_diagnostics*_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Focused diagnostics tests
-        run: flutter test test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart
-      - if: ${{ always() && steps.dependencies.outcome == 'success' }}
+        run: flutter test --timeout 1m test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart
+      - if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         name: Compare full suite with current app baseline
         shell: bash
         run: |
@@ -38,12 +38,12 @@ jobs:
           cd "$RUNNER_TEMP/diagnostics-baseline"
           flutter pub get
           set +e
-          flutter test --reporter json > "$RUNNER_TEMP/baseline-tests.json"
+          flutter test --timeout 1m --reporter json > "$RUNNER_TEMP/baseline-tests.json"
           baseline_status=$?
           dart run tool/semantic_benchmark.dart > "$RUNNER_TEMP/baseline-benchmark.txt"
           baseline_benchmark_status=$?
           cd "$GITHUB_WORKSPACE"
-          flutter test --reporter json > "$RUNNER_TEMP/head-tests.json"
+          flutter test --timeout 1m --reporter json > "$RUNNER_TEMP/head-tests.json"
           head_status=$?
           dart run tool/semantic_benchmark.dart > "$RUNNER_TEMP/head-benchmark.txt"
           head_benchmark_status=$?
