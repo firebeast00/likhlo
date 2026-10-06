@@ -37,7 +37,14 @@ Map<String, Map<String, dynamic>> _decodeRecords(Map<String, String> values) {
   for (final item in values.entries) {
     try {
       final decoded = jsonDecode(item.value);
-      if (decoded is Map && decoded['schema_version'] == 1) {
+      if (decoded is Map && decoded['schema_version'] == 1 &&
+          decoded['id'] == item.key && decoded['started_at'] is String &&
+          DateTime.tryParse(decoded['started_at'] as String) != null &&
+          decoded['outcome'] is String && decoded['raw_transcript'] is String &&
+          decoded['events'] is List && decoded['review'] is Map &&
+          decoded['review']['assessment'] is String &&
+          ['parse', 'normalization', 'confidence', 'execution', 'response', 'tts', 'context']
+              .every((key) => decoded[key] == null || decoded[key] is Map)) {
         result[item.key] = Map<String, dynamic>.from(decoded);
       }
     } catch (_) {
@@ -111,6 +118,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
   bool _enabled;
   String? storageError;
   int evictedRecords = 0;
+  int corruptRecordsSkipped = 0;
 
   VoiceDiagnosticsService(this.storage, {
     DateTime Function()? clock,
@@ -163,6 +171,9 @@ class VoiceDiagnosticsService extends ChangeNotifier {
     try {
       final values = await storage.load();
       final loaded = useIsolates ? await compute(_decodeRecords, values) : _decodeRecords(values);
+      for (final id in values.keys.where((id) => !loaded.containsKey(id))) {
+        _deleted.add(id); corruptRecordsSkipped++;
+      }
       for (final entry in loaded.entries) {
         if (_deleted.contains(entry.key) || _records.containsKey(entry.key)) continue;
         final record = entry.value;
@@ -242,11 +253,14 @@ class VoiceDiagnosticsService extends ChangeNotifier {
       final safe = _safe(data);
       if (stage == 'recognition') {
         final raw = safe['text'] as String? ?? '';
+        final previous = record['recognition'] as Map?;
+        final duplicate = record['raw_transcript'] == raw && previous != null &&
+            ['is_final', 'cycle', 'provider', 'confidence', 'stability', 'detected_language']
+                .every((key) => previous[key] == safe[key]);
         record['raw_transcript'] = raw;
+        record['recognition'] = {for (final entry in safe.entries) if (entry.key != 'text') entry.key: entry.value};
         if ((data['text'] as String? ?? '').length > maxTextLength) record['text_truncated'] = true;
-        if (events.isNotEmpty && events.last is Map &&
-            events.last['stage'] == stage && events.last['data']['text'] == raw &&
-            events.last['data']['is_final'] == safe['is_final']) return;
+        if (duplicate) return;
       }
       final newEvent = {'at': clock().toUtc().toIso8601String(), 'stage': stage, 'data': safe};
       if (events.length >= maxEvents) {
@@ -444,7 +458,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
       'privacy': {'audio_included': false, 'contains_transcripts': true,
         'name_masking': maskNames ? 'best_effort_review_required' : 'disabled_test_data_only'},
       'retention': {'days': 30, 'max_records': recordLimit, 'max_bytes': byteLimit,
-        'evicted_this_session': evictedRecords, 'storage_error': storageError},
+        'evicted_this_session': evictedRecords, 'corrupt_records_skipped': corruptRecordsSkipped, 'storage_error': storageError},
       'summary': {'selected': selected.length, 'reviewed_decisive': reviewed.length,
         'correct': correct, 'reviewed_accuracy': reviewed.isEmpty ? null : correct / reviewed.length,
         'review_coverage': selected.isEmpty ? 0.0 : reviewed.length / selected.length},

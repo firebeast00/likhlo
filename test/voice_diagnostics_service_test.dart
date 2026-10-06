@@ -124,9 +124,21 @@ void main() {
   });
   test('repeated partials are deduplicated while final flag is retained', () {
     final id = begin();
-    for (var i = 0; i < 5; i++) { service.event(id, 'recognition', {'text': 'chai', 'is_final': false}); }
+    for (var i = 0; i < 5; i++) {
+      service.event(id, 'recognition', {'text': 'chai', 'is_final': false});
+      service.event(id, 'speech_session', {'event': 'result_partial'});
+    }
     service.event(id, 'recognition', {'text': 'chai', 'is_final': true});
-    expect((service.record(id)!['events'] as List).length, 2);
+    expect((service.record(id)!['events'] as List).where((dynamic e) => e['stage'] == 'recognition').length, 2);
+  });
+  test('damaged record envelopes are skipped without breaking history', () async {
+    storage.values['bad'] = '{"schema_version":1,"id":"bad","started_at":null}';
+    final restarted = VoiceDiagnosticsService(storage, clock: () => now);
+    await restarted.initialize(); await restarted.flush();
+    expect(restarted.summaries, isEmpty);
+    expect(restarted.corruptRecordsSkipped, 1);
+    expect(storage.values.containsKey('bad'), false);
+    restarted.dispose();
   });
   test('restart recovers in-flight commands with unknown action outcome', () async {
     final id = begin(); await service.flush();
