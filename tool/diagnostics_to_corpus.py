@@ -22,13 +22,18 @@ def convert(report):
             skipped += 1
             continue
         expected = None
-        if review.get('assessment') == 'correct':
+        try:
+            expected = json.loads(review.get('expected_result', ''))
+        except (ValueError, TypeError):
+            pass
+        if not isinstance(expected, dict) and review.get('assessment') == 'correct':
             expected = command.get('parse')
-        else:
-            try:
-                expected = json.loads(review.get('expected_result', ''))
-            except (ValueError, TypeError):
-                pass
+            entries = command.get('execution_input', {}).get('entries', [])
+            if isinstance(expected, dict) and len(entries) == 1:
+                final = entries[0]
+                if any(expected.get(key) != final.get(key) for key in ('amount', 'title')):
+                    skipped += 1
+                    continue  # Final save may be correct only because the tester edited it.
         if not isinstance(expected, dict) or not isinstance(expected.get('intent'), str):
             skipped += 1
             continue
@@ -36,7 +41,8 @@ def convert(report):
             skipped += 1  # Different parser paths need their own focused tests.
             continue
         text = command.get('submitted_transcript') or command.get('raw_transcript')
-        if not text or command.get('text_truncated') or command.get('dropped_events', 0):
+        if (not text or '[name_' in text or '[name_' in str(expected.get('title', ''))
+                or command.get('text_truncated') or command.get('dropped_events', 0)):
             skipped += 1
             continue
         sample = {'id': command['id'], 'input': text, 'source': 'voice'}

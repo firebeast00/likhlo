@@ -16,38 +16,58 @@ void main() {
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('diagnostics_backup_');
     Hive.init(directory.path);
-    for (final adapter in <TypeAdapter>[
-      ExpenseAdapter(), WalletAdapter(), DebtEntryAdapter(), MessEntryAdapter(), WorkspaceAdapter(),
-    ]) {
-      if (!Hive.isAdapterRegistered(adapter.typeId)) Hive.registerAdapter(adapter);
-    }
+    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ExpenseAdapter());
+    if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(WalletAdapter());
+    if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(DebtEntryAdapter());
+    if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(MessEntryAdapter());
+    if (!Hive.isAdapterRegistered(9)) Hive.registerAdapter(WorkspaceAdapter());
     await Hive.openBox<Expense>('expenses');
     await Hive.openBox<Wallet>('wallets');
     await Hive.openBox('settings');
     await Hive.openBox('preferences');
   });
-  tearDown(() async { await Hive.close(); await directory.delete(recursive: true); });
+  tearDown(() async {
+    await Hive.close();
+    await directory.delete(recursive: true);
+  });
 
-  test('ledger backups exclude transcript consent and preserve unrelated preferences', () async {
+  test(
+      'ledger backups exclude transcript consent and preserve unrelated preferences',
+      () async {
     final preferences = Hive.box('preferences');
     await preferences.put(VoiceDiagnosticObserver.enabledKey, true);
     await preferences.put(VoiceDiagnosticObserver.historyKey, true);
     await preferences.put('other_setting', 'kept');
     final payload = await BackupService().createPayload();
     final entries = payload['data']['preferences'] as List;
-    expect(entries.any((dynamic e) => e['key'] == VoiceDiagnosticObserver.enabledKey), false);
-    expect(entries.any((dynamic e) => e['key'] == VoiceDiagnosticObserver.historyKey), false);
-    expect(entries.any((dynamic e) => e['key'] == 'other_setting' && e['value'] == 'kept'), true);
+    expect(
+        entries
+            .any((dynamic e) => e['key'] == VoiceDiagnosticObserver.enabledKey),
+        false);
+    expect(
+        entries
+            .any((dynamic e) => e['key'] == VoiceDiagnosticObserver.historyKey),
+        false);
+    expect(
+        entries.any(
+            (dynamic e) => e['key'] == 'other_setting' && e['value'] == 'kept'),
+        true);
   });
-  test('restoring another device backup cannot enable transcript recording', () async {
+  test('restoring another device backup cannot enable transcript recording',
+      () async {
     final service = BackupService();
     final payload = await service.createPayload();
-    (payload['data']['preferences'] as List).add({'key': VoiceDiagnosticObserver.enabledKey, 'value': true});
+    payload['data']['preferences'] = [
+      ...(payload['data']['preferences'] as List),
+      {'key': VoiceDiagnosticObserver.enabledKey, 'value': true},
+    ];
     await service.restore(service.validate(payload));
-    expect(Hive.box('preferences').get(VoiceDiagnosticObserver.enabledKey), false);
+    expect(
+        Hive.box('preferences').get(VoiceDiagnosticObserver.enabledKey), false);
     await Hive.box('preferences').put(VoiceDiagnosticObserver.enabledKey, true);
     final second = await service.createPayload();
     await service.restore(service.validate(second));
-    expect(Hive.box('preferences').get(VoiceDiagnosticObserver.enabledKey), true);
+    expect(
+        Hive.box('preferences').get(VoiceDiagnosticObserver.enabledKey), true);
   });
 }

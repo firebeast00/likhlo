@@ -16,6 +16,8 @@ class VoiceDiagnosticObserver {
 
   static void stage(String stage, Map<String, dynamic> data) {
     if (!active) return;
-    try { sink?.call(currentId, stage, data); } catch (_) {}
+    try {
+      sink?.call(currentId, stage, data);
+    } catch (_) {}
   }
 }

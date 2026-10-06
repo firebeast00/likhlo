@@ -56,6 +56,8 @@ is never changed by a TTS failure.
    noise and no-network conditions. Include failed and successful commands.
 2. Review every failure immediately and a sample of successes. Record the
    intended amount/title/wallet/date; a saved wrong command is still wrong.
+   If you had to correct detected fields before saving, review the original
+   interpretation as wrong and name the stage that needed correction.
 3. Collect JSON files manually. Group repeated failures by recognition,
    normalization, intent/field parsing, action validation and spoken feedback.
 4. Fix the largest repeated group. Keep speakers/devices aside as a holdout;
@@ -73,7 +75,8 @@ For wrong examples, developers can turn the tester's explanation into a JSON
 object in `review.expected_result`, e.g.
 `{"intent":"add_expense","amount":100,"title":"Chai"}`. The conversion
 tool never imports or executes ledger commands. It skips unreviewed, unsure,
-truncated, batch and Udhaar examples; add separate focused tests for those
+masked, truncated, batch and Udhaar examples, and saves whose amount/title were edited
+without explicit developer labels; add separate focused tests for those
 paths. Masked examples are suitable for privacy review, but use an approved
 synthetic unmasked export when exact names/spellings matter.
 
