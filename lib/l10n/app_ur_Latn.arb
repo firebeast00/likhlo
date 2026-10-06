@@ -1569,5 +1569,7 @@
   "diagnostics_preview_hint": "Share karne se pehle JSON mein zaati tafseel check karein. Kuch naam, raqam ya zaati tafseel reh sakti hai. Command nikalne ke liye wapas ja kar usay deselect karein.",
   "diagnostics_save_json": "JSON save karein",
   "diagnostics_share_json": "JSON share karein",
-  "diagnostics_error": "Diagnostics ka yeh kaam mukammal nahi hua. Dobara koshish karein."
+  "diagnostics_error": "Diagnostics ka yeh kaam mukammal nahi hua. Dobara koshish karein.",
+  "diagnostics_select_all": "Sab chunein",
+  "diagnostics_use_filtered": "Filter wali list use karein"
 }

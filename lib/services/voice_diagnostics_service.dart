@@ -50,8 +50,31 @@ Map<String, Map<String, dynamic>> _decodeRecords(Map<String, String> values) {
 Map<String, String> _encodeRecords(Map<String, Map<String, dynamic>> values) =>
     values.map((key, value) => MapEntry(key, jsonEncode(value)));
 
-String encodeVoiceDiagnosticExport(Map<String, dynamic> report) =>
-    const JsonEncoder.withIndent('  ').convert(report);
+String encodeVoiceDiagnosticExport(Map<String, dynamic> report) {
+  final names = (report.remove('_masking_names') as List?)?.cast<String>();
+  final mask = report.remove('_masking_enabled') == true;
+  if (names != null && mask) report['commands'] = _maskValues(report['commands'], names);
+  return const JsonEncoder.withIndent('  ').convert(report);
+}
+
+dynamic _maskValues(dynamic value, List<String> names) {
+  if (names.isEmpty) return value;
+  final labels = {for (var i = 0; i < names.length; i++) names[i].toLowerCase(): '[name_${i + 1}]'};
+  final pattern = RegExp(names.map(RegExp.escape).join('|'), caseSensitive: false);
+  dynamic visit(dynamic v) {
+    if (v is String) return v.replaceAllMapped(pattern, (match) => labels[match.group(0)!.toLowerCase()]!);
+    if (v is Map) return v.map((key, item) => MapEntry(key, visit(item)));
+    if (v is List) return v.map(visit).toList();
+    return v;
+  }
+  return visit(value);
+}
+
+dynamic _cloneValue(dynamic value) {
+  if (value is Map) return value.map((key, item) => MapEntry(key, _cloneValue(item)));
+  if (value is List) return value.map(_cloneValue).toList();
+  return value;
+}
 
 class VoiceDiagnosticsService extends ChangeNotifier {
   static final instance = _createInstance();
@@ -106,11 +129,20 @@ class VoiceDiagnosticsService extends ChangeNotifier {
     return sorted.map((value) => _copy(value)).toList(growable: false);
   }
 
+  int get recordCount => _records.length;
+  List<Map<String, dynamic>> get summaries {
+    final items = _records.values.map((r) => <String, dynamic>{
+      for (final key in ['id', 'started_at', 'outcome', 'raw_transcript', 'submitted_transcript']) key: r[key],
+      'review': {'assessment': r['review']['assessment']},
+    }).toList()..sort((a, b) => (b['started_at'] as String).compareTo(a['started_at'] as String));
+    return items;
+  }
+
   Map<String, dynamic>? record(String id) =>
       _records[id] == null ? null : _copy(_records[id]!);
 
   static Map<String, dynamic> _copy(Map<String, dynamic> value) =>
-      Map<String, dynamic>.from(jsonDecode(jsonEncode(value)) as Map);
+      Map<String, dynamic>.from(_cloneValue(value) as Map);
 
   /// Called after the first frame; opening this box is not a startup dependency.
   void start() {
@@ -190,6 +222,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
         'tts': {'status': 'not_requested', 'completion_observed': false},
       };
       _changed(id);
+      _scheduleFlush(immediate: true);
       unawaited(initialize());
       return id;
     } catch (_) {
@@ -388,7 +421,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
 
   /// Redaction is explicit and best-effort. It never rewrites local evidence.
   Map<String, dynamic> export({required Iterable<String> ids,
-    bool maskNames = true, Iterable<String> additionalNames = const [],
+    bool maskNames = true, bool deferMasking = false, Iterable<String> additionalNames = const [],
   }) {
     _prune();
     final selected = ids.map((id) => _records[id]).whereType<Map<String, dynamic>>().map(_copy).toList();
@@ -400,19 +433,6 @@ class VoiceDiagnosticsService extends ChangeNotifier {
       }
     }
     final ordered = names.toList()..sort((a, b) => b.length.compareTo(a.length));
-    dynamic redact(dynamic value) {
-      if (value is String) {
-        if (!maskNames) return value;
-        var result = value;
-        for (var i = 0; i < ordered.length; i++) {
-          result = result.replaceAll(RegExp(RegExp.escape(ordered[i]), caseSensitive: false), '[name_${i + 1}]');
-        }
-        return result;
-      }
-      if (value is Map) return value.map((key, val) => MapEntry(key, redact(val)));
-      if (value is List) return value.map(redact).toList();
-      return value;
-    }
     final reviewed = selected.where((r) => r['review']['assessment'] != 'unreviewed' && r['review']['assessment'] != 'unsure').toList();
     final correct = reviewed.where((r) => r['review']['assessment'] == 'correct').length;
     return {
@@ -428,7 +448,9 @@ class VoiceDiagnosticsService extends ChangeNotifier {
       'summary': {'selected': selected.length, 'reviewed_decisive': reviewed.length,
         'correct': correct, 'reviewed_accuracy': reviewed.isEmpty ? null : correct / reviewed.length,
         'review_coverage': selected.isEmpty ? 0.0 : reviewed.length / selected.length},
-      'commands': redact(selected),
+      if (deferMasking) '_masking_names': ordered,
+      if (deferMasking) '_masking_enabled': maskNames,
+      'commands': deferMasking || !maskNames ? selected : _maskValues(selected, ordered),
     };
   }
 

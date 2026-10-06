@@ -874,6 +874,8 @@ const englishMessages = <String, String>{
   "diagnostics_save_json": "Save JSON",
   "diagnostics_share_json": "Share JSON",
   "diagnostics_error": "Could not complete this diagnostic operation. Try again.",
+  "diagnostics_select_all": "Select all",
+  "diagnostics_use_filtered": "Use filtered list",
 };
 
 const romanUrduMessages = <String, String>{
@@ -1751,6 +1753,8 @@ const romanUrduMessages = <String, String>{
   "diagnostics_save_json": "JSON save karein",
   "diagnostics_share_json": "JSON share karein",
   "diagnostics_error": "Diagnostics ka yeh kaam mukammal nahi hua. Dobara koshish karein.",
+  "diagnostics_select_all": "Sab chunein",
+  "diagnostics_use_filtered": "Filter wali list use karein",
 };
 
 const urduSpeechMessages = <String, String>{

@@ -161,6 +161,19 @@ void main() {
     expect(jsonEncode(report['commands']), isNot(contains(b)));
     expect(service.export(ids: [b])['summary']['reviewed_accuracy'], isNull);
   });
+  test('background export masks names and removes internal worker fields', () {
+    final id = begin(); service.event(id, 'recognition', {'text': 'Ali ko 500 diya'});
+    final input = service.export(ids: [id], additionalNames: ['Ali'], deferMasking: true);
+    final report = jsonDecode(encodeVoiceDiagnosticExport(input));
+    expect(report.containsKey('_masking_names'), false);
+    expect(jsonEncode(report['commands']), isNot(contains('Ali')));
+    expect(service.record(id)!['raw_transcript'], contains('Ali'));
+  });
+  test('oversized submitted text is flagged for exclusion from exact replay', () {
+    final id = begin(); service.submitted(id, 'a' * 3000);
+    expect(service.record(id)!['text_truncated'], true);
+    expect((service.record(id)!['submitted_transcript'] as String).length, VoiceDiagnosticsService.maxTextLength);
+  });
   test('cleared records cannot be resurrected by late callbacks', () async {
     final id = begin(); await service.flush(); await service.clear();
     service.event(id, 'recognition', {'text': 'late'}); service.finish(id, 'completed'); await service.flush();

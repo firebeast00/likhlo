@@ -26,4 +26,17 @@ void main() {
     expect(service.record(id)!['outcome'], 'completed');
     await tester.pumpWidget(const SizedBox()); service.dispose();
   });
+  testWidgets('deselecting the last selected command disables export', (tester) async {
+    final service = VoiceDiagnosticsService(MemoryDiagnosticStorage(), enabled: true, useIsolates: false);
+    await service.initialize();
+    final id = service.begin(entryPoint: 'test')!;
+    service.finish(id, 'completed'); await service.flush();
+    await tester.pumpWidget(MaterialApp(home: VoiceDiagnosticsScreen(service: service)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox)); await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox)); await tester.pumpAndSettle();
+    expect(find.text('Export selected commands'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Export selected commands')).onPressed, isNull);
+    await tester.pumpWidget(const SizedBox()); service.dispose();
+  });
 }

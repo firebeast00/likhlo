@@ -1569,5 +1569,7 @@
   "diagnostics_preview_hint": "Check the JSON for personal details before sharing. Masking may miss names, amounts and other private details. Go back and deselect any command to exclude it.",
   "diagnostics_save_json": "Save JSON",
   "diagnostics_share_json": "Share JSON",
-  "diagnostics_error": "Could not complete this diagnostic operation. Try again."
+  "diagnostics_error": "Could not complete this diagnostic operation. Try again.",
+  "diagnostics_select_all": "Select all",
+  "diagnostics_use_filtered": "Use filtered list"
 }

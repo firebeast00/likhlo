@@ -22,6 +22,7 @@ class VoiceDiagnosticsScreen extends StatefulWidget {
 class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
   late final service = widget.service ?? VoiceDiagnosticsService.instance;
   final selected = <String>{};
+  bool selecting = false;
   String filter = 'all';
   String period = 'all';
 
@@ -56,7 +57,7 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
 
   List<Map<String, dynamic>> _visible() {
     final now = DateTime.now();
-    return service.records.where((r) {
+    return service.summaries.where((r) {
       if (period != 'all' && now.difference(DateTime.parse(r['started_at'] as String)).inDays >= int.parse(period)) return false;
       if (filter == 'issues') return r['review']['assessment'] == 'wrong' ||
           VoiceDiagnosticsService.terminalOutcomes.contains(r['outcome']) && r['outcome'] != 'completed';
@@ -89,7 +90,7 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
 
   Future<void> _export() async {
     final visible = _visible();
-    final ids = visible.map((r) => r['id'] as String).where((id) => selected.isEmpty || selected.contains(id)).toList();
+    final ids = visible.map((r) => r['id'] as String).where((id) => !selecting || selected.contains(id)).toList();
     if (ids.isEmpty) return;
     await service.flush();
     if (!mounted) return;
@@ -103,7 +104,7 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
     final visible = _visible();
     return Scaffold(
       appBar: AppBar(title: Text(_label('title')), actions: [IconButton(
-        tooltip: _label('clear'), onPressed: service.records.isEmpty ? null : _clear, icon: const Icon(Icons.delete_outline)),
+        tooltip: _label('clear'), onPressed: service.recordCount == 0 ? null : _clear, icon: const Icon(Icons.delete_outline)),
       ]),
       body: Column(children: [
         SwitchListTile(title: Text(_label('capture')), subtitle: Text(_label('local_only')),
@@ -114,18 +115,25 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
           Expanded(child: DropdownButton<String>(isExpanded: true, value: filter,
             items: ['all', 'issues', 'unreviewed', ...VoiceDiagnosticsService.terminalOutcomes, 'awaiting_confirmation']
                 .map((v) => DropdownMenuItem(value: v, child: Text(_label(v), overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (v) => setState(() { filter = v!; selected.clear(); }))),
+            onChanged: (v) => setState(() { filter = v!; selected.clear(); selecting = false; }))),
           const SizedBox(width: 16),
           Expanded(child: DropdownButton<String>(isExpanded: true, value: period,
             items: ['all', '1', '7', '30'].map((v) => DropdownMenuItem(value: v,
               child: Text(_label(v == 'all' ? 'all_dates' : 'days_$v')))).toList(),
-            onChanged: (v) => setState(() { period = v!; selected.clear(); }))),
+            onChanged: (v) => setState(() { period = v!; selected.clear(); selecting = false; }))),
         ])),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          TextButton(onPressed: visible.isEmpty ? null : () => setState(() {
+            selecting = true; selected..clear()..addAll(visible.map((r) => r['id'] as String));
+          }), child: Text(_label('select_all'))),
+          TextButton(onPressed: !selecting ? null : () => setState(() { selecting = false; selected.clear(); }),
+            child: Text(_label('use_filtered'))),
+        ]),
         Expanded(child: visible.isEmpty ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_label('empty')))) :
           ListView.builder(itemCount: visible.length, itemBuilder: (context, index) {
             final r = visible[index]; final id = r['id'] as String;
             return ListTile(
-              leading: Checkbox(value: selected.contains(id), onChanged: (v) => setState(() { if (v == true) { selected.add(id); } else { selected.remove(id); } })),
+              leading: Checkbox(value: selected.contains(id), onChanged: (v) => setState(() { selecting = true; if (v == true) { selected.add(id); } else { selected.remove(id); } })),
               title: Text((r['submitted_transcript'] ?? r['raw_transcript']).toString().isEmpty ? _label('no_speech') :
                 (r['submitted_transcript'] ?? r['raw_transcript']).toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
               subtitle: Text('${_label(r['outcome'] as String)} · ${_label(r['review']['assessment'] as String)}\n${DateTime.parse(r['started_at'] as String).toLocal()}'),
@@ -134,8 +142,8 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
             );
           })),
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(16), child: SizedBox(width: double.infinity,
-          child: FilledButton.icon(onPressed: visible.isEmpty ? null : _export,
-            icon: const Icon(Icons.ios_share), label: Text(_label(selected.isEmpty ? 'export_visible' : 'export_selected')))))),
+          child: FilledButton.icon(onPressed: visible.isEmpty || selecting && selected.isEmpty ? null : _export,
+            icon: const Icon(Icons.ios_share), label: Text(_label(selecting ? 'export_selected' : 'export_visible')))))),
       ]),
     );
   }
@@ -207,7 +215,7 @@ class _DiagnosticExportScreenState extends State<_DiagnosticExportScreen> {
   Future<void> _prepare() async {
     final attempt = ++generation;
     setState(() => busy = true);
-    final report = widget.service.export(ids: widget.ids, maskNames: mask, additionalNames: widget.names);
+    final report = widget.service.export(ids: widget.ids, maskNames: mask, deferMasking: true, additionalNames: widget.names);
     final result = await compute(encodeVoiceDiagnosticExport, report);
     if (mounted && attempt == generation) setState(() { json = result; busy = false; });
   }
