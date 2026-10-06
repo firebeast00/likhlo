@@ -440,11 +440,22 @@ class VoiceDiagnosticsService extends ChangeNotifier {
     _prune();
     final selected = ids.map((id) => _records[id]).whereType<Map<String, dynamic>>().map(_copy).toList();
     final names = <String>{...additionalNames.where((s) => s.trim().isNotEmpty)};
-    for (final value in selected) {
-      for (final field in ['person', 'wallet_name', 'title']) {
-        final name = (value['parse'] as Map?)?[field];
-        if (name is String && name.trim().isNotEmpty) names.add(name);
+    void collectNames(dynamic value) {
+      if (value is Map) {
+        for (final entry in value.entries) {
+          if (['person', 'wallet_name', 'title'].contains(entry.key) &&
+              entry.value is String && (entry.value as String).trim().isNotEmpty) {
+            names.add(entry.value as String);
+          } else if (entry.value is Map || entry.value is List) {
+            collectNames(entry.value);
+          }
+        }
+      } else if (value is List) {
+        for (final item in value) { collectNames(item); }
       }
+    }
+    for (final value in selected) {
+      collectNames(value['parse']); collectNames(value['execution_input']);
     }
     final ordered = names.toList()..sort((a, b) => b.length.compareTo(a.length));
     final reviewed = selected.where((r) => r['review']['assessment'] != 'unreviewed' && r['review']['assessment'] != 'unsure').toList();

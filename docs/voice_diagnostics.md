@@ -21,7 +21,7 @@ Each schema-v1 command stores recognizer words unchanged up to the documented
 text limit, partial/final flags, provider confidence when available, requested
 locale and on-device mode, recognizer cycles/retries/errors, assembled submitted
 input, normalization rules, intent/fields/confidence, confirmations, action
-results and affected IDs, app responses and independent TTS status. Query
+inputs after tester edits, results and affected IDs, app responses and independent TTS status. Query
 records include the actual reference time, calendar range/month, wallet filter
 and aggregate results. Tester assessment is independent of action completion.
 

@@ -212,6 +212,7 @@ class TransactionExecutor {
     switch (command) {
       case CreateTransactionCommand():
         final entry = _prepareForMainLedger(command.entry);
+        _recordDiagnosticEntries([entry]);
         final saved = await store.add(entry);
         if (saved && enableAudio) {
           unawaited(
@@ -270,6 +271,7 @@ class TransactionExecutor {
           );
         }
         final entries = command.entries.map(_prepareForMainLedger).toList();
+        _recordDiagnosticEntries(entries);
         final saved = await store.addAll(entries);
         if (saved && enableAudio) {
           final feedbackAction = entries.every((entry) => entry.type == 'income')
@@ -305,6 +307,7 @@ class TransactionExecutor {
         }
         final outgoing = _prepareForMainLedger(command.outgoing);
         final incoming = _prepareForMainLedger(command.incoming);
+        _recordDiagnosticEntries([outgoing, incoming]);
         final saved = await store.addAll([outgoing, incoming]);
         if (saved && enableAudio) {
           unawaited(
@@ -326,6 +329,7 @@ class TransactionExecutor {
         );
       case UpdateTransactionCommand():
         final updatedEntry = _prepareForMainLedger(command.updated);
+        _recordDiagnosticEntries([updatedEntry]);
         final updated = await store.update(
           command.existingId,
           updatedEntry,
@@ -442,6 +446,18 @@ class TransactionExecutor {
           action: TransactionAction.emptyTrash,
         );
     }
+  }
+
+  void _recordDiagnosticEntries(Iterable<Expense> entries) {
+    final diagnostics = VoiceDiagnosticsService.instance;
+    if (!diagnostics.enabled || diagnostics.currentId == null) return;
+    try {
+      diagnostics.stage('execution_input', {'entries': entries.map((entry) => {
+        'id': entry.id, 'title': entry.title, 'amount': entry.amount,
+        'type': entry.type, 'category': entry.category, 'date': entry.date,
+        'wallet_id': entry.walletId,
+      }).toList()});
+    } catch (_) { /* Observations never change ledger behavior. */ }
   }
 
   FinancialFeedbackAction _feedbackAction(
