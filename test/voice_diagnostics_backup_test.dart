@@ -22,7 +22,10 @@ void main() {
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(MessEntryAdapter());
     if (!Hive.isAdapterRegistered(9)) Hive.registerAdapter(WorkspaceAdapter());
     await Hive.openBox<Expense>('expenses');
-    await Hive.openBox<Wallet>('wallets');
+    final wallets = await Hive.openBox<Wallet>('wallets');
+    await wallets.put('cash', Wallet(
+      id: 'cash', name: 'Cash', balance: 1000, colorValue: 0xFF00897B,
+    ));
     await Hive.openBox('settings');
     await Hive.openBox('preferences');
   });
