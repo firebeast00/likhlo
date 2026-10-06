@@ -1,4 +1,5 @@
 import '../l10n/app_strings.dart';
+import 'voice_diagnostics_screen.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -780,6 +781,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   VoicePrivacySettings.diagnosticsKey,
                   value,
                 ),
+              ),
+              _buildDivider(),
+              ListTile(
+                leading: const Icon(Icons.fact_check_outlined, color: Colors.purple),
+                title: Text(AppStrings.current.text('diagnostics_title')),
+                subtitle: Text(AppStrings.current.text('diagnostics_settings_hint')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context, MaterialPageRoute<void>(
+                  builder: (_) => const VoiceDiagnosticsScreen())),
               ),
               _buildDivider(),
               _buildSwitchTile(

@@ -27,6 +27,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final VoiceEntryController _voiceEntry = VoiceEntryController();
   final SpeechNetworkRecovery _speechNetworkRecovery = SpeechNetworkRecovery();
   int _speechAttempt = 0;
+  String? _voiceDiagnosticId;
   final FeedbackCoordinator _feedback = FeedbackCoordinator();
   bool _isListening = false;
   bool _handlingSpeechError = false;
@@ -93,7 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     quickActions.initialize((String shortcutType) {
       Future.delayed(const Duration(milliseconds: 400), () {
         if (shortcutType == 'action_voice_log') {
-          _listenForExpense();
+          _listenForExpense(entryPoint: 'quick_action');
         } else if (shortcutType == 'action_add_expense') {
           _showAddOrEditModal();
         }
@@ -126,6 +127,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   @override
   void dispose() {
+    VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'interrupted', reason: 'screen_disposed');
     _audioWarmupTimer?.cancel();
     NotificationService().onActionTriggered = null;
     _voiceEntry.speech.cancel();

@@ -1,3 +1,4 @@
+import '../services/voice_diagnostics_service.dart';
 import '../l10n/app_strings.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';

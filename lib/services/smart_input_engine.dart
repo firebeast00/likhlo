@@ -1,4 +1,5 @@
 import 'local_nlp_service.dart';
+import 'voice_diagnostics_service.dart';
 import 'pakistani_language_normalizer.dart';
 import 'smart_command.dart';
 
@@ -51,6 +52,21 @@ class SmartInputEngine {
       accounts: accounts,
     );
     final command = _toTypedCommand(parsed, source);
+    VoiceDiagnosticsService.instance.stage('normalization', {
+      'original': input, 'normalized': normalization.normalized,
+      'applied_rules': normalization.appliedRules,
+    });
+    VoiceDiagnosticsService.instance.stage('parse', {
+      'intent': parsed.intent.wireName, ...parsed.toLegacyMap(),
+      'query_metric': parsed.queryMetric?.name, 'time_range': parsed.timeRange.name,
+      'navigation_target': parsed.navigationTarget, 'app_action': parsed.appAction?.name,
+      'entry_type_filter': parsed.entryTypeFilter, 'has_explicit_date': parsed.hasExplicitDate,
+      'confidence_by_field': parsed.confidenceByField, 'clarification_reasons': parsed.clarificationReasons,
+      if (command is MutationCommand) 'selector': {'title': command.selector.title,
+        'amount': command.selector.amount, 'date': command.selector.date, 'type': command.selector.transactionType},
+      if (command is MutationCommand) 'patch': {'title': command.patch.title, 'amount': command.patch.amount,
+        'category': command.patch.category, 'date': command.patch.date, 'wallet_id': command.patch.walletId},
+    });
     return SmartInputPlan(
       originalText: input,
       normalization: normalization,

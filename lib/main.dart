@@ -19,6 +19,7 @@ import 'models/workspace_model.dart';
 // Services
 import "./services/notification_service.dart";
 import './services/automatic_backup_service.dart';
+import './services/voice_diagnostics_service.dart';
 
 // Providers
 import 'providers/settings_provider.dart';
@@ -72,6 +73,7 @@ void main() async {
   if (storageError == null) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       AutomaticBackupService.instance.start();
+      VoiceDiagnosticsService.instance.start();
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       try {
         await NotificationService().init().timeout(const Duration(seconds: 6));

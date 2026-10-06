@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'voice_diagnostics_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -194,6 +195,20 @@ class TransactionExecutor {
   }) : audioFeedback = audioFeedback ?? AudioFeedbackService();
 
   Future<TransactionResult> execute(LedgerCommand command) async {
+    final diagnostics = VoiceDiagnosticsService.instance;
+    diagnostics.stage('execution', {'action': command.action.name, 'status': 'started'});
+    try {
+      final result = await _execute(command);
+      diagnostics.stage('execution', {'action': result.action.name, 'status': result.status.name,
+        'affected_ids': result.affectedIds, 'reason': result.reason});
+      return result;
+    } catch (error) {
+      diagnostics.stage('execution', {'action': command.action.name, 'status': 'failed', 'error_type': error.runtimeType.toString()});
+      rethrow;
+    }
+  }
+
+  Future<TransactionResult> _execute(LedgerCommand command) async {
     switch (command) {
       case CreateTransactionCommand():
         final entry = _prepareForMainLedger(command.entry);

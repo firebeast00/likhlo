@@ -11,6 +11,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
     String initialType = 'expense',
     String? reviewMessage,
   }) async {
+    final diagnosticId = VoiceDiagnosticsService.instance.currentId;
     _dismissKeyboard();
     if (existing?.category == 'Transfer') {
       _showTransactionInfo(
@@ -212,7 +213,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                     width: double.infinity, height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: transactionType == 'transfer' ? Colors.blue : primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                      onPressed: () async {
+                      onPressed: () => VoiceDiagnosticsService.instance.run(diagnosticId, () async {
                         final amt = double.tryParse(amountCtrl.text.trim());
                         if (amt == null || !amt.isFinite || amt <= 0) {
                           _showTransactionError(AppMessage('enter_a_valid_amount_above_zero_8262af'));
@@ -353,7 +354,7 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                           );
                         }
                         unawaited(_refreshSmartEntryReminders());
-                      },
+                      }),
                       child: Text(transactionType == 'transfer' ? AppStrings.current.text('complete_transfer_bf7f6e') : AppStrings.current.text('save_transaction_a3f812'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
                   )

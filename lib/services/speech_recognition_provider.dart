@@ -14,6 +14,7 @@ class SpeechRecognitionResult {
   final String text;
   final bool isFinal;
   final double? stability;
+  final double? confidence;
   final String provider;
   final String? detectedLanguage;
 
@@ -22,6 +23,7 @@ class SpeechRecognitionResult {
     required this.isFinal,
     required this.provider,
     this.stability,
+    this.confidence,
     this.detectedLanguage,
   });
 }
@@ -140,6 +142,7 @@ class DeviceSpeechRecognitionProvider implements SpeechRecognitionProvider {
       ),
       onResult: (result) => onResult(SpeechRecognitionResult(
         text: result.recognizedWords,
+        confidence: result.hasConfidenceRating ? result.confidence : null,
         isFinal: result.finalResult,
         provider: id,
       )),

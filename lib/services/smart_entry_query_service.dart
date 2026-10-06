@@ -1,5 +1,6 @@
 import '../models/expense_model.dart';
 import 'local_nlp_service.dart';
+import 'voice_diagnostics_service.dart';
 
 /// Selects existing ledger entries for read-only financial questions.
 List<Expense> selectSmartEntryQueryEntries(
@@ -10,6 +11,14 @@ List<Expense> selectSmartEntryQueryEntries(
   DateTime? now,
 }) {
   final reference = now ?? DateTime.now();
+  VoiceDiagnosticsService.instance.stage('query_filter', {
+    'reference_local': reference.toIso8601String(),
+    'utc_offset_minutes': reference.timeZoneOffset.inMinutes,
+    'time_range': command.timeRange.name,
+    'referenced_month': referencedMonth?.toIso8601String(),
+    'wallet_id': walletId, 'entry_type': command.entryTypeFilter,
+    'category': command.category, 'date_semantics': 'local_calendar_days_week_starts_monday',
+  });
   final hasCategory = command.category != 'General' &&
       (command.confidenceByField['category'] ?? 0) >= 0.8;
   var title = command.title.trim();

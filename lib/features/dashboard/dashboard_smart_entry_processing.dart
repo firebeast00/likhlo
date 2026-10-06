@@ -54,10 +54,20 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           return false;
         }
 
+        VoiceDiagnosticsService.instance.stage('parse', {'intent': 'batch', 'raw_text': normalized,
+          'entry_count': batchAttempt.draft!.entries.length,
+          'entries': batchAttempt.draft!.entries.map((entry) => {
+            'title': entry.title, 'amount': entry.amount, 'category': entry.category,
+            'type': entry.type, 'wallet_id': entry.walletId, 'date': entry.date,
+            'source_text': entry.sourceText, 'confidence': entry.confidence,
+          }).toList()});
+        VoiceDiagnosticsService.instance.awaitingConfirmation(reason: 'batch_review');
+        final diagnosticId = VoiceDiagnosticsService.instance.currentId;
         final confirmed = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => BatchTransactionReviewScreen(
               draft: batchAttempt.draft!,
+              diagnosticId: diagnosticId,
             ),
           ),
         );
@@ -198,6 +208,11 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         (command.confidenceByField['amount'] ?? 0) >= 0.9,
       ),
     );
+    VoiceDiagnosticsService.instance.stage('confidence', {
+      'score': semanticConfidence.score, 'disposition': semanticConfidence.disposition.name,
+      'reasons': semanticConfidence.reasons, 'requires_asr_review': plan.requiresAsrReview,
+      'resolved_wallet_id': resolvedWalletId,
+    });
     assert(() {
       debugPrint(
         '[SmartEntry confidence] '
@@ -297,6 +312,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
         : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
 
+    VoiceDiagnosticsService.instance.awaitingConfirmation(reason: reviewMessage);
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
       amountValue == amountValue.truncateToDouble()

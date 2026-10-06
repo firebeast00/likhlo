@@ -1,3 +1,4 @@
+import '../services/voice_diagnostics_service.dart';
 import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,10 +16,12 @@ import '../services/transaction_executor.dart';
 
 class BatchTransactionReviewScreen extends ConsumerStatefulWidget {
   final TransactionBatchDraft draft;
+  final String? diagnosticId;
 
   const BatchTransactionReviewScreen({
     super.key,
     required this.draft,
+    this.diagnosticId,
   });
 
   @override
@@ -169,9 +172,9 @@ class _BatchTransactionReviewScreenState
 
     setState(() => _saving = true);
     try {
-      final result = await ref.read(transactionExecutorProvider).execute(
+      final result = await VoiceDiagnosticsService.instance.run(widget.diagnosticId, () => ref.read(transactionExecutorProvider).execute(
             CreateBatchTransactionsCommand(entries: entries),
-          );
+          ));
       if (!mounted) return;
       if (!result.succeeded) {
         _showError(

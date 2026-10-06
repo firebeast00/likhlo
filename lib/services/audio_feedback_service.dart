@@ -4,6 +4,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:hive/hive.dart';
 
 import '../models/expense_model.dart';
+import 'voice_diagnostics_service.dart';
 import 'deterministic_feedback_service.dart';
 import 'voice_privacy_service.dart';
 import '../l10n/app_strings.dart';
@@ -28,6 +29,51 @@ class AudioFeedbackService {
   static AppLanguage? _configuredPreference;
   static bool _configuredUrdu = false;
   static Future<void>? _configurationTask;
+  static FlutterTts? _diagnosticTts;
+  static String? _activeDiagnosticId;
+  static int? _activeDiagnosticRequest;
+  // FlutterTts callbacks have no utterance ID. After overlapping utterances,
+  // report unknown completion rather than attributing an old callback to a save.
+  static bool _callbackCorrelationReliable = true;
+
+  static void _recordTtsCallback(String status) {
+    final id = _activeDiagnosticId;
+    if (id == null || !_callbackCorrelationReliable) return;
+    VoiceDiagnosticsService.instance.stage('tts', {
+      'status': status, 'request': _activeDiagnosticRequest,
+      'completion_observed': status == 'completed',
+    }, id: id);
+    if (status == 'completed' || status == 'failed' || status == 'interrupted') {
+      _activeDiagnosticId = null;
+      _activeDiagnosticRequest = null;
+    }
+  }
+
+  void _observeTts(FlutterTts engine, int request, String? id) {
+    if (id == null && _activeDiagnosticId == null) return;
+    try {
+      if (!identical(_diagnosticTts, engine)) {
+        _diagnosticTts = engine;
+        _callbackCorrelationReliable = true;
+        engine.setStartHandler(() => _recordTtsCallback('started'));
+        engine.setCompletionHandler(() => _recordTtsCallback('completed'));
+        engine.setCancelHandler(() => _recordTtsCallback('interrupted'));
+        engine.setErrorHandler((_) => _recordTtsCallback('failed'));
+      }
+      if (_activeDiagnosticId != null) {
+        _recordTtsCallback('interrupted');
+        _callbackCorrelationReliable = false;
+      }
+      _activeDiagnosticId = id;
+      _activeDiagnosticRequest = request;
+      VoiceDiagnosticsService.instance.stage('tts', {
+        'status': 'speak_invoked', 'request': request, 'completion_observed': false,
+        'callback_correlation': _callbackCorrelationReliable ? 'single_utterance' : 'unknown_after_overlap',
+      }, id: id);
+    } catch (_) {
+      // Installing diagnostic listeners must never prevent spoken feedback.
+    }
+  }
 
   AudioFeedbackService({
     FlutterTts? tts,
@@ -99,6 +145,11 @@ class AudioFeedbackService {
   /// Cancels delayed feedback as well as speech already playing.
   Future<void> stop() async {
     ++_latestRequest;
+    if (_activeDiagnosticId != null) {
+      _recordTtsCallback('interrupted');
+      _activeDiagnosticId = null;
+      _callbackCorrelationReliable = false;
+    }
     try {
       final engine = _ttsInstance ?? (_usesSharedTts ? _sharedTts : null);
       if (engine != null && identical(_configuredTts, engine)) await engine.stop();
@@ -111,14 +162,19 @@ class AudioFeedbackService {
     required int request,
     required List<AppMessage> messages,
   }) async {
+    final diagnosticId = VoiceDiagnosticsService.instance.currentId;
+    void observe(String status, {String? reason}) => VoiceDiagnosticsService.instance.stage('tts', {
+      'status': status, 'reason': reason, 'request': request, 'completion_observed': false,
+    }, id: diagnosticId);
+    observe('preparing');
     final stopwatch = Stopwatch()..start();
     final language = AppLanguage.read();
     final canSpeakUrdu = messages.every((message) => message.hasUrduSpeech);
     try {
-      if (request != _latestRequest) return;
-      if (!Hive.isBoxOpen('preferences')) return;
+      if (request != _latestRequest) { observe('interrupted', reason: 'superseded'); return; }
+      if (!Hive.isBoxOpen('preferences')) { observe('skipped', reason: 'preferences_unavailable'); return; }
       final privacy = VoicePrivacySettings.read(Hive.box('preferences'));
-      if (!privacy.spokenFeedbackEnabled) return;
+      if (!privacy.spokenFeedbackEnabled) { observe('skipped', reason: 'spoken_feedback_disabled'); return; }
 
       // Run the lightweight device-audio check while TTS configuration is
       // completing. Home pre-warms configuration after its first frame, so
@@ -133,20 +189,30 @@ class AudioFeedbackService {
         _configureOnce(canSpeakUrdu ? language : AppLanguage.english).then<Object?>((_) => null),
       ]);
       final silentMode = readiness.first == true;
-      if (silentMode || request != _latestRequest || AppLanguage.read() != language) return;
+      if (silentMode || request != _latestRequest || AppLanguage.read() != language) {
+        observe('skipped', reason: silentMode ? 'silent_mode' : 'superseded_or_language_changed'); return;
+      }
       // A concurrent warm-up can reconfigure the shared engine while the
       // silent-mode check is pending. Restore this message's voice immediately
       // before speaking, including English fallback for unknown templates.
       await _configureOnce(canSpeakUrdu ? language : AppLanguage.english);
-      if (request != _latestRequest || AppLanguage.read() != language) return;
+      if (request != _latestRequest || AppLanguage.read() != language) { observe('interrupted', reason: 'superseded_or_language_changed'); return; }
       final useUrdu = _configuredUrdu;
       // The setting may have changed while the device was preparing speech.
       if (!Hive.isBoxOpen('preferences') ||
           !VoicePrivacySettings.read(Hive.box('preferences'))
               .spokenFeedbackEnabled) {
+        observe('skipped', reason: 'spoken_feedback_disabled');
         return;
       }
       if (request == _latestRequest) {
+        VoiceDiagnosticsService.instance.stage('spoken_response', {
+          'message_keys': messages.map((message) => message.key).toList(),
+          'language': useUrdu ? 'ur' : 'en',
+          'messages': messages.map((message) => message.render(
+            useUrdu ? AppLanguage.romanUrdu : AppLanguage.english, spoken: true)).toList(),
+        }, id: diagnosticId);
+        _observeTts(_tts, request, diagnosticId);
         await _tts.speak(
           messages.map((message) => message.render(
             useUrdu ? AppLanguage.romanUrdu : AppLanguage.english,
@@ -169,6 +235,7 @@ class AudioFeedbackService {
         }());
       }
     } catch (error) {
+      observe('failed', reason: error.runtimeType.toString());
       debugPrint('Spoken confirmation unavailable: $error');
     }
   }

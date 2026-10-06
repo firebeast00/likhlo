@@ -1,7 +1,16 @@
 part of '../../screens/home_screen.dart';
 
 extension _DashboardVoiceMethods on _HomeScreenState {
-  Future<void> _listenForExpense() async {
+  Future<void> _listenForExpense({String entryPoint = 'home_microphone'}) async {
+    try {
+      await _listenForExpenseImpl(entryPoint: entryPoint);
+    } catch (error) {
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'voice_${error.runtimeType}');
+      rethrow;
+    }
+  }
+
+  Future<void> _listenForExpenseImpl({required String entryPoint}) async {
     _dismissKeyboard();
     if (_isProcessingVoiceCommand) {
       _showTransactionInfo(
@@ -18,6 +27,14 @@ extension _DashboardVoiceMethods on _HomeScreenState {
 
     await AudioFeedbackService().stop();
     if (!mounted) return;
+    VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'interrupted', reason: 'new_attempt');
+    _voiceDiagnosticId = VoiceDiagnosticsService.instance.begin(entryPoint: entryPoint, context: {
+      'app_language': AppLanguage.read().name,
+      'nlp_language': ref.read(settingsProvider).smartEntryLanguage,
+      'provider': _voiceEntry.speech.id,
+      'time_zone': DateTime.now().timeZoneName,
+      'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+    });
     _cancelSpeechTimers();
     _voiceEntry.session.reset();
     _speechNetworkRecovery.reset();
@@ -31,6 +48,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       );
       if (!mounted) return;
       if (!available) {
+        VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'recognizer_unavailable');
         _showTransactionError(
           AppMessage('speech_recognition_is_not_available_enable_the_g_17bd68'),
           title: AppMessage('voice_recognition_unavailable_1fa909'),
@@ -108,6 +126,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     final attempt = ++_speechAttempt;
     final localeId =
     _speechLocaleCandidates[_speechLocaleCandidateIndex];
+    VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_cycle', {
+      'cycle': attempt, 'locale_requested': localeId,
+      'on_device_requested': _speechNetworkRecovery.onDevice,
+      'provider': _voiceEntry.speech.id,
+    });
     _recognizerReportedListening = false;
     _speechListenStartedAt = DateTime.now();
     _speechStartupTimer?.cancel();
@@ -132,6 +155,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
             return;
           }
           _markRecognizerActive();
+          VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognition', {
+            'text': result.text, 'is_final': result.isFinal, 'provider': result.provider,
+            'confidence': result.confidence, 'stability': result.stability,
+            'detected_language': result.detectedLanguage, 'cycle': attempt,
+          });
           final words = result.text.trim();
           final completeness = _speechCompleteness(words);
           final decision = _voiceEntry.session.recordTranscript(
@@ -164,6 +192,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         },
       );
     } catch (error) {
+      VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_error', {'error_type': error.runtimeType.toString(), 'phase': 'listen'});
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'listen_failed');
       debugPrint('Speech listen failed: $error');
       if (!mounted || _handlingSpeechError) return;
       _handlingSpeechError = true;
@@ -383,6 +413,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         required String transcript,
         required SpeechCommandCompleteness completeness,
       }) {
+    VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'speech_session', {
+      'event': event, 'transcript': transcript, 'state': _voiceEntry.session.state.name,
+      'retry': _voiceEntry.session.retryCount, 'complete': completeness.isComplete,
+      'reason': completeness.reason,
+    });
     assert(() {
       debugPrint(
         '[Voice session] time=${DateTime.now().toIso8601String()} '
@@ -401,6 +436,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         _voiceEntry.session.state != SpeechSessionState.finalizing) {
       return;
     }
+    VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_error', {'code': errorMessage});
     debugPrint('STT Error: $errorMessage');
     _handlingSpeechError = true;
 
@@ -437,6 +473,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       return;
     }
 
+    VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: errorMessage);
     _smartInputCtrl.clear();
 
     if (normalized.contains('error_client')) {
@@ -480,14 +517,18 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         _voiceEntry.session.markProcessing();
         _isProcessingVoiceCommand = true;
         try {
-          await _processNLP(
+          final diagnosticId = _voiceDiagnosticId;
+          VoiceDiagnosticsService.instance.submitted(diagnosticId, decision.transcript);
+          final accepted = await VoiceDiagnosticsService.instance.run(diagnosticId, () => _processNLP(
             decision.transcript,
             source: SmartInputSource.voice,
-          );
+          ));
+          VoiceDiagnosticsService.instance.finishProcessing(diagnosticId, accepted);
           _voiceEntry.session.markCompleted();
           _smartInputCtrl.clear();
           _voiceEntry.session.reset();
         } catch (error) {
+          VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'processing_${error.runtimeType}');
           _voiceEntry.session.markFailed();
           _smartInputCtrl.clear();
           rethrow;
@@ -496,6 +537,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         }
         return;
       case SpeechSessionAction.discardDraft:
+        VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'incomplete', reason: 'draft_discarded');
         _cancelSpeechTimers();
         _setListening(false);
         _smartInputCtrl.clear();
@@ -507,6 +549,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         return;
       case SpeechSessionAction.none:
         if (_voiceEntry.session.state == SpeechSessionState.failed) {
+          VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'no_speech', reason: 'no_complete_transcript');
           _cancelSpeechTimers();
           if (_isListening) _setListening(false);
           _smartInputCtrl.clear();

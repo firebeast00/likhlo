@@ -1,3 +1,4 @@
+import '../services/voice_diagnostics_service.dart';
 import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
+  String? _voiceDiagnosticId;
   bool _voiceFinalizing = false;
   Timer? _udharVoiceStableTimer;
   String _udharVoiceStableTranscript = '';
@@ -241,6 +243,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   @override
   void dispose() {
+    VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'interrupted', reason: 'udhar_screen_disposed');
     _udharVoiceStableTimer?.cancel();
     unawaited(_speech.cancel());
     _smartInputCtrl.dispose();
@@ -248,8 +251,22 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   void _listenForInput() async {
+    try { await _listenForInputImpl(); }
+    catch (error) {
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'udhar_voice_${error.runtimeType}');
+      rethrow;
+    }
+  }
+
+  Future<void> _listenForInputImpl() async {
     if (_voiceFinalizing || _savingDebt) return;
     if (!_isListening) {
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'interrupted', reason: 'new_attempt');
+      _voiceDiagnosticId = VoiceDiagnosticsService.instance.begin(entryPoint: 'udhar_microphone', context: {
+        'app_language': AppLanguage.read().name,
+        'nlp_language': ref.read(settingsProvider).smartEntryLanguage,
+        'provider': 'device', 'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+      });
       _udharVoiceStableTimer?.cancel();
       _udharVoiceStableTranscript = '';
       _speechSession.start();
@@ -261,6 +278,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           }
         },
         onError: (val) {
+          VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_error', {'code': val.errorMsg});
+          VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: val.errorMsg);
           _speechSession.onRecognizerError(retryable: false);
           if (mounted) {
             setState(() => _isListening = false);
@@ -278,6 +297,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
       if (available) {
         final localeId = await _preferredSpeechLocale();
+        VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_cycle', {'locale_requested': localeId, 'on_device_requested': false, 'provider': 'device'});
         if (!mounted) return;
         setState(() => _isListening = true);
         _smartInputCtrl.clear();
@@ -292,6 +312,10 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ),
           onResult: (val) {
             if (!mounted || !_isListening) return;
+            VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognition', {
+              'text': val.recognizedWords, 'is_final': val.finalResult,
+              'confidence': val.hasConfidenceRating ? val.confidence : null, 'provider': 'device',
+            });
             final words = val.recognizedWords.trim();
             if (words.isEmpty) return;
 
@@ -320,6 +344,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           },
         );
       } else {
+        VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'recognizer_unavailable');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -385,6 +410,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           return;
         }
 
+        VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'speech_session', {'event': 'stable_udhar', 'native_final': false});
         final decision = _speechSession.recordTranscript(
           _udharVoiceStableTranscript,
           isFinal: true,
@@ -424,15 +450,18 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       if (!mounted) return;
       if (result.action == SpeechSessionAction.processFinal &&
           result.transcript.isNotEmpty) {
-        await _processNLP(
-          result.transcript,
-          fromVoice: true,
-          allowInstantSave: finalResult,
-        );
+        final id = _voiceDiagnosticId;
+        VoiceDiagnosticsService.instance.submitted(id, result.transcript);
+        await VoiceDiagnosticsService.instance.run(id, () => _processNLP(
+          result.transcript, fromVoice: true, allowInstantSave: finalResult,
+        ));
       } else {
+        VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId,
+          _speechSession.latestDraft.isEmpty ? 'no_speech' : 'incomplete', reason: 'udhar_no_final_command');
         _smartInputCtrl.clear();
       }
-    } catch (_) {
+    } catch (error) {
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'udhar_processing_${error.runtimeType}');
       if (mounted) _smartInputCtrl.clear();
     } finally {
       _speechSession.reset();
@@ -452,6 +481,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       accounts: _udharAccounts(),
     );
     if (draft == null) {
+      VoiceDiagnosticsService.instance.finish(VoiceDiagnosticsService.instance.currentId, 'not_understood', reason: 'udhar_amount_person_or_direction_ambiguous');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -470,9 +500,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         type: draft.type,
         walletId: walletId,
       );
+      VoiceDiagnosticsService.instance.finishProcessing(VoiceDiagnosticsService.instance.currentId, saved);
       if (saved && mounted) _smartInputCtrl.clear();
     } else {
+      VoiceDiagnosticsService.instance.awaitingConfirmation(reason: 'udhar_review');
       _showAddDialog(
+        diagnosticId: VoiceDiagnosticsService.instance.currentId,
         initialName: draft.person,
         initialAmount: draft.amount.toStringAsFixed(
           draft.amount == draft.amount.truncateToDouble() ? 0 : 2,
@@ -548,6 +581,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         amount <= 0 ||
         !amount.isFinite ||
         !wallets.any((wallet) => wallet.id == walletId)) {
+      VoiceDiagnosticsService.instance.stage('execution', {'status': 'rejected', 'reason': 'udhar_invalid_person_amount_or_wallet'});
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -561,6 +595,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           .read(walletProvider.notifier)
           .getBalanceForWallet(walletId);
       if (available + 0.000001 < amount) {
+        VoiceDiagnosticsService.instance.stage('execution', {'status': 'rejected', 'reason': 'udhar_insufficient_balance', 'available': available});
         if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -625,6 +660,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ),
         );
       }
+      VoiceDiagnosticsService.instance.stage('response', {'message_key': 'udhaar_recorded_rs_d8137b', 'amount': amount, 'person': person});
       if (mounted) {
         _smartInputCtrl.clear();
         setState(() {});
@@ -723,6 +759,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   void _showAddDialog({
+    String? diagnosticId,
     String initialName = "",
     String initialAmount = "",
     String initialType = 'lent',
@@ -931,7 +968,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                   );
                                   return;
                                 }
-                                final saved = await _saveDebtRecord(
+                                final saved = await VoiceDiagnosticsService.instance.run(diagnosticId, () => _saveDebtRecord(
                                   name: nameCtrl.text,
                                   amount: double.tryParse(
                                         amountCtrl.text.trim(),
@@ -940,7 +977,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                   type: type,
                                   walletId: walletId,
                                   dueDate: selectedDate,
-                                );
+                                ));
+                                if (saved) VoiceDiagnosticsService.instance.finish(diagnosticId, 'completed', reason: 'udhar_committed');
                                 if (saved) {
                                   unawaited(
                                     NotificationService()
@@ -968,6 +1006,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           },
         ),
       ).whenComplete(() {
+        VoiceDiagnosticsService.instance.finish(diagnosticId, 'cancelled', reason: 'udhar_confirmation_dismissed');
         nameCtrl.dispose();
         amountCtrl.dispose();
       }),
