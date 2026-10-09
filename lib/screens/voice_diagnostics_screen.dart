@@ -8,6 +8,8 @@ import 'package:hive/hive.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../l10n/app_strings.dart';
+import '../models/debt_model.dart';
+import '../models/wallet_model.dart';
 import '../services/voice_diagnostics_service.dart';
 
 String _label(String key) => AppStrings.current.text('diagnostics_$key');
@@ -23,6 +25,7 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
   late final service = widget.service ?? VoiceDiagnosticsService.instance;
   final selected = <String>{};
   bool selecting = false;
+  bool exporting = false;
   String filter = 'all';
   String period = 'all';
 
@@ -114,33 +117,43 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
 
   Iterable<String> _knownNames() sync* {
     // Only existing labels; no new device identifier or contacts access.
-    for (final boxName in ['wallets', 'debts']) {
-      if (!Hive.isBoxOpen(boxName)) continue;
-      for (final dynamic entry in Hive.box(boxName).values) {
-        try {
-          final String name =
-              boxName == 'wallets' ? entry.name : entry.borrowerName;
-          if (name.trim().isNotEmpty) yield name;
-        } catch (_) {}
+    if (Hive.isBoxOpen('wallets')) {
+      for (final entry in Hive.box<Wallet>('wallets').values) {
+        if (entry.name.trim().isNotEmpty) yield entry.name;
+      }
+    }
+    if (Hive.isBoxOpen('debts')) {
+      for (final entry in Hive.box<DebtEntry>('debts').values) {
+        if (entry.borrowerName.trim().isNotEmpty) yield entry.borrowerName;
       }
     }
   }
 
   Future<void> _export() async {
+    if (exporting) return;
     final visible = _visible();
     final ids = visible
         .map((r) => r['id'] as String)
         .where((id) => !selecting || selected.contains(id))
         .toList();
     if (ids.isEmpty) return;
-    await service.flush();
-    if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => _DiagnosticExportScreen(
-              service: service,
-              ids: ids,
-              names: _knownNames().toList(),
-            )));
+    setState(() => exporting = true);
+    try {
+      await service.flush();
+      if (!mounted) return;
+      // Read before route construction so preparation errors can be reported.
+      final names = _knownNames().toList();
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => _DiagnosticExportScreen(
+                service: service,
+                ids: ids,
+                names: names,
+              )));
+    } catch (_) {
+      _error();
+    } finally {
+      if (mounted) setState(() => exporting = false);
+    }
   }
 
   @override
@@ -279,7 +292,7 @@ class _VoiceDiagnosticsScreenState extends State<VoiceDiagnosticsScreen> {
                     width: double.infinity,
                     child: FilledButton.icon(
                         onPressed:
-                            visible.isEmpty || selecting && selected.isEmpty
+                            exporting || visible.isEmpty || selecting && selected.isEmpty
                                 ? null
                                 : _export,
                         icon: const Icon(Icons.ios_share),
@@ -428,21 +441,29 @@ class _DiagnosticExportScreenState extends State<_DiagnosticExportScreen> {
 
   Future<void> _prepare() async {
     final attempt = ++generation;
-    setState(() => busy = true);
-    final report = widget.service.export(
-        ids: widget.ids,
-        maskNames: mask,
-        deferMasking: true,
-        additionalNames: widget.names);
-    final result = await compute(encodeVoiceDiagnosticExport, report);
-    if (mounted && attempt == generation)
-      setState(() {
-        json = result;
-        busy = false;
-      });
+    setState(() {
+      busy = true;
+      json = '';
+    });
+    try {
+      final report = widget.service.export(
+          ids: widget.ids,
+          maskNames: mask,
+          deferMasking: true,
+          additionalNames: widget.names);
+      final result = widget.service.useIsolates
+          ? await compute(encodeVoiceDiagnosticExport, report)
+          : encodeVoiceDiagnosticExport(report);
+      if (mounted && attempt == generation) setState(() => json = result);
+    } catch (_) {
+      // Leave no stale report available to share after a failed regeneration.
+    } finally {
+      if (mounted && attempt == generation) setState(() => busy = false);
+    }
   }
 
   Future<void> _send(bool share) async {
+    if (busy || json.isEmpty) return;
     setState(() => busy = true);
     try {
       final bytes = Uint8List.fromList(utf8.encode(json));
@@ -493,6 +514,21 @@ class _DiagnosticExportScreenState extends State<_DiagnosticExportScreen> {
         Expanded(
             child: busy
                 ? const Center(child: CircularProgressIndicator())
+                : json.isEmpty
+                    ? Center(
+                        child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(_label('error')),
+                                  const SizedBox(height: 12),
+                                  TextButton.icon(
+                                      onPressed: _prepare,
+                                      icon: const Icon(Icons.refresh),
+                                      label: Text(AppStrings.current
+                                          .text('try_again_042c86'))),
+                                ])))
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
                     child: SelectableText(json,
@@ -505,13 +541,14 @@ class _DiagnosticExportScreenState extends State<_DiagnosticExportScreen> {
                 child: Row(children: [
                   Expanded(
                       child: OutlinedButton(
-                          onPressed: busy ? null : () => _send(false),
+                          onPressed: busy || json.isEmpty ? null : () => _send(false),
                           child: Text(_label('save_json')))),
                   const SizedBox(width: 12),
                   Expanded(
                       child: FilledButton(
-                          onPressed: busy ? null : () => _send(true),
+                          onPressed: busy || json.isEmpty ? null : () => _send(true),
                           child: Text(_label('share_json')))),
                 ]))),
       ]));
 }
+

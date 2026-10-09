@@ -141,6 +141,7 @@ class VoiceDiagnosticsService extends ChangeNotifier {
   final Set<String> _dirty = {};
   final Set<String> _deleted = {};
   Future<void>? _initialization;
+  bool _loaded = false;
   Future<void> _writes = Future<void>.value();
   Timer? _flushTimer;
   bool _disposed = false;
@@ -241,9 +242,13 @@ class VoiceDiagnosticsService extends ChangeNotifier {
         _sizes[entry.key] = utf8.encode(values[entry.key]!).length;
       }
       _prune();
+      _loaded = true;
+      storageError = null;
       _notify();
       _scheduleFlush();
     } catch (_) {
+      // A temporary storage failure must allow the next operation to retry.
+      _initialization = null;
       storageError = 'diagnostic_storage_unavailable';
       _notify();
     }
@@ -510,6 +515,9 @@ class VoiceDiagnosticsService extends ChangeNotifier {
     _flushTimer?.cancel();
     _writes = _writes.then((_) async {
       await initialize();
+      // Do not write/prune against an incomplete view of persisted history, or
+      // clear the load error merely because there were no pending writes.
+      if (!_loaded) return;
       try {
         final snapshots = {
           for (final id in _dirty)
@@ -643,3 +651,4 @@ class VoiceDiagnosticsService extends ChangeNotifier {
     super.dispose();
   }
 }
+

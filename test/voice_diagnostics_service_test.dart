@@ -145,6 +145,31 @@ void main() {
     await service.flush();
     expect(storage.values[id], isNotNull);
   });
+  test('failed history load stays visible and retries without losing records',
+      () async {
+    final persisted = begin();
+    service.finish(persisted, 'completed');
+    await service.flush();
+    final restarted = VoiceDiagnosticsService(storage,
+        enabled: true, useIsolates: false, clock: () => now);
+    storage.fail = true;
+    await restarted.initialize();
+    expect(restarted.storageError, 'diagnostic_storage_unavailable');
+    final pending = restarted.begin(entryPoint: 'during_storage_failure')!;
+    restarted.finish(pending, 'completed');
+    await restarted.flush();
+    expect(restarted.storageError, 'diagnostic_storage_unavailable');
+    expect(storage.values.containsKey(pending), false);
+
+    storage.fail = false;
+    await restarted.initialize();
+    await restarted.flush();
+    expect(restarted.record(persisted)!['outcome'], 'completed');
+    expect(restarted.record(pending)!['outcome'], 'completed');
+    expect(storage.values.keys, containsAll([persisted, pending]));
+    expect(restarted.storageError, isNull);
+    restarted.dispose();
+  });
   test('changed partials have bounded history and visible drop count', () {
     final id = begin();
     for (var i = 0; i < 150; i++) {
@@ -274,3 +299,4 @@ void main() {
         isNot(contains('private after opt-out')));
   });
 }
+
