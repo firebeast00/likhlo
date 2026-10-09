@@ -12,6 +12,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
         ? Colors.white.withValues(alpha: 0.055)
         : primaryColor.withValues(alpha: 0.045);
     final defaultAccountLabel = _smartEntryDefaultAccountLabel(wallets);
+    final voiceBusy = _isListening || _voiceStarting || _finalizingRecognizerStop || _isProcessingVoiceCommand;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -49,7 +50,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
               const SizedBox(width: 11),
               Expanded(
                 child: InkWell(
-                  onTap: _isListening
+                  onTap: voiceBusy
                       ? null
                       : _showSmartEntryAccountPicker,
                   borderRadius: BorderRadius.circular(8),
@@ -59,7 +60,9 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _isListening ? AppStrings.current.text('listening_now_dbfe77') : AppStrings.current.text('smart_entry_2ac121'),
+                          _isProcessingVoiceCommand
+                              ? AppStrings.current.text('diagnostics_processing')
+                              : _isListening ? AppStrings.current.text('listening_now_dbfe77') : AppStrings.current.text('smart_entry_2ac121'),
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -98,7 +101,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                 IconButton(
                   tooltip: AppStrings.current.text('select_default_smart_entry_wallet_f54e86'),
                   visualDensity: VisualDensity.compact,
-                  onPressed: _showSmartEntryAccountPicker,
+                  onPressed: voiceBusy ? null : _showSmartEntryAccountPicker,
                   icon: Icon(
                     Icons.tune_rounded,
                     color: primaryColor,
@@ -116,12 +119,13 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
             ),
             child: TextField(
               controller: _smartInputCtrl,
+              readOnly: voiceBusy,
               textInputAction: TextInputAction.done,
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
-              onSubmitted: _processNLP,
+              onSubmitted: voiceBusy ? null : _processNLP,
               decoration: InputDecoration(
                 hintText: _isListening
                     ? AppStrings.current.text('listening_6c19a4')
@@ -147,7 +151,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                       constraints:
                       const BoxConstraints.tightFor(width: 38, height: 40),
                       onPressed:
-                      _isScanningReceipt ? null : _scanReceiptIntoInput,
+                      _isScanningReceipt || voiceBusy ? null : _scanReceiptIntoInput,
                       icon: _isScanningReceipt
                           ? SizedBox(
                         width: 17,
@@ -169,7 +173,9 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                       visualDensity: VisualDensity.compact,
                       constraints:
                       const BoxConstraints.tightFor(width: 38, height: 40),
-                      onPressed: _listenForExpense,
+                      onPressed: _isProcessingVoiceCommand || _finalizingRecognizerStop ||
+                          _voiceStarting || _recognizerCleanupPending
+                          ? null : _listenForExpense,
                       icon: Icon(
                         _isListening
                             ? Icons.stop_circle_rounded
@@ -189,7 +195,7 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
                       child: IconButton(
                         tooltip: AppStrings.current.text('save_smart_entry_ec5c33'),
                         padding: EdgeInsets.zero,
-                        onPressed: () =>
+                        onPressed: voiceBusy ? null : () =>
                             _processNLP(_smartInputCtrl.text),
                         icon: const Icon(
                           Icons.arrow_upward_rounded,
@@ -210,3 +216,4 @@ extension _DashboardSmartInputWidgetMethods on _HomeScreenState {
 
 
 }
+

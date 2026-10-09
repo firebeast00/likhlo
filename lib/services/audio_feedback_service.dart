@@ -29,6 +29,13 @@ class AudioFeedbackService {
   static AppLanguage? _configuredPreference;
   static bool _configuredUrdu = false;
   static Future<void>? _configurationTask;
+  static Future<void> _microphoneCleanup = Future<void>.value();
+
+  /// Ledger writes never await this gate. Only spoken feedback waits for the
+  /// current recognizer cleanup, avoiding microphone/TTS overlap.
+  static void deferSpokenFeedbackUntil(Future<void> cleanup) {
+    _microphoneCleanup = cleanup;
+  }
   static FlutterTts? _diagnosticTts;
   static String? _activeDiagnosticId;
   static int? _activeDiagnosticRequest;
@@ -175,6 +182,8 @@ class AudioFeedbackService {
       if (!Hive.isBoxOpen('preferences')) { observe('skipped', reason: 'preferences_unavailable'); return; }
       final privacy = VoicePrivacySettings.read(Hive.box('preferences'));
       if (!privacy.spokenFeedbackEnabled) { observe('skipped', reason: 'spoken_feedback_disabled'); return; }
+      await _microphoneCleanup;
+      if (request != _latestRequest) { observe('interrupted', reason: 'superseded'); return; }
 
       // Run the lightweight device-audio check while TTS configuration is
       // completing. Home pre-warms configuration after its first frame, so
@@ -297,3 +306,4 @@ class AudioFeedbackService {
     return value == null || value.isEmpty ? null : value;
   }
 }
+

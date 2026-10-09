@@ -25,11 +25,11 @@ jobs:
       - run: python3 tool/generate_app_catalog.py --check
       - id: dependencies
         run: flutter pub get
-      - name: Format new diagnostics files
-        run: dart format lib/services/voice_diagnostics_service.dart lib/services/voice_diagnostic_observer.dart lib/screens/voice_diagnostics_screen.dart test/voice_diagnostics*_test.dart
+      - name: Format diagnostics and voice timing files
+        run: dart format lib/services/voice_diagnostics_service.dart lib/services/voice_diagnostic_observer.dart lib/screens/voice_diagnostics_screen.dart lib/services/speech_timing_policy.dart test/voice_diagnostics*_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - name: Focused diagnostics tests
-        run: flutter test --timeout 1m test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart
+      - name: Focused diagnostics and voice timing tests
+        run: flutter test --timeout 1m test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart
       - if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         name: Compare full suite with current app baseline
         shell: bash
@@ -62,6 +62,8 @@ jobs:
             lib/services/voice_diagnostics_service.dart
             lib/screens/voice_diagnostics_screen.dart
             test/voice_diagnostics*_test.dart
+            lib/services/speech_timing_policy.dart
+            test/speech_timing_policy_test.dart
   android:
     concurrency:
       group: voice-diagnostics-apk-${{ github.head_ref || github.ref_name }}
@@ -107,3 +109,4 @@ jobs:
         with:
           name: likhlo-voice-diagnostics-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
+

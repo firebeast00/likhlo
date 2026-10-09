@@ -69,6 +69,7 @@ abstract interface class SpeechRecognitionProvider {
   Future<void> listen({
     required SpeechRecognitionListenOptions options,
     required Future<void> Function(SpeechRecognitionResult result) onResult,
+    void Function(double level)? onSoundLevelChange,
   });
 
   Future<void> stop();
@@ -126,8 +127,10 @@ class DeviceSpeechRecognitionProvider implements SpeechRecognitionProvider {
   Future<void> listen({
     required SpeechRecognitionListenOptions options,
     required Future<void> Function(SpeechRecognitionResult result) onResult,
+    void Function(double level)? onSoundLevelChange,
   }) async {
     await _speech.listen(
+      onSoundLevelChange: onSoundLevelChange,
       listenOptions: stt.SpeechListenOptions(
         localeId: options.localeId,
         cancelOnError: true,
@@ -218,8 +221,12 @@ class SpeechProviderRouter implements SpeechRecognitionProvider {
   Future<void> listen({
     required SpeechRecognitionListenOptions options,
     required Future<void> Function(SpeechRecognitionResult result) onResult,
+    void Function(double level)? onSoundLevelChange,
   }) =>
-      (_active ?? _selected).listen(options: options, onResult: onResult);
+      (_active ?? _selected).listen(
+          options: options,
+          onResult: onResult,
+          onSoundLevelChange: onSoundLevelChange);
 
   @override
   Future<void> stop() => (_active ?? _selected).stop();
@@ -227,3 +234,4 @@ class SpeechProviderRouter implements SpeechRecognitionProvider {
   @override
   Future<void> cancel() => (_active ?? _selected).cancel();
 }
+

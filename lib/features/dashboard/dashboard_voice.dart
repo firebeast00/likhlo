@@ -2,17 +2,23 @@ part of '../../screens/home_screen.dart';
 
 extension _DashboardVoiceMethods on _HomeScreenState {
   Future<void> _listenForExpense({String entryPoint = 'home_microphone'}) async {
+    if (_voiceStarting || _recognizerCleanupPending) return;
+    _voiceStarting = true;
+    if (mounted) _smartInputUiRevision.value++;
     try {
       await _listenForExpenseImpl(entryPoint: entryPoint);
     } catch (error) {
       VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'voice_${error.runtimeType}');
       rethrow;
+    } finally {
+      _voiceStarting = false;
+      if (mounted) _smartInputUiRevision.value++;
     }
   }
 
   Future<void> _listenForExpenseImpl({required String entryPoint}) async {
     _dismissKeyboard();
-    if (_isProcessingVoiceCommand) {
+    if (_isProcessingVoiceCommand || _finalizingRecognizerStop) {
       _showTransactionInfo(
         AppMessage('your_previous_voice_command_is_still_being_proce_4be015'),
         title: AppMessage('please_wait_ee9e88'),
@@ -69,9 +75,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
 
     _smartInputCtrl.clear();
     _voiceEntry.session.start();
+    _speechTiming.start();
+    _speechCacheKey = null;
     _speechDeadlineTimer = Timer(
       VoiceEntryController.sessionLimit,
-          () => unawaited(_finishSpeechSession()),
+          () => unawaited(_finishSpeechSession(deadline: true)),
     );
     _setListening(true);
     unawaited(HapticFeedback.mediumImpact());
@@ -124,6 +132,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
   Future<void> _startSpeechListening() async {
     if (!mounted) return;
     final attempt = ++_speechAttempt;
+    _speechTiming.startCycle();
+    _speechFinalResult = Completer<void>();
     final localeId =
     _speechLocaleCandidates[_speechLocaleCandidateIndex];
     VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_cycle', {
@@ -148,6 +158,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
           pauseFor: VoiceEntryController.pauseWindow,
           listenFor: VoiceEntryController.sessionLimit,
         ),
+        onSoundLevelChange: (level) {
+          if (mounted && attempt == _speechAttempt && !_finalizingRecognizerStop) {
+            _speechTiming.recordSoundLevel(level);
+          }
+        },
         onResult: (result) async {
           if (!mounted || attempt != _speechAttempt) return;
           if (_voiceEntry.session.state != SpeechSessionState.listening &&
@@ -161,11 +176,20 @@ extension _DashboardVoiceMethods on _HomeScreenState {
             'detected_language': result.detectedLanguage, 'cycle': attempt,
           });
           final words = result.text.trim();
+          final hadFinal = _speechTiming.hasFinalResult;
+          final changed = _speechTiming.recordTranscript(words, isFinal: result.isFinal);
+          if (changed && hadFinal && !result.isFinal) {
+            _speechFinalResult = Completer<void>();
+          }
+          if (result.isFinal && words.isNotEmpty &&
+              !(_speechFinalResult?.isCompleted ?? true)) {
+            _speechFinalResult!.complete();
+          }
           final completeness = _speechCompleteness(words);
           final decision = _voiceEntry.session.recordTranscript(
             words,
-            // Some recognizers finalize a phrase during a pause. Let the
-            // inactivity window decide when the full command has ended.
+            // Retain the draft until the endpoint policy accepts it. The
+            // actual final flag is tracked above and bypasses the long timer.
             isFinal: false,
             isComplete: completeness.isComplete,
           );
@@ -183,11 +207,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
             transcript: combinedWords,
             completeness: completeness,
           );
-          _scheduleStableSpeechFinalization(
-            combinedWords,
-            completeness,
-            isFinal: result.isFinal,
-          );
+          _scheduleStableSpeechFinalization(completeness);
           await _applySpeechDecision(decision);
         },
       );
@@ -217,130 +237,147 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         isBackup: wallet.isBackup,
       ));
 
+  String _speechContextKey(String text) {
+    final now = DateTime.now();
+    return '$text|${now.year}-${now.month}-${now.day}|'
+        '${ref.read(categoryProvider).join('\u0000')}|'
+        '${ref.read(walletProvider).map((w) => '${w.id}:${w.name}:${w.walletType}:${w.isBackup}').join('\u0000')}';
+  }
+
   SpeechCommandCompleteness _speechCompleteness(String transcript) {
     final normalized = transcript.trim();
     if (normalized.isEmpty) {
       return const SpeechCommandCompleteness.incomplete('empty_transcript');
     }
+    final key = _speechContextKey(normalized);
+    if (key == _speechCacheKey && _speechCachedCompleteness != null) {
+      return _speechCachedCompleteness!;
+    }
     try {
+      _speechTiming.mark('parse_started');
+      final accounts = _parsingAccounts().toList(growable: false);
       final plan = ref.read(smartEntryControllerProvider).parse(
-        normalized,
-        ref.read(categoryProvider),
-        source: SmartInputSource.voice,
-        accounts: _parsingAccounts(),
+        normalized, ref.read(categoryProvider),
+        source: SmartInputSource.voice, accounts: accounts,
       );
-      final accounts = ref
-          .read(walletProvider)
-          .map(
-            (wallet) => SmartEntryAccount(
-          id: wallet.id,
-          name: wallet.name,
-          type: wallet.walletType,
-          availableBalance: 0,
-          isBackup: wallet.isBackup,
-        ),
-      )
-          .toList(growable: false);
-      return _voiceEntry.completeness.evaluate(
-        plan,
-        accounts: accounts,
-      );
+      final result = _voiceEntry.completeness.evaluate(plan, accounts: accounts);
+      _speechCachedPlan = plan;
+      _speechCachedCompleteness = result;
+      _speechCacheKey = key;
+      _speechTiming.mark('parse_completed');
+      return result;
     } catch (error) {
       debugPrint('Speech completeness check failed: $error');
+      _speechCacheKey = null;
       return const SpeechCommandCompleteness.incomplete('parse_failed');
     }
   }
 
-  void _scheduleStableSpeechFinalization(
-    String transcript,
-    SpeechCommandCompleteness completeness, {
-    required bool isFinal,
-  }) {
-    if (transcript.isEmpty) {
-      _speechStabilityTimer?.cancel();
-      _speechStabilityTimer = null;
-      _speechStableTranscript = '';
-      _speechStableReason = '';
-      return;
+  SpeechTimingKind _speechTimingKind(SpeechCommandCompleteness completeness) {
+    if (const {'query_metric', 'navigation_target', 'app_control', 'search_subject'}
+        .contains(completeness.reason)) return SpeechTimingKind.query;
+    if (completeness.reason.startsWith('transfer') ||
+        RegExp(r'\b(and|aur|phir|then)\b').hasMatch(
+            _voiceEntry.session.latestDraft.toLowerCase())) {
+      return SpeechTimingKind.extended;
     }
+    return SpeechTimingKind.transaction;
+  }
 
-    if (_speechStableTranscript == transcript &&
-        _speechStableReason == completeness.reason &&
-        (_speechStabilityTimer?.isActive ?? false)) {
-      return;
-    }
-
+  void _scheduleStableSpeechFinalization(SpeechCommandCompleteness completeness) {
     _speechStabilityTimer?.cancel();
-    _speechStableTranscript = transcript;
-    _speechStableReason = completeness.reason;
-
-    final fastReadOnly = completeness.isComplete &&
-        const {
-          'query_metric',
-          'navigation_target',
-          'app_control',
-        }.contains(completeness.reason);
-    final window = fastReadOnly
-        ? VoiceEntryController.readOnlyStabilityWindow
-        : VoiceEntryController.stabilityWindow;
-
-    final stableTranscript = transcript;
-    _speechStabilityTimer = Timer(window, () async {
-      if (!mounted ||
-          _restartingSpeech ||
-          _voiceEntry.session.state != SpeechSessionState.listening ||
-          _voiceEntry.session.latestDraft != stableTranscript) {
+    if (_finalizingRecognizerStop || _isProcessingVoiceCommand) return;
+    final wait = _speechTiming.waitFor(
+        isComplete: completeness.isComplete,
+        kind: _speechTimingKind(completeness));
+    // An incomplete active phrase is not a session deadline. Keep its draft
+    // and the real deadline timer, allowing the user to continue speaking.
+    if (wait == null) return;
+    final attempt = _speechAttempt;
+    _speechStabilityTimer = Timer(wait, () {
+      if (!mounted || attempt != _speechAttempt || _restartingSpeech ||
+          _finalizingRecognizerStop || _isProcessingVoiceCommand ||
+          _voiceEntry.session.state != SpeechSessionState.listening) return;
+      final current = _voiceEntry.session.latestDraft;
+      final complete = _speechCompleteness(current);
+      // Sound activity may have continued without a new ASR text callback.
+      final remaining = _speechTiming.waitFor(
+          isComplete: complete.isComplete, kind: _speechTimingKind(complete));
+      if (remaining == null) return;
+      if (remaining > Duration.zero) {
+        _scheduleStableSpeechFinalization(complete);
         return;
       }
-      final currentCompleteness = _speechCompleteness(stableTranscript);
-      final decision = _voiceEntry.session.onSessionExpired(
-        isComplete: currentCompleteness.isComplete,
-      );
-      _traceSpeechEvent(
-        'stable',
-        transcript: stableTranscript,
-        completeness: currentCompleteness,
-      );
-      _speechStableTranscript = '';
-      _speechStableReason = '';
-      if (decision.action != SpeechSessionAction.none) {
-        await _stopRecognizerThenApply(decision);
-      }
+      _traceSpeechEvent('endpoint_ready', transcript: current, completeness: complete);
+      unawaited(_finishSpeechSession());
     });
   }
 
-  Future<void> _finishSpeechSession({bool manual = false}) async {
-    if (!mounted) return;
-    final transcript = _voiceEntry.session.latestDraft;
-    final completeness = _speechCompleteness(transcript);
-    final decision = completeness.isComplete && transcript.isNotEmpty
-        ? _voiceEntry.session.recordTranscript(transcript, isFinal: true)
-        : _voiceEntry.session.onRecognizerError(retryable: false);
-    _traceSpeechEvent(
-      manual ? 'manual_stop' : 'session_deadline',
-      transcript: transcript,
-      completeness: completeness,
-    );
-    if (decision.action == SpeechSessionAction.none &&
-        _voiceEntry.session.state != SpeechSessionState.failed) {
-      return;
-    }
-    await _stopRecognizerThenApply(decision);
-  }
-
-  Future<void> _stopRecognizerThenApply(
-      SpeechSessionDecision decision,
-      ) async {
+  Future<void> _finishSpeechSession({bool manual = false, bool deadline = false}) async {
+    if (!mounted || _finalizingRecognizerStop || _isProcessingVoiceCommand ||
+        _voiceEntry.session.state != SpeechSessionState.listening) return;
+    final attempt = _speechAttempt;
+    _finalizingRecognizerStop = true;
     _cancelSpeechTimers();
-    _restartingSpeech = true;
+    _setListening(false);
+    _speechTiming.mark('finalization_started');
     try {
-      await _voiceEntry.speech.stop();
+      _speechTiming.mark('cleanup_started');
+      final id = _voiceDiagnosticId;
+      _recognizerCleanupPending = true;
+      final cleanup = Future<void>.sync(_voiceEntry.speech.stop);
+      AudioFeedbackService.deferSpokenFeedbackUntil(cleanup);
+      final observedCleanup = cleanup.then((_) {
+        if (mounted && attempt == _speechAttempt) {
+          _speechTiming.mark('cleanup_completed');
+          VoiceDiagnosticsService.instance.stage('timing', _speechTiming.timings, id: id);
+        }
+      }).whenComplete(() {
+        if (mounted && attempt == _speechAttempt) {
+          _recognizerCleanupPending = false;
+          _smartInputUiRevision.value++;
+        }
+      });
+      await reconcileSpeechEndpoint(
+        timing: _speechTiming,
+        cleanup: observedCleanup,
+        finalResult: () => _speechFinalResult!.future,
+        isCurrent: () => mounted && attempt == _speechAttempt,
+      );
+      if (!mounted || attempt != _speechAttempt) return;
+      final transcript = _voiceEntry.session.latestDraft;
+      final completeness = _speechCompleteness(transcript);
+      _traceSpeechEvent(manual ? 'manual_stop' : deadline ? 'session_deadline' : 'finalized',
+          transcript: transcript, completeness: completeness);
+      if (!completeness.isComplete || transcript.isEmpty) {
+        // Preserve what was heard in the input, rather than clearing it on a
+        // short native pause. It can be edited or submitted for normal review.
+        VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId,
+            transcript.isEmpty ? 'no_speech' : 'incomplete',
+            reason: completeness.reason);
+        _voiceEntry.session.reset();
+        _showTransactionError(
+          AppMessage('the_voice_command_was_incomplete_please_tap_the__e3c527'),
+          title: AppMessage('voice_command_incomplete_0baf1a'),
+        );
+        return;
+      }
+      final decision = _voiceEntry.session.recordTranscript(
+          transcript, isFinal: true, isComplete: true);
+      _speechTiming.mark('endpoint_accepted');
+      await _applySpeechDecision(decision,
+          forceReview: !_speechTiming.hasFinalResult);
+    } catch (error) {
+      _voiceEntry.session.markFailed();
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed',
+          reason: 'finalization_${error.runtimeType}');
+      _showTransactionError(
+          AppMessage('voice_log_stopped_before_it_received_a_final_res_3ba187'),
+          title: AppMessage('voice_log_stopped_c214bc'));
     } finally {
-      _restartingSpeech = false;
+      _finalizingRecognizerStop = false;
+      if (mounted) _smartInputUiRevision.value++;
     }
-    if (!mounted) return;
-    if (_isListening) _setListening(false);
-    await _applySpeechDecision(decision);
   }
 
   Future<void> _restartSpeechListening({bool advanceLocale = false}) async {
@@ -374,8 +411,6 @@ extension _DashboardVoiceMethods on _HomeScreenState {
   void _cancelSpeechTimers() {
     _speechStabilityTimer?.cancel();
     _speechStabilityTimer = null;
-    _speechStableTranscript = '';
-    _speechStableReason = '';
     _speechDeadlineTimer?.cancel();
     _speechDeadlineTimer = null;
     _speechStartupTimer?.cancel();
@@ -405,7 +440,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       transcript: transcript,
       completeness: completeness,
     );
-    await _applySpeechDecision(decision);
+    await _applySpeechDecision(decision, forceReview: true);
   }
 
   void _traceSpeechEvent(
@@ -416,7 +451,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'speech_session', {
       'event': event, 'transcript': transcript, 'state': _voiceEntry.session.state.name,
       'retry': _voiceEntry.session.retryCount, 'complete': completeness.isComplete,
-      'reason': completeness.reason,
+      'reason': completeness.reason, 'timing': _speechTiming.timings,
     });
     assert(() {
       debugPrint(
@@ -431,7 +466,8 @@ extension _DashboardVoiceMethods on _HomeScreenState {
   }
 
   Future<void> _handleSpeechError(String errorMessage) async {
-    if (!mounted || _handlingSpeechError) return;
+    if (!mounted || _handlingSpeechError || _finalizingRecognizerStop ||
+        _isProcessingVoiceCommand) return;
     if (_voiceEntry.session.state != SpeechSessionState.listening &&
         _voiceEntry.session.state != SpeechSessionState.finalizing) {
       return;
@@ -469,7 +505,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     _setListening(false);
 
     if (decision.action == SpeechSessionAction.processFinal) {
-      await _applySpeechDecision(decision);
+      await _applySpeechDecision(decision, forceReview: true);
       return;
     }
 
@@ -507,7 +543,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     );
   }
 
-  Future<void> _applySpeechDecision(SpeechSessionDecision decision) async {
+  Future<void> _applySpeechDecision(SpeechSessionDecision decision, {bool forceReview = false}) async {
     if (!mounted) return;
     switch (decision.action) {
       case SpeechSessionAction.processFinal:
@@ -515,14 +551,20 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         _cancelSpeechTimers();
         _setListening(false);
         _voiceEntry.session.markProcessing();
-        _isProcessingVoiceCommand = true;
+        _setVoiceProcessing(true);
+        _speechTiming.mark('processing_started');
         try {
           final diagnosticId = _voiceDiagnosticId;
           VoiceDiagnosticsService.instance.submitted(diagnosticId, decision.transcript);
           final accepted = await VoiceDiagnosticsService.instance.run(diagnosticId, () => _processNLP(
             decision.transcript,
             source: SmartInputSource.voice,
+            forceVoiceReview: forceReview,
+            preparedPlan: _speechCacheKey == _speechContextKey(decision.transcript)
+                ? _speechCachedPlan : null,
           ));
+          _speechTiming.mark('processing_completed');
+          VoiceDiagnosticsService.instance.stage('timing', _speechTiming.timings, id: diagnosticId);
           VoiceDiagnosticsService.instance.finishProcessing(diagnosticId, accepted);
           _voiceEntry.session.markCompleted();
           _smartInputCtrl.clear();
@@ -533,7 +575,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
           _smartInputCtrl.clear();
           rethrow;
         } finally {
-          _isProcessingVoiceCommand = false;
+          _setVoiceProcessing(false);
         }
         return;
       case SpeechSessionAction.discardDraft:
@@ -589,40 +631,31 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     }
     _speechStartupTimer?.cancel();
     _speechStartupTimer = null;
+    _speechTiming.recordEnd();
     unawaited(_finalizeNormallyStoppedSpeech());
   }
 
   Future<void> _finalizeNormallyStoppedSpeech() async {
-    // Several Android recognizers report `done` just before delivering their
-    // final callback. Give it a chance to arrive. An incomplete transcript is
-    // continued in a fresh recognizer cycle rather than promoted to a command.
-    if (_finalizingRecognizerStop) return;
-    final attempt = _speechAttempt;
-    _finalizingRecognizerStop = true;
-    try {
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      if (!mounted || _restartingSpeech || attempt != _speechAttempt) return;
-      final transcript = _voiceEntry.session.latestDraft;
-      final completeness = _speechCompleteness(transcript);
-      if (transcript.isNotEmpty) {
-        _scheduleStableSpeechFinalization(
-          transcript,
-          completeness,
-          isFinal: false,
-        );
-        return;
-      }
-      final decision = _voiceEntry.session.onRecognizerError(retryable: true);
-      _traceSpeechEvent(
-        'recognizer_stopped',
-        transcript: transcript,
-        completeness: completeness,
-      );
-      await _applySpeechDecision(decision);
-    } finally {
-      _finalizingRecognizerStop = false;
+    if (_finalizingRecognizerStop || _isProcessingVoiceCommand ||
+        _voiceEntry.session.state != SpeechSessionState.listening) return;
+    final transcript = _voiceEntry.session.latestDraft;
+    final completeness = _speechCompleteness(transcript);
+    if (transcript.isEmpty) {
+      final attempt = _speechAttempt;
+      _speechStabilityTimer?.cancel();
+      _speechStabilityTimer = Timer(SpeechTimingPolicy.resultGrace, () {
+        if (!mounted || attempt != _speechAttempt || _finalizingRecognizerStop ||
+            _isProcessingVoiceCommand) return;
+        if (_voiceEntry.session.latestDraft.isNotEmpty) {
+          _scheduleStableSpeechFinalization(
+              _speechCompleteness(_voiceEntry.session.latestDraft));
+        } else {
+          unawaited(_applySpeechDecision(
+              _voiceEntry.session.onRecognizerError(retryable: true)));
+        }
+      });
+      return;
     }
+    _scheduleStableSpeechFinalization(completeness);
   }
-
-
 }

@@ -25,6 +25,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   late Animation<double> _fabScale;
 
   final VoiceEntryController _voiceEntry = VoiceEntryController();
+  final SpeechTimingTracker _speechTiming = SpeechTimingTracker();
+  Completer<void>? _speechFinalResult;
+  SmartInputPlan? _speechCachedPlan;
+  SpeechCommandCompleteness? _speechCachedCompleteness;
+  String? _speechCacheKey;
   final SpeechNetworkRecovery _speechNetworkRecovery = SpeechNetworkRecovery();
   int _speechAttempt = 0;
   String? _voiceDiagnosticId;
@@ -47,19 +52,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Timer? _notificationUpdateTimer;
   Timer? _audioWarmupTimer;
   Timer? _speechStabilityTimer;
-  String _speechStableTranscript = '';
-  String _speechStableReason = '';
   Timer? _speechDeadlineTimer;
   Timer? _speechStartupTimer;
   DateTime? _speechListenStartedAt;
   bool _recognizerReportedListening = false;
   bool _finalizingRecognizerStop = false;
+  bool _recognizerCleanupPending = false;
+  bool _voiceStarting = false;
   bool _isProcessingVoiceCommand = false;
 
   void _setListening(bool value) {
     if (_isListening == value) return;
     _isListening = value;
     _smartInputUiRevision.value++;
+  }
+
+  void _setVoiceProcessing(bool value) {
+    if (_isProcessingVoiceCommand == value) return;
+    _isProcessingVoiceCommand = value;
+    if (mounted) _smartInputUiRevision.value++;
   }
 
   void _setScanningReceipt(bool value) {
@@ -340,3 +351,4 @@ class _LearnedSmartEntryPreference {
     'updatedAt': updatedAt,
   };
 }
+
