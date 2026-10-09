@@ -86,6 +86,9 @@ class ChirpGatewaySpeechProvider implements SpeechRecognitionProvider {
   Future<void> listen({
     required SpeechRecognitionListenOptions options,
     required Future<void> Function(SpeechRecognitionResult result) onResult,
+    // The gateway does not expose sound levels. Endpoint timing retains its
+    // transcript/final-result fallback for this provider.
+    void Function(double level)? onSoundLevelChange,
   }) async {
     final token = await config.accessTokenProvider();
     if (token == null || token.trim().isEmpty) {
@@ -165,3 +168,4 @@ class ChirpGatewaySpeechProvider implements SpeechRecognitionProvider {
     _socket = null;
   }
 }
+
