@@ -311,7 +311,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           _speechSession.onRecognizerError(retryable: false);
           if (mounted) {
             setState(() => _isListening = false);
-            // Keep the recognized draft available for correction after an error.
+            _smartInputCtrl.clear();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(AppStrings.current.text('voice_recognition_stopped_please_try_again_010e48')),
@@ -444,11 +444,13 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         _scheduleFastUdharVoiceSave(words);
         return;
       }
-      unawaited(_finishVoiceInput());
+      unawaited(_finishVoiceInput(
+          stableComplete: !_udharSpeechTiming.recognizerEnded &&
+              _udharVoiceIsComplete(words)));
     });
   }
 
-  Future<void> _finishVoiceInput({bool manual = false}) async {
+  Future<void> _finishVoiceInput({bool manual = false, bool stableComplete = false}) async {
     if (!_isListening || _voiceFinalizing) return;
     final attempt = _udharVoiceAttempt;
     _udharVoiceStableTimer?.cancel();
@@ -482,6 +484,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       final words = _speechSession.latestDraft;
       if (words.isEmpty) {
         VoiceDiagnosticsService.instance.finish(id, 'no_speech', reason: 'udhar_no_transcript');
+        _smartInputCtrl.clear();
         return;
       }
       final result = _speechSession.recordTranscript(words, isFinal: true);
@@ -491,13 +494,15 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         VoiceDiagnosticsService.instance.submitted(id, result.transcript);
         await VoiceDiagnosticsService.instance.run(id, () => _processNLP(
             result.transcript, fromVoice: true,
-            allowInstantSave: !manual && _udharSpeechTiming.hasFinalResult));
+            allowInstantSave: !manual &&
+                (stableComplete || _udharSpeechTiming.hasFinalResult)));
         _udharSpeechTiming.mark('processing_completed');
         VoiceDiagnosticsService.instance.stage('timing', _udharSpeechTiming.timings, id: id);
       }
     } catch (error) {
       VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed',
           reason: 'udhar_processing_${error.runtimeType}');
+      if (mounted) _smartInputCtrl.clear();
     } finally {
       _speechSession.reset();
       _voiceFinalizing = false;
@@ -509,7 +514,6 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     bool fromVoice = false,
     bool allowInstantSave = true,
   }) async {
-    if (!fromVoice && (_isListening || _voiceFinalizing)) return;
     if (text.trim().isEmpty || _savingDebt) return;
     final wallets = ref.read(walletProvider);
     final draft = const UdharInputService().parse(
@@ -526,6 +530,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ),
         ),
       );
+      if (fromVoice) _smartInputCtrl.clear();
       return;
     }
     final walletId = _walletForCommand(text);
@@ -1437,7 +1442,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
-                onPressed: _isListening || _voiceFinalizing ? null : _showUdharWalletPicker,
+                onPressed: _isListening ? null : _showUdharWalletPicker,
                 icon: const Icon(
                   Icons.account_balance_wallet_outlined,
                   size: 17,
@@ -1476,8 +1481,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
-              readOnly: _isListening || _voiceFinalizing,
-              onSubmitted: _isListening || _voiceFinalizing ? null : _processNLP,
+              onSubmitted: _processNLP,
               decoration: InputDecoration(
                 hintText: _isListening
                     ? AppStrings.current.text('listening_6c19a4')
@@ -1501,8 +1505,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       visualDensity: VisualDensity.compact,
                       constraints:
                           const BoxConstraints.tightFor(width: 38, height: 40),
-                      onPressed: _voiceFinalizing || _voiceStarting ||
-                          _recognizerCleanupPending ? null : _listenForInput,
+                      onPressed: _listenForInput,
                       icon: Icon(
                         _isListening
                             ? Icons.stop_circle_rounded
@@ -1522,7 +1525,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                       child: IconButton(
                         tooltip: AppStrings.current.text('save_quick_udhar_1145fe'),
                         padding: EdgeInsets.zero,
-                        onPressed: _isListening || _voiceFinalizing ? null : () =>
+                        onPressed: () =>
                             _processNLP(_smartInputCtrl.text),
                         icon: const Icon(
                           Icons.arrow_upward_rounded,
@@ -1540,7 +1543,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: _scanningDebt || _isListening || _voiceFinalizing ? null : _startReceiptScan,
+              onPressed: _scanningDebt ? null : _startReceiptScan,
               icon: _scanningDebt
                   ? const SizedBox.square(
                       dimension: 16,

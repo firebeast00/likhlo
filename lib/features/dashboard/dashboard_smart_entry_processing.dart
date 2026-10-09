@@ -4,13 +4,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
   Future<bool> _processNLP(
       String text, {
         SmartInputSource source = SmartInputSource.typed,
-        SmartInputPlan? preparedPlan,
-        bool forceVoiceReview = false,
       }) async {
-    if (source == SmartInputSource.typed &&
-        (_isListening || _finalizingRecognizerStop || _isProcessingVoiceCommand)) {
-      return false;
-    }
     _dismissKeyboard();
     final normalized = text.trim();
     if (normalized.isEmpty) return false;
@@ -94,7 +88,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       }
     }
 
-    final plan = preparedPlan ?? ref.read(smartEntryControllerProvider).parse(
+    final plan = ref.read(smartEntryControllerProvider).parse(
       normalized,
       categories,
       source: source,
@@ -104,30 +98,6 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     final command = plan.parsed;
     final canonicalInput = plan.normalizedText;
     if (!command.intent.isTransactionAddition) {
-      if (forceVoiceReview && const {
-        SmartEntryIntent.transfer, SmartEntryIntent.repeatEntry,
-        SmartEntryIntent.deleteEntry, SmartEntryIntent.editEntry,
-      }.contains(command.intent)) {
-        VoiceDiagnosticsService.instance.awaitingConfirmation(reason: 'voice_endpoint_review');
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(AppStrings.current.text('review_before_saving_6f92b7')),
-            content: Text(normalized),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(AppStrings.current.text('cancel_77dfd2')),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(AppStrings.current.text('continue_2e0262')),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true || !mounted) return false;
-      }
       if (command.intent == SmartEntryIntent.deleteEntry ||
           command.intent == SmartEntryIntent.editEntry) {
         await _handleSmartEntryMutationCommand(plan);
@@ -253,7 +223,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       return true;
     }());
 
-    if (!forceVoiceReview && !plan.requiresAsrReview &&
+    if (!plan.requiresAsrReview &&
         semanticConfidence.canAutoExecute &&
         shouldAutoSaveSmartEntry(
           result,
@@ -327,9 +297,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     }).toList(growable: false);
     final defaultsAreEmpty = defaultAccounts.isEmpty ||
         defaultAccounts.every((account) => account.availableBalance <= 0);
-    final reviewMessage = forceVoiceReview
-        ? 'Review the detected title, amount, category, date, and wallet before saving.'
-        : plan.requiresAsrReview
+    final reviewMessage = plan.requiresAsrReview
         ? 'Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.'
         : resolvedWalletId != null &&
         !semanticConfidence.canAutoExecute
@@ -446,4 +414,3 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
 
 
 }
-

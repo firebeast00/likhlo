@@ -23,6 +23,37 @@ jobs:
           channel: stable
           cache: true
       - run: python3 tool/generate_app_catalog.py --check
+      - name: Verify timing preserves command execution behavior
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          baseline = '6f71e5208cda453253f97c73cb8a667aa4cf5f09'
+          paths = [
+              'lib/features/dashboard/dashboard_smart_entry_processing.dart',
+              'lib/features/dashboard/dashboard_smart_input_widget.dart',
+              'lib/features/dashboard/dashboard_smart_entry_transfer.dart',
+              'lib/features/dashboard/dashboard_smart_entry_mutation.dart',
+              'lib/features/dashboard/dashboard_smart_entry_queries.dart',
+              'lib/features/dashboard/dashboard_smart_entry_matching.dart',
+              'lib/features/smart_entry/', 'lib/providers/',
+              'lib/services/local_nlp_service.dart',
+              'lib/services/smart_input_engine.dart',
+              'lib/services/confidence_evaluator.dart',
+              'lib/services/transaction_executor.dart',
+              'lib/services/udhar_input_service.dart',
+              'lib/services/speech_command_completeness.dart',
+              'lib/services/speech_session_controller.dart',
+          ]
+          subprocess.run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--', *paths], check=True)
+          path = 'lib/screens/debt_screen.dart'
+          previous = subprocess.check_output(['git', 'show', f'{baseline}:{path}'], text=True)
+          current = Path(path).read_text()
+          marker = '  Future<void> _processNLP('
+          assert current[current.index(marker):].rstrip() == previous[previous.index(marker):].rstrip(), 'Udhaar processing, ledger or UI behavior changed'
+          print('Original command handlers, NLP rules, confidence, ledger validators and entry controls are unchanged')
+          PY
       - id: dependencies
         run: flutter pub get
       - name: Format diagnostics and voice timing files

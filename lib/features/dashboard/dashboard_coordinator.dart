@@ -27,7 +27,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final VoiceEntryController _voiceEntry = VoiceEntryController();
   final SpeechTimingTracker _speechTiming = SpeechTimingTracker();
   Completer<void>? _speechFinalResult;
-  SmartInputPlan? _speechCachedPlan;
   SpeechCommandCompleteness? _speechCachedCompleteness;
   String? _speechCacheKey;
   final SpeechNetworkRecovery _speechNetworkRecovery = SpeechNetworkRecovery();

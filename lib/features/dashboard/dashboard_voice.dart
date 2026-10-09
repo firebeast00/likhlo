@@ -261,7 +261,6 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         source: SmartInputSource.voice, accounts: accounts,
       );
       final result = _voiceEntry.completeness.evaluate(plan, accounts: accounts);
-      _speechCachedPlan = plan;
       _speechCachedCompleteness = result;
       _speechCacheKey = key;
       _speechTiming.mark('parse_completed');
@@ -350,12 +349,18 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       _traceSpeechEvent(manual ? 'manual_stop' : deadline ? 'session_deadline' : 'finalized',
           transcript: transcript, completeness: completeness);
       if (!completeness.isComplete || transcript.isEmpty) {
-        // Preserve what was heard in the input, rather than clearing it on a
-        // short native pause. It can be edited or submitted for normal review.
+        if (manual || deadline) {
+          // Manual stop and the session deadline retain their existing
+          // handler behavior, including normal confidence/amount validation.
+          final decision = _voiceEntry.session.onRecognizerError(retryable: false);
+          await _applySpeechDecision(decision);
+          return;
+        }
         VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId,
             transcript.isEmpty ? 'no_speech' : 'incomplete',
             reason: completeness.reason);
         _voiceEntry.session.reset();
+        _smartInputCtrl.clear();
         _showTransactionError(
           AppMessage('the_voice_command_was_incomplete_please_tap_the__e3c527'),
           title: AppMessage('voice_command_incomplete_0baf1a'),
@@ -365,8 +370,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       final decision = _voiceEntry.session.recordTranscript(
           transcript, isFinal: true, isComplete: true);
       _speechTiming.mark('endpoint_accepted');
-      await _applySpeechDecision(decision,
-          forceReview: !_speechTiming.hasFinalResult);
+      await _applySpeechDecision(decision);
     } catch (error) {
       _voiceEntry.session.markFailed();
       VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed',
@@ -440,7 +444,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       transcript: transcript,
       completeness: completeness,
     );
-    await _applySpeechDecision(decision, forceReview: true);
+    await _applySpeechDecision(decision);
   }
 
   void _traceSpeechEvent(
@@ -505,7 +509,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     _setListening(false);
 
     if (decision.action == SpeechSessionAction.processFinal) {
-      await _applySpeechDecision(decision, forceReview: true);
+      await _applySpeechDecision(decision);
       return;
     }
 
@@ -543,7 +547,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     );
   }
 
-  Future<void> _applySpeechDecision(SpeechSessionDecision decision, {bool forceReview = false}) async {
+  Future<void> _applySpeechDecision(SpeechSessionDecision decision) async {
     if (!mounted) return;
     switch (decision.action) {
       case SpeechSessionAction.processFinal:
@@ -559,9 +563,6 @@ extension _DashboardVoiceMethods on _HomeScreenState {
           final accepted = await VoiceDiagnosticsService.instance.run(diagnosticId, () => _processNLP(
             decision.transcript,
             source: SmartInputSource.voice,
-            forceVoiceReview: forceReview,
-            preparedPlan: _speechCacheKey == _speechContextKey(decision.transcript)
-                ? _speechCachedPlan : null,
           ));
           _speechTiming.mark('processing_completed');
           VoiceDiagnosticsService.instance.stage('timing', _speechTiming.timings, id: diagnosticId);

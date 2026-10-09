@@ -1,6 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:student_expense_manager/services/local_nlp_service.dart';
+import 'package:student_expense_manager/services/smart_command.dart';
+import 'package:student_expense_manager/services/smart_input_engine.dart';
+import 'package:student_expense_manager/services/speech_command_completeness.dart';
 import 'package:student_expense_manager/services/speech_session_controller.dart';
 import 'package:student_expense_manager/services/speech_timing_policy.dart';
 
@@ -19,6 +23,44 @@ class _SpeechClock {
 }
 
 void main() {
+  const accounts = [
+    SmartEntryAccount(id: 'cash', name: 'Cash', type: 'cash', availableBalance: 10000),
+    SmartEntryAccount(id: 'jazzcash', name: 'JazzCash', type: 'jazzcash', availableBalance: 10000),
+  ];
+  const categories = ['Food', 'Transport', 'Shopping', 'General'];
+  for (final example in {
+    '500 petrol': SmartEntryIntent.addExpense,
+    '80 jama karo cash mein': SmartEntryIntent.addIncome,
+    'delete burger': SmartEntryIntent.deleteEntry,
+    'petrol wali entries dikhao': SmartEntryIntent.searchEntries,
+  }.entries) {
+    test('complete stable speech dispatches ${example.value.name} without native final', () {
+      final plan = SmartInputEngine().parse(example.key, categories,
+          source: SmartInputSource.voice, accounts: accounts);
+      final completeness = const SpeechCommandCompletenessEvaluator()
+          .evaluate(plan, accounts: accounts);
+      expect(plan.parsed.intent, example.value);
+      expect(completeness.isComplete, isTrue);
+      final c = _SpeechClock();
+      final session = SpeechSessionController()..start();
+      c.timing.recordTranscript(example.key, isFinal: false);
+      session.recordTranscript(example.key, isFinal: false);
+      c.now = const Duration(seconds: 3);
+      expect(c.wait(complete: completeness.isComplete), Duration.zero);
+      expect(c.timing.hasFinalResult, isFalse);
+      final decision = session.onStableTranscript(isComplete: completeness.isComplete);
+      expect(decision.action, SpeechSessionAction.processFinal);
+      expect(decision.transcript, example.key);
+      // Endpoint acceptance changes when dispatch occurs, not its NLP intent.
+      final submitted = SmartInputEngine().parse(decision.transcript, categories,
+          source: SmartInputSource.voice, accounts: accounts);
+      expect(submitted.parsed.intent, plan.parsed.intent);
+      expect(submitted.parsed.amount, plan.parsed.amount);
+      expect(submitted.requiresAsrReview, plan.requiresAsrReview);
+      expect(submitted.parsed.clarificationReasons, plan.parsed.clarificationReasons);
+    });
+  }
+
   test('a same-text final upgrades a partial to the short final window', () {
     final c = _SpeechClock();
     c.timing.recordTranscript('500 biryani', isFinal: false);
