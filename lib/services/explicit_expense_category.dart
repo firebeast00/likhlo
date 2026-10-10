@@ -42,9 +42,9 @@ class ExplicitExpenseCategoryExtractor {
         RegExp(r'\b(?:in\s+|into\s+)?category\s+' + escaped +
             _end + _optionalInstruction, caseSensitive: false),
         RegExp(r'\b(?:in\s+|into\s+)?' + escaped +
-            r'\s+category\b(?:\s+(?:me|mein))?' + _optionalInstruction,
+            r'\s+category\b(?:\s+(?:mein|me)\b)?' + _optionalInstruction,
             caseSensitive: false),
-        RegExp(r'\b' + escaped + r'\s+(?:me|mein)\s+' + _addInstruction,
+        RegExp(r'\b' + escaped + r'\s+(?:mein|me)\b\s+' + _addInstruction,
             caseSensitive: false),
         RegExp(r'\b(?:in|into)\s+' + escaped + _end +
             r'(?:\s+category)?' + _optionalInstruction, caseSensitive: false),
@@ -74,7 +74,7 @@ class ExplicitExpenseCategoryExtractor {
       RegExp(r'\b(?:in|into)\s+(.+?)\s+category\b', caseSensitive: false),
       RegExp(r'\binto\s+(.+?)' + _unknownEnd, caseSensitive: false),
       RegExp(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+'
-          r'(?:me|mein)\s+' + _addInstruction, caseSensitive: false),
+          r'(?:mein|me)\b\s+' + _addInstruction, caseSensitive: false),
     ];
     for (final expression in unknownPatterns) {
       for (final match in expression.allMatches(input)) {
@@ -121,7 +121,7 @@ class ExplicitExpenseCategoryExtractor {
   static const _addInstruction =
       r'(?:add(?:\s+karo|\s+kar\s+do)?|save(?:\s+karo)?|(?:daal|dalo|daalo)(?:\s+do)?)\b';
   static const _optionalInstruction =
-      r'(?:\s+(?:me|mein))?(?:\s+' + _addInstruction + r')?';
+      r'(?:\s+(?:mein|me)\b)?(?:\s+' + _addInstruction + r')?';
   // Keep wallet/date/amount clauses available to the existing parser. A word
   // continuing a category name is not a boundary (Dinner != Dinner Party).
   // Digits may belong to an unknown category name, not a second entry.
