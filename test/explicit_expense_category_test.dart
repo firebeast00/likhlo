@@ -4,6 +4,7 @@ import 'package:student_expense_manager/features/smart_entry/multi_entry_parser.
 import 'package:student_expense_manager/services/explicit_expense_category.dart';
 import 'package:student_expense_manager/services/confidence_evaluator.dart';
 import 'package:student_expense_manager/services/local_nlp_service.dart';
+import 'package:student_expense_manager/services/pakistani_language_normalizer.dart';
 import 'package:student_expense_manager/services/smart_command.dart';
 import 'package:student_expense_manager/services/smart_input_engine.dart';
 import 'package:student_expense_manager/services/speech_command_completeness.dart';
@@ -164,6 +165,18 @@ void main() {
     });
   }
 
+  test('ordinary entries do not add another normalization pass', () {
+    final normalizer = _CountingNormalizer();
+    final fastController = SmartEntryController(
+        engine: SmartInputEngine(normalizer: normalizer));
+    final plan = fastController.parse('milk 120', categories,
+        source: SmartInputSource.voice, enableHomeExpenseCategories: true);
+    expect(plan.expenseCategory, isNull);
+    expect(normalizer.calls, 1);
+    expect(plan.parsed.title, 'Milk');
+    expect(plan.parsed.amount, 120);
+  });
+
   test('feature is disabled for existing engine/controller callers', () {
     const input = 'milk 120 category dinner';
     final original = SmartInputEngine().parse(input, categories);
@@ -172,4 +185,16 @@ void main() {
     expect(unchanged.parsed.category, original.parsed.category);
     expect(unchanged.parsed.title, original.parsed.title);
   });
+}
+
+class _CountingNormalizer extends PakistaniLanguageNormalizer {
+  int calls = 0;
+
+  @override
+  PakistaniNormalizationResult normalize(String input,
+      {bool enableContextualAsrRepairs = false}) {
+    calls++;
+    return super.normalize(input,
+        enableContextualAsrRepairs: enableContextualAsrRepairs);
+  }
 }

@@ -39,6 +39,9 @@ class SmartEntryController {
     );
   }
 
+  static final _categoryAnchor = RegExp(
+    r'\b(?:category|in|into|me|mein)\b|میں', caseSensitive: false);
+
   /// Opt-in only for Home single expenses; batch and other intent paths stay
   /// on the original engine. Full-text routing/negation precedes subtraction.
   ExplicitExpenseCategory? resolveHomeExpenseCategory(
@@ -47,6 +50,7 @@ class SmartEntryController {
     required SmartInputSource source,
     Iterable<SmartEntryAccount> accounts = const [],
   }) {
+    if (!_categoryAnchor.hasMatch(input)) return null;
     final text = _engine.normalizer.normalize(input,
         enableContextualAsrRepairs: source == SmartInputSource.voice).normalized;
     if (RegExp(r'\b(nahi|nahin|mat|dont|don\x27t|ya|or)\b').hasMatch(text)) return null;
