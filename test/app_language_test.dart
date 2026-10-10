@@ -126,7 +126,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      Future<void>? pendingSave;
+      String? selection;
       await tester.pumpWidget(UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
@@ -139,7 +139,7 @@ void main() {
               child: LanguageSettingsTile(
                 language: ref.watch(settingsProvider).appLanguage,
                 onChanged: (value) {
-                  pendingSave = ref.read(settingsProvider.notifier).updateLanguage(value);
+                  selection = value;
                 },
               ),
             ),
@@ -160,9 +160,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(next == AppLanguage.english ? 'English' : 'Roman Urdu').last);
       await tester.pumpAndSettle();
-      expect(pendingSave, isNotNull);
-      // Await the actual save outside the widget test's fake async clock.
-      await tester.runAsync(() => pendingSave!);
+      expect(selection, next.name);
+      // Persist the emitted value outside the widget test's fake async clock.
+      await tester.runAsync(() =>
+          container.read(settingsProvider.notifier).updateLanguage(selection!));
       await tester.pumpAndSettle();
       expect(container.read(settingsProvider).appLanguage, next.name);
       expect(container.read(settingsProvider).smartEntryLanguage, next.name);
