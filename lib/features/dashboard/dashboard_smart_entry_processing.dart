@@ -1,6 +1,34 @@
 part of '../../screens/home_screen.dart';
 
 extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
+  static const _voiceCategoryAliasKey = 'home_voice_category_aliases_v1';
+
+  Map<String, String> _readVoiceCategoryAliases() {
+    try {
+      final stored = Hive.box('preferences').get(_voiceCategoryAliasKey);
+      if (stored is! Map) return const {};
+      return {for (final entry in stored.entries.take(100))
+        if (entry.key is String && entry.value is String)
+          entry.key as String: entry.value as String};
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> _rememberVoiceCategoryAlias(String heard, String category) async {
+    final key = SpeechCategoryMatcher.aliasKey(heard);
+    if (key.isEmpty || key.length > 80) return;
+    final aliases = Map<String, String>.of(_readVoiceCategoryAliases())..remove(key);
+    if (aliases.length >= 100) aliases.remove(aliases.keys.first);
+    aliases[key] = category;
+    try {
+      await Hive.box('preferences').put(_voiceCategoryAliasKey, aliases);
+      _speechCacheKey = null;
+    } catch (_) {
+      // Learning failure must never block or alter the confirmed transaction.
+    }
+  }
+
   Future<bool> _processNLP(
       String text, {
         SmartInputSource source = SmartInputSource.typed,
@@ -9,13 +37,42 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     final normalized = text.trim();
     if (normalized.isEmpty) return false;
 
-    final categories = ref.read(categoryProvider);
-    final expenseCategory = ref.read(smartEntryControllerProvider)
+    var categories = ref.read(categoryProvider);
+    var expenseCategory = ref.read(smartEntryControllerProvider)
         .resolveHomeExpenseCategory(normalized, categories,
-            source: source, accounts: _parsingAccounts());
+            source: source, accounts: _parsingAccounts(),
+            voiceCategoryAliases: source == SmartInputSource.voice
+                ? _readVoiceCategoryAliases() : const {});
     if (expenseCategory?.needsClarification == true) {
-      _showTransactionInfo(expenseCategory!.issue!, title: 'Choose a category');
-      return false;
+      if (source != SmartInputSource.voice || !expenseCategory!.canSuggest) {
+        _showTransactionInfo(expenseCategory!.issue!, title: 'Choose a category');
+        return false;
+      }
+      final pending = expenseCategory!;
+      VoiceDiagnosticsService.instance.stage('category_matching', {
+        'raw_text': normalized, 'requested_names': pending.requestedNames,
+        'suggestions': pending.suggestions,
+        'suggestion_scores': pending.suggestionScores,
+      });
+      VoiceDiagnosticsService.instance.awaitingConfirmation(reason: 'voice_category');
+      final choice = await showDialog<SpeechCategoryChoice>(context: context,
+          builder: (_) => SpeechCategoryDialog(
+            heardName: pending.requestedNames.single,
+            categories: categories, suggestions: pending.suggestions));
+      if (!mounted || choice == null) return false;
+      // The category may have been removed while the dialog was open.
+      if (!ref.read(categoryProvider).contains(choice.category)) return false;
+      VoiceDiagnosticsService.instance.stage('category_confirmation', {
+        'requested_name': pending.requestedNames.single,
+        'category': choice.category, 'remember': choice.remember,
+      });
+      if (choice.remember) {
+        await _rememberVoiceCategoryAlias(pending.requestedNames.single, choice.category);
+        if (!mounted) return false;
+      }
+      categories = ref.read(categoryProvider);
+      if (!categories.contains(choice.category)) return false;
+      expenseCategory = pending.confirmed(choice.category);
     }
 
     if (source == SmartInputSource.typed || source == SmartInputSource.voice) {

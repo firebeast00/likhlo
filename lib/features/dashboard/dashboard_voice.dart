@@ -260,10 +260,10 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         normalized, ref.read(categoryProvider),
         source: SmartInputSource.voice, accounts: accounts,
         enableHomeExpenseCategories: true,
+        voiceCategoryAliases: _readVoiceCategoryAliases(),
       );
-      final result = plan.expenseCategory?.needsClarification == true
-          ? const SpeechCommandCompleteness.incomplete('category_instruction_incomplete')
-          : _voiceEntry.completeness.evaluate(plan, accounts: accounts);
+      final result = const HomeCategorySpeechPolicy().evaluate(plan,
+          accounts: accounts, evaluator: _voiceEntry.completeness);
       _speechCachedCompleteness = result;
       _speechCacheKey = key;
       _speechTiming.mark('parse_completed');
@@ -352,6 +352,15 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       _traceSpeechEvent(manual ? 'manual_stop' : deadline ? 'session_deadline' : 'finalized',
           transcript: transcript, completeness: completeness);
       if (!completeness.isComplete || transcript.isEmpty) {
+        if (completeness.reason == 'category_instruction_incomplete') {
+          VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'incomplete',
+              reason: completeness.reason);
+          _voiceEntry.session.reset();
+          _smartInputCtrl.text = transcript;
+          _showTransactionInfo(AppMessage('expense_category_incomplete'),
+              title: AppMessage('expense_category_choose'));
+          return;
+        }
         if (manual || deadline) {
           // Manual stop and the session deadline retain their existing
           // handler behavior, including normal confidence/amount validation.
@@ -473,7 +482,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
   }
 
   Future<void> _handleSpeechError(String errorMessage) async {
-    if (!mounted || _handlingSpeechError || _finalizingRecognizerStop ||
+    if (!mounted || _handlingSpeechError || _restartingSpeech || _finalizingRecognizerStop ||
         _isProcessingVoiceCommand) return;
     if (_voiceEntry.session.state != SpeechSessionState.listening &&
         _voiceEntry.session.state != SpeechSessionState.finalizing) {
@@ -484,6 +493,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     _handlingSpeechError = true;
 
     final normalized = errorMessage.toLowerCase();
+    if (normalized.contains('error_client')) _speechInitialized = false;
     final recoverableEnd = normalized.contains('error_speech_timeout') ||
         normalized.contains('error_no_match') ||
         normalized.contains('error_client');
@@ -561,6 +571,10 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         _setVoiceProcessing(true);
         _speechTiming.mark('processing_started');
         try {
+          final categoryDraft = ref.read(smartEntryControllerProvider)
+              .resolveHomeExpenseCategory(decision.transcript, ref.read(categoryProvider),
+                  source: SmartInputSource.voice, accounts: _parsingAccounts(),
+                  voiceCategoryAliases: _readVoiceCategoryAliases());
           final diagnosticId = _voiceDiagnosticId;
           VoiceDiagnosticsService.instance.submitted(diagnosticId, decision.transcript);
           final accepted = await VoiceDiagnosticsService.instance.run(diagnosticId, () => _processNLP(
@@ -571,7 +585,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
           VoiceDiagnosticsService.instance.stage('timing', _speechTiming.timings, id: diagnosticId);
           VoiceDiagnosticsService.instance.finishProcessing(diagnosticId, accepted);
           _voiceEntry.session.markCompleted();
-          _smartInputCtrl.clear();
+          if (!accepted && categoryDraft?.needsClarification == true) {
+            _smartInputCtrl.text = decision.transcript;
+          } else {
+            _smartInputCtrl.clear();
+          }
           _voiceEntry.session.reset();
         } catch (error) {
           VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'processing_${error.runtimeType}');

@@ -896,6 +896,9 @@ const englishMessages = <String, String>{
   "expense_category_unknown": "Choose an existing category; the requested category was not found.",
   "expense_category_incomplete": "Complete the category name before saving.",
   "expense_category_conflict": "Choose one category for this expense.",
+  "speech_category_heard": "Heard “{p0}”. Choose the category you meant.",
+  "speech_category_remember": "Remember for voice entries",
+  "speech_category_use": "Use category",
 };
 
 const romanUrduMessages = <String, String>{
@@ -1795,6 +1798,9 @@ const romanUrduMessages = <String, String>{
   "expense_category_unknown": "Maujood category chunen; di hui category nahi mili.",
   "expense_category_incomplete": "Save karne se pehle category ka poora naam dein.",
   "expense_category_conflict": "Is kharch ke liye ek category chunen.",
+  "speech_category_heard": "“{p0}” suna. Apni category chunen.",
+  "speech_category_remember": "Voice entries ke liye yaad rakhein",
+  "speech_category_use": "Category chunen",
 };
 
 const urduSpeechMessages = <String, String>{

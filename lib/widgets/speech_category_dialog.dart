@@ -1,0 +1,70 @@
+import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
+
+class SpeechCategoryChoice {
+  final String category;
+  final bool remember;
+  const SpeechCategoryChoice(this.category, {this.remember = false});
+}
+
+/// Confirmation changes only the isolated category, never the transaction text.
+class SpeechCategoryDialog extends StatefulWidget {
+  final String heardName;
+  final List<String> categories;
+  final List<String> suggestions;
+  const SpeechCategoryDialog({super.key, required this.heardName,
+    required this.categories, this.suggestions = const []});
+
+  @override
+  State<SpeechCategoryDialog> createState() => _SpeechCategoryDialogState();
+}
+
+class _SpeechCategoryDialogState extends State<SpeechCategoryDialog> {
+  String? _selected;
+  bool _remember = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings.current;
+    return AlertDialog(
+      title: Text(strings.text('expense_category_choose')),
+      content: SingleChildScrollView(child: Column(
+        mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(strings.text('speech_category_heard', {'p0': widget.heardName})),
+          if (widget.suggestions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              for (final name in widget.suggestions)
+                ChoiceChip(label: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis)), selected: _selected == name,
+                    onSelected: (_) => setState(() => _selected = name)),
+            ]),
+          ],
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _selected,
+            key: ValueKey(_selected),
+            isExpanded: true, menuMaxHeight: 240,
+            hint: Text(strings.text('expense_category_choose')),
+            items: widget.categories.map((name) => DropdownMenuItem(
+                value: name, child: Text(name, overflow: TextOverflow.ellipsis)))
+                .toList(growable: false),
+            onChanged: (name) => setState(() => _selected = name),
+          ),
+          CheckboxListTile(contentPadding: EdgeInsets.zero,
+            title: Text(strings.text('speech_category_remember')),
+            value: _remember, onChanged: (value) => setState(() => _remember = value ?? false)),
+        ],
+      )),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(),
+            child: Text(strings.text('cancel_77dfd2'))),
+        FilledButton(onPressed: _selected == null ? null : () =>
+            Navigator.of(context).pop(SpeechCategoryChoice(_selected!, remember: _remember)),
+            child: Text(strings.text('speech_category_use'))),
+      ],
+    );
+  }
+}

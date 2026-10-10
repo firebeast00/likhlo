@@ -66,10 +66,10 @@ jobs:
       - id: dependencies
         run: flutter pub get
       - name: Format diagnostics and voice timing files
-        run: dart format lib/services/voice_diagnostics_service.dart lib/services/voice_diagnostic_observer.dart lib/screens/voice_diagnostics_screen.dart lib/services/speech_timing_policy.dart test/voice_diagnostics*_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart lib/services/explicit_expense_category.dart test/explicit_expense_category_test.dart
+        run: dart format lib/services/voice_diagnostics_service.dart lib/services/voice_diagnostic_observer.dart lib/screens/voice_diagnostics_screen.dart lib/services/speech_timing_policy.dart test/voice_diagnostics*_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart lib/services/explicit_expense_category.dart lib/services/speech_category_matcher.dart lib/services/home_category_speech_policy.dart lib/widgets/speech_category_dialog.dart test/explicit_expense_category_test.dart test/speech_category_matcher_test.dart test/speech_category_dialog_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Focused diagnostics, voice timing and language settings tests
-        run: flutter test --timeout 1m test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart test/app_language_test.dart test/explicit_expense_category_test.dart
+        run: flutter test --timeout 1m test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart test/app_language_test.dart test/explicit_expense_category_test.dart test/speech_category_matcher_test.dart test/speech_category_dialog_test.dart
       - if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         name: Compare full suite with current app baseline
         shell: bash

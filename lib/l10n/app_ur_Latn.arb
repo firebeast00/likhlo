@@ -1591,5 +1591,8 @@
   "expense_category_wallet_collision": "Category aur wallet dono ka naam wazeh karein.",
   "expense_category_unknown": "Maujood category chunen; di hui category nahi mili.",
   "expense_category_incomplete": "Save karne se pehle category ka poora naam dein.",
-  "expense_category_conflict": "Is kharch ke liye ek category chunen."
+  "expense_category_conflict": "Is kharch ke liye ek category chunen.",
+  "speech_category_heard": "“{p0}” suna. Apni category chunen.",
+  "speech_category_remember": "Voice entries ke liye yaad rakhein",
+  "speech_category_use": "Category chunen"
 }

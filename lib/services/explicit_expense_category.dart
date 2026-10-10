@@ -4,15 +4,50 @@ class ExplicitExpenseCategory {
   final String? category;
   final String? issue;
   final bool hasAddInstruction;
+  final List<String> requestedNames;
+  final bool hasCategoryLabel;
+  final List<String> suggestions;
+  final Map<String, double> suggestionScores;
+  final String resolution;
 
   const ExplicitExpenseCategory({
     required this.cleanedText,
     this.category,
     this.issue,
     this.hasAddInstruction = false,
+    this.requestedNames = const [],
+    this.hasCategoryLabel = false,
+    this.suggestions = const [],
+    this.suggestionScores = const {},
+    this.resolution = 'exact',
   });
 
   bool get needsClarification => issue != null;
+  bool get isInstructionIncomplete =>
+      issue == 'Complete the category name before saving.';
+  bool get canSuggest => requestedNames.length == 1 &&
+      issue == 'Choose an existing category; the requested category was not found.';
+
+  ExplicitExpenseCategory withVoiceMatches(List<String> names,
+      Map<String, double> scores) => ExplicitExpenseCategory(
+    cleanedText: cleanedText, category: category, issue: issue,
+    hasAddInstruction: hasAddInstruction, requestedNames: requestedNames,
+    hasCategoryLabel: hasCategoryLabel, suggestions: names,
+    suggestionScores: scores, resolution: 'suggestion',
+  );
+
+  ExplicitExpenseCategory confirmed(String name, {String provenance = 'confirmed'}) =>
+      ExplicitExpenseCategory(cleanedText: cleanedText, category: name,
+        hasAddInstruction: hasAddInstruction, requestedNames: requestedNames,
+        hasCategoryLabel: hasCategoryLabel, suggestions: suggestions,
+        suggestionScores: suggestionScores, resolution: provenance);
+
+  ExplicitExpenseCategory withCleanedText(String text) => ExplicitExpenseCategory(
+    cleanedText: text, category: category, issue: issue,
+    hasAddInstruction: hasAddInstruction, requestedNames: requestedNames,
+    hasCategoryLabel: hasCategoryLabel, suggestions: suggestions,
+    suggestionScores: suggestionScores, resolution: resolution,
+  );
 }
 
 class ExplicitExpenseCategoryExtractor {
@@ -22,12 +57,15 @@ class ExplicitExpenseCategoryExtractor {
     String input,
     Iterable<String> categories, {
     Iterable<String> walletNames = const [],
+    bool voice = false,
   }) {
     final names = categories.where((name) => name.trim().isNotEmpty).toList()
       ..sort((a, b) => b.length.compareTo(a.length));
     final spans = <_CategorySpan>[];
     final selected = <String>{};
     final issues = <String>[];
+    final requested = <String>{};
+    final label = voice ? r'(?:category|catagory)' : 'category';
     var hasAddInstruction = false;
     final wallets = {'cash', 'jazzcash', 'easypaisa', ...walletNames.map(_key)};
 
@@ -39,15 +77,15 @@ class ExplicitExpenseCategoryExtractor {
     for (final name in names) {
       final escaped = pattern(name);
       final patterns = <RegExp>[
-        RegExp(r'\b(?:in\s+|into\s+)?category\s+' + escaped +
+        RegExp(r'\b(?:in\s+|into\s+)?' + label + r'\s+' + escaped +
             _end + _optionalInstruction, caseSensitive: false),
         RegExp(r'\b(?:in\s+|into\s+)?' + escaped +
-            r'\s+category\b(?:\s+(?:mein|me)\b)?' + _optionalInstruction,
+            r'\s+' + label + r'\b(?:\s+(?:mein|me)\b)?' + _optionalInstruction,
             caseSensitive: false),
         RegExp(r'\b' + escaped + r'\s+(?:mein|me)\b\s+' + _addInstruction,
             caseSensitive: false),
         RegExp(r'\b(?:in|into)\s+' + escaped + _end +
-            r'(?:\s+category)?' + _optionalInstruction, caseSensitive: false),
+            r'(?:\s+' + label + r')?' + _optionalInstruction, caseSensitive: false),
       ];
       for (var index = 0; index < patterns.length; index++) {
         for (final match in patterns[index].allMatches(input)) {
@@ -55,7 +93,7 @@ class ExplicitExpenseCategoryExtractor {
           final clause = match.group(0)!;
           // Unqualified "in X" / "X mein add karo" can also name a wallet.
           if ((index == 2 || index == 3) &&
-              !RegExp(r'\bcategory\b', caseSensitive: false).hasMatch(clause) &&
+              !RegExp(r'\b' + label + r'\b', caseSensitive: false).hasMatch(clause) &&
               wallets.contains(_key(name))) {
             issues.add('Name both the category and wallet explicitly.');
           }
@@ -70,16 +108,28 @@ class ExplicitExpenseCategoryExtractor {
     // A named category instruction must not disappear into keyword fallback
     // just because the requested category is absent from the dynamic lexicon.
     final unknownPatterns = <RegExp>[
-      RegExp(r'\bcategory\s+(.+?)' + _end, caseSensitive: false),
-      RegExp(r'\b(?:in|into)\s+(.+?)\s+category\b', caseSensitive: false),
-      RegExp(r'\binto\s+(.+?)' + _end, caseSensitive: false),
+      RegExp(r'\b' + label + r'\s+(.+?)' + _end +
+          (voice ? _optionalInstruction : ''), caseSensitive: false),
+      RegExp(r'\b(?:in|into)\s+(.+?)\s+' + label + r'\b' +
+          (voice ? _optionalInstruction : ''), caseSensitive: false),
+      RegExp((voice ? r'\b(?:in|into)\s+(.+?)' : r'\binto\s+(.+?)') + _end +
+          (voice ? _optionalInstruction : ''), caseSensitive: false),
       RegExp(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+'
           r'(?:mein|me)\b\s+' + _addInstruction, caseSensitive: false),
+      if (voice) RegExp(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+' +
+          label + r'\b' + _optionalInstruction, caseSensitive: false),
     ];
     for (final expression in unknownPatterns) {
       for (final match in expression.allMatches(input)) {
         if (covered(match.start, match.end)) continue;
-        if (wallets.contains(_key(match.group(1)!))) continue;
+        var requestedName = _key(match.group(1)!);
+        if (voice && RegExp(r'\b(?:mein|me)\b\s+' + _addInstruction,
+            caseSensitive: false).hasMatch(match.group(0)!)) {
+          requestedName = requestedName.replaceFirst(
+              RegExp(r'^(?:kharch|khurch|expense)\s+ka\s+'), '');
+        }
+        if (wallets.contains(requestedName)) continue;
+        requested.add(requestedName);
         spans.add(_CategorySpan(match.start, match.end));
         hasAddInstruction |= RegExp(_addInstruction, caseSensitive: false)
             .hasMatch(match.group(0)!);
@@ -87,14 +137,15 @@ class ExplicitExpenseCategoryExtractor {
       }
     }
     // A bare/trailing anchor is an unfinished instruction, not an implicit item.
-    for (final match in RegExp(r'\bcategory\b', caseSensitive: false).allMatches(input)) {
+    for (final match in RegExp(r'\b' + label + r'\b', caseSensitive: false).allMatches(input)) {
       if (!covered(match.start, match.end)) {
         spans.add(_CategorySpan(match.start, match.end));
         issues.add('Complete the category name before saving.');
       }
     }
     if (spans.isEmpty) return null;
-    if (selected.length > 1) {
+    if (selected.length > 1 || (voice &&
+        (requested.length > 1 || (selected.isNotEmpty && requested.isNotEmpty)))) {
       issues.add('Choose one category for this expense.');
     }
     spans.sort((a, b) => a.start.compareTo(b.start));
@@ -112,6 +163,8 @@ class ExplicitExpenseCategoryExtractor {
       category: issues.isEmpty && selected.length == 1 ? selected.single : null,
       issue: issues.isEmpty ? null : issues.last,
       hasAddInstruction: hasAddInstruction,
+      requestedNames: requested.toList(growable: false),
+      hasCategoryLabel: RegExp(r'\b' + label + r'\b', caseSensitive: false).hasMatch(input),
     );
   }
 

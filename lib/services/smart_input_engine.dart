@@ -70,6 +70,10 @@ class SmartInputEngine {
       if (expenseCategory != null) 'explicit_category': {
         'category': expenseCategory.category, 'issue': expenseCategory.issue,
         'parsing_text': expenseCategory.cleanedText,
+        'requested_names': expenseCategory.requestedNames,
+        'resolution': expenseCategory.resolution,
+        'suggestions': expenseCategory.suggestions,
+        'suggestion_scores': expenseCategory.suggestionScores,
       },
       'confidence_by_field': parsed.confidenceByField, 'clarification_reasons': parsed.clarificationReasons,
       if (command is MutationCommand) 'selector': {'title': command.selector.title,

@@ -4,6 +4,7 @@ import '../../services/local_nlp_service.dart';
 import '../../services/smart_command.dart';
 import '../../services/smart_input_engine.dart';
 import '../../services/explicit_expense_category.dart';
+import '../../services/speech_category_matcher.dart';
 import '../../services/primary_intent_router.dart';
 import 'multi_entry_parser.dart';
 
@@ -26,9 +27,11 @@ class SmartEntryController {
     Iterable<SmartEntryAccount> accounts = const [],
     ExplicitExpenseCategory? expenseCategory,
     bool enableHomeExpenseCategories = false,
+    Map<String, String> voiceCategoryAliases = const {},
   }) {
     final category = expenseCategory ?? (enableHomeExpenseCategories
-        ? resolveHomeExpenseCategory(input, categories, source: source, accounts: accounts)
+        ? resolveHomeExpenseCategory(input, categories, source: source, accounts: accounts,
+            voiceCategoryAliases: voiceCategoryAliases)
         : null);
     return _engine.parse(
       input,
@@ -49,8 +52,11 @@ class SmartEntryController {
     List<String> categories, {
     required SmartInputSource source,
     Iterable<SmartEntryAccount> accounts = const [],
+    Map<String, String> voiceCategoryAliases = const {},
   }) {
-    if (!_categoryAnchor.hasMatch(input)) return null;
+    final voice = source == SmartInputSource.voice;
+    if (!_categoryAnchor.hasMatch(input) &&
+        !(voice && RegExp(r'\bcatagory\b', caseSensitive: false).hasMatch(input))) return null;
     final text = _engine.normalizer.normalize(input,
         enableContextualAsrRepairs: source == SmartInputSource.voice).normalized;
     if (RegExp(r'\b(nahi|nahin|mat|dont|don\x27t|ya|or)\b').hasMatch(text)) return null;
@@ -61,14 +67,10 @@ class SmartEntryController {
     const extractor = ExplicitExpenseCategoryExtractor();
     final wallets = accounts.map((account) => account.name);
     // Match saved names before normalization can remove punctuation from them.
-    final raw = extractor.extract(input, categories, walletNames: wallets) ??
-        extractor.extract(text, categories, walletNames: wallets);
-    final extracted = raw == null ? null : ExplicitExpenseCategory(
-      cleanedText: _engine.normalizer.normalize(raw.cleanedText,
-          enableContextualAsrRepairs: source == SmartInputSource.voice).normalized,
-      category: raw.category, issue: raw.issue,
-      hasAddInstruction: raw.hasAddInstruction,
-    );
+    final raw = extractor.extract(input, categories, walletNames: wallets, voice: voice) ??
+        extractor.extract(text, categories, walletNames: wallets, voice: voice);
+    final extracted = raw == null ? null : raw.withCleanedText(_engine.normalizer.normalize(raw.cleanedText,
+        enableContextualAsrRepairs: voice).normalized);
     if (extracted == null) return null;
     if (route.intent == RoutedSmartIntent.editEntry ||
         route.intent == RoutedSmartIntent.addIncome) {
@@ -78,7 +80,8 @@ class SmartEntryController {
               RoutedSmartIntent.addExpense) return null;
     }
     if (const MultiEntryParser().tryParseBatch(extracted.cleanedText) != null) return null;
-    return extracted;
+    return voice ? const SpeechCategoryMatcher().match(extracted, categories,
+        confirmedAliases: voiceCategoryAliases, walletNames: wallets) : extracted;
   }
 }
 

@@ -1591,5 +1591,8 @@
   "expense_category_wallet_collision": "Name both the category and wallet explicitly.",
   "expense_category_unknown": "Choose an existing category; the requested category was not found.",
   "expense_category_incomplete": "Complete the category name before saving.",
-  "expense_category_conflict": "Choose one category for this expense."
+  "expense_category_conflict": "Choose one category for this expense.",
+  "speech_category_heard": "Heard “{p0}”. Choose the category you meant.",
+  "speech_category_remember": "Remember for voice entries",
+  "speech_category_use": "Use category"
 }
