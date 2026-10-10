@@ -1586,5 +1586,10 @@
   "settings_anonymous_hint": "Sirf timing aur errors; audio ya text nahi",
   "settings_diagnostics_hint": "Commands dekhein, report export karein",
   "settings_spoken_hint": "Transaction ki tasdeeq sunein",
-  "settings_backup_hint": "Encrypted backup banayen ya restore karein"
+  "settings_backup_hint": "Encrypted backup banayen ya restore karein",
+  "expense_category_choose": "Category chunen",
+  "expense_category_wallet_collision": "Category aur wallet dono ka naam wazeh karein.",
+  "expense_category_unknown": "Maujood category chunen; di hui category nahi mili.",
+  "expense_category_incomplete": "Save karne se pehle category ka poora naam dein.",
+  "expense_category_conflict": "Is kharch ke liye ek category chunen."
 }

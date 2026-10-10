@@ -259,8 +259,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       final plan = ref.read(smartEntryControllerProvider).parse(
         normalized, ref.read(categoryProvider),
         source: SmartInputSource.voice, accounts: accounts,
+        enableHomeExpenseCategories: true,
       );
-      final result = _voiceEntry.completeness.evaluate(plan, accounts: accounts);
+      final result = plan.expenseCategory?.needsClarification == true
+          ? const SpeechCommandCompleteness.incomplete('category_instruction_incomplete')
+          : _voiceEntry.completeness.evaluate(plan, accounts: accounts);
       _speechCachedCompleteness = result;
       _speechCacheKey = key;
       _speechTiming.mark('parse_completed');

@@ -10,6 +10,13 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     if (normalized.isEmpty) return false;
 
     final categories = ref.read(categoryProvider);
+    final expenseCategory = ref.read(smartEntryControllerProvider)
+        .resolveHomeExpenseCategory(normalized, categories,
+            source: source, accounts: _parsingAccounts());
+    if (expenseCategory?.needsClarification == true) {
+      _showTransactionInfo(expenseCategory!.issue!, title: 'Choose a category');
+      return false;
+    }
 
     if (source == SmartInputSource.typed || source == SmartInputSource.voice) {
       final wallets = ref.read(walletProvider);
@@ -28,7 +35,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           .toList(growable: false);
 
       final batchAttempt = ref.read(smartEntryBatchControllerProvider).tryBuild(
-            rawText: normalized,
+            rawText: expenseCategory?.cleanedText ?? normalized,
             categories: categories,
             source: source,
             accounts: accounts,
@@ -93,6 +100,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       categories,
       source: source,
       accounts: _parsingAccounts(),
+      expenseCategory: expenseCategory,
     );
     _debugSmartInputPlan(plan);
     final command = plan.parsed;
@@ -142,6 +150,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     final result = command.toLegacyMap();
     final learnedPreference = _learnedPreferenceFor(command.title);
     if (result['type'] == 'expense' &&
+        plan.expenseCategory == null &&
         result['category'] == 'General' &&
         learnedPreference != null &&
         categories.contains(learnedPreference.category)) {

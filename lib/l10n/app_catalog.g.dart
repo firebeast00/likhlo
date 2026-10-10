@@ -891,6 +891,11 @@ const englishMessages = <String, String>{
   "settings_diagnostics_hint": "Review commands and export reports",
   "settings_spoken_hint": "Hear transaction confirmations",
   "settings_backup_hint": "Encrypted backup and restore",
+  "expense_category_choose": "Choose a category",
+  "expense_category_wallet_collision": "Name both the category and wallet explicitly.",
+  "expense_category_unknown": "Choose an existing category; the requested category was not found.",
+  "expense_category_incomplete": "Complete the category name before saving.",
+  "expense_category_conflict": "Choose one category for this expense.",
 };
 
 const romanUrduMessages = <String, String>{
@@ -1785,6 +1790,11 @@ const romanUrduMessages = <String, String>{
   "settings_diagnostics_hint": "Commands dekhein, report export karein",
   "settings_spoken_hint": "Transaction ki tasdeeq sunein",
   "settings_backup_hint": "Encrypted backup banayen ya restore karein",
+  "expense_category_choose": "Category chunen",
+  "expense_category_wallet_collision": "Category aur wallet dono ka naam wazeh karein.",
+  "expense_category_unknown": "Maujood category chunen; di hui category nahi mili.",
+  "expense_category_incomplete": "Save karne se pehle category ka poora naam dein.",
+  "expense_category_conflict": "Is kharch ke liye ek category chunen.",
 };
 
 const urduSpeechMessages = <String, String>{

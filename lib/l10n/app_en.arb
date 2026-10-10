@@ -1586,5 +1586,10 @@
   "settings_anonymous_hint": "Timing and errors only; no audio or text",
   "settings_diagnostics_hint": "Review commands and export reports",
   "settings_spoken_hint": "Hear transaction confirmations",
-  "settings_backup_hint": "Encrypted backup and restore"
+  "settings_backup_hint": "Encrypted backup and restore",
+  "expense_category_choose": "Choose a category",
+  "expense_category_wallet_collision": "Name both the category and wallet explicitly.",
+  "expense_category_unknown": "Choose an existing category; the requested category was not found.",
+  "expense_category_incomplete": "Complete the category name before saving.",
+  "expense_category_conflict": "Choose one category for this expense."
 }
