@@ -73,9 +73,7 @@ class SmartEntryController {
           const PrimaryIntentRouter().classify(extracted.cleanedText).intent !=
               RoutedSmartIntent.addExpense) return null;
     }
-    if (const MultiEntryParser().tryParseBatch(extracted.cleanedText) != null ||
-        (extracted.needsClarification &&
-            const MultiEntryParser().tryParseBatch(text) != null)) return null;
+    if (const MultiEntryParser().tryParseBatch(extracted.cleanedText) != null) return null;
     return extracted;
   }
 }

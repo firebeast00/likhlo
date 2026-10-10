@@ -77,6 +77,8 @@ void main() {
     'milk 120 category diner',
     'milk 120 category dinner party',
     'milk 120 category dinner2',
+    'milk 120 category Food 3',
+    'category Food 3, milk 120',
     'milk 120 category dinner category food',
     'milk 120 category dinner category missing',
     'milk 120 category',
@@ -144,6 +146,7 @@ void main() {
     'milk 120 category dinner or food',
     'milk 120 and bread 50',
     'milk 120 category dinner and bread 50',
+    'milk 120 category missing and bread 50',
   ]) {
     test('$input keeps the original NLP result', () {
       final original = controller.parse(input, categories, source: SmartInputSource.typed);
