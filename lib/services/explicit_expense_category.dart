@@ -27,6 +27,10 @@ class ExplicitExpenseCategory {
       issue == 'Complete the category name before saving.';
   bool get canSuggest => requestedNames.length == 1 &&
       issue == 'Choose an existing category; the requested category was not found.';
+  // Without a matching saved name, a number may be a second expense amount.
+  // Keep the original draft for editing instead of subtracting that amount.
+  bool get canConfirmVoice => canSuggest && (suggestions.isNotEmpty ||
+      !RegExp(r'\d').hasMatch(requestedNames.single));
 
   ExplicitExpenseCategory withVoiceMatches(List<String> names,
       Map<String, double> scores) => ExplicitExpenseCategory(
@@ -66,6 +70,7 @@ class ExplicitExpenseCategoryExtractor {
     final issues = <String>[];
     final requested = <String>{};
     final label = voice ? r'(?:category|catagory)' : 'category';
+    final boundary = voice ? _end.replaceFirst('category|', 'category|catagory|') : _end;
     var hasAddInstruction = false;
     final wallets = {'cash', 'jazzcash', 'easypaisa', ...walletNames.map(_key)};
 
@@ -78,13 +83,13 @@ class ExplicitExpenseCategoryExtractor {
       final escaped = pattern(name);
       final patterns = <RegExp>[
         RegExp(r'\b(?:in\s+|into\s+)?' + label + r'\s+' + escaped +
-            _end + _optionalInstruction, caseSensitive: false),
+            boundary + _optionalInstruction, caseSensitive: false),
         RegExp(r'\b(?:in\s+|into\s+)?' + escaped +
             r'\s+' + label + r'\b(?:\s+(?:mein|me)\b)?' + _optionalInstruction,
             caseSensitive: false),
         RegExp(r'\b' + escaped + r'\s+(?:mein|me)\b\s+' + _addInstruction,
             caseSensitive: false),
-        RegExp(r'\b(?:in|into)\s+' + escaped + _end +
+        RegExp(r'\b(?:in|into)\s+' + escaped + boundary +
             r'(?:\s+' + label + r')?' + _optionalInstruction, caseSensitive: false),
       ];
       for (var index = 0; index < patterns.length; index++) {
@@ -108,11 +113,11 @@ class ExplicitExpenseCategoryExtractor {
     // A named category instruction must not disappear into keyword fallback
     // just because the requested category is absent from the dynamic lexicon.
     final unknownPatterns = <RegExp>[
-      RegExp(r'\b' + label + r'\s+(.+?)' + _end +
+      RegExp(r'\b' + label + r'\s+(.+?)' + boundary +
           (voice ? _optionalInstruction : ''), caseSensitive: false),
       RegExp(r'\b(?:in|into)\s+(.+?)\s+' + label + r'\b' +
           (voice ? _optionalInstruction : ''), caseSensitive: false),
-      RegExp((voice ? r'\b(?:in|into)\s+(.+?)' : r'\binto\s+(.+?)') + _end +
+      RegExp((voice ? r'\b(?:in|into)\s+(.+?)' : r'\binto\s+(.+?)') + boundary +
           (voice ? _optionalInstruction : ''), caseSensitive: false),
       RegExp(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+'
           r'(?:mein|me)\b\s+' + _addInstruction, caseSensitive: false),
@@ -129,17 +134,27 @@ class ExplicitExpenseCategoryExtractor {
               RegExp(r'^(?:kharch|khurch|expense)\s+ka\s+'), '');
         }
         if (wallets.contains(requestedName)) continue;
-        requested.add(requestedName);
+        final missing = voice && const {'me', 'mein', 'add', 'save', 'karo', 'add karo'}
+            .contains(requestedName);
+        if (!missing) requested.add(requestedName);
         spans.add(_CategorySpan(match.start, match.end));
         hasAddInstruction |= RegExp(_addInstruction, caseSensitive: false)
             .hasMatch(match.group(0)!);
-        issues.add('Choose an existing category; the requested category was not found.');
+        issues.add(missing ? 'Complete the category name before saving.'
+            : 'Choose an existing category; the requested category was not found.');
       }
     }
     // A bare/trailing anchor is an unfinished instruction, not an implicit item.
     for (final match in RegExp(r'\b' + label + r'\b', caseSensitive: false).allMatches(input)) {
       if (!covered(match.start, match.end)) {
         spans.add(_CategorySpan(match.start, match.end));
+        issues.add('Complete the category name before saving.');
+      }
+    }
+    if (voice) {
+      final trailing = RegExp(r'\b(?:in|into)\s*[.!?]*$', caseSensitive: false).firstMatch(input);
+      if (trailing != null && !covered(trailing.start, trailing.end)) {
+        spans.add(_CategorySpan(trailing.start, trailing.end));
         issues.add('Complete the category name before saving.');
       }
     }

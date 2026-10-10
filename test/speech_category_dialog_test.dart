@@ -23,7 +23,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await Hive.box('settings').put('appLanguage', language.name);
+      await tester.runAsync(() => Hive.box('settings').put('appLanguage', language.name));
       SpeechCategoryChoice? result;
       await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) =>
           Scaffold(body: TextButton(onPressed: () async {

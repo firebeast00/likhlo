@@ -123,6 +123,17 @@ void main() {
     expect(unknown.expenseCategory!.needsClarification, true);
   });
 
+  for (final input in ['milk 120 catagory', 'milk 120 category me add karo',
+      'milk 120 into', 'milk 120 in']) {
+    test('$input retains an unfinished category slot', () {
+      final plan = controller.parse(input, names, source: SmartInputSource.voice,
+          enableHomeExpenseCategories: true);
+      expect(plan.expenseCategory!.isInstructionIncomplete, true);
+      expect(plan.expenseCategory!.canSuggest, false);
+      expect(policy.evaluate(plan).isComplete, false);
+    });
+  }
+
   test('unknown categories cannot bypass missing amount or item checks', () {
     for (final input in ['milk category diner', '120 category diner']) {
       final plan = controller.parse(input, names, source: SmartInputSource.voice,
@@ -134,6 +145,8 @@ void main() {
   for (final input in [
     'milk 120 category diner category food',
     'milk 120 category diner category missing',
+    'milk 120 catagory diner catagory missing',
+    'milk 120 category dinner catagory food',
     'milk 120 category dinner category food',
   ]) {
     test('$input rejects alias learning and fuzzy selection on conflicts', () {
@@ -187,6 +200,14 @@ void main() {
       expect(result, isNull);
     });
   }
+
+  test('an unknown numeric span cannot erase a second expense through confirmation', () {
+    final result = controller.resolveHomeExpenseCategory(
+        'milk 120 category diner bread 80', names, source: SmartInputSource.voice)!;
+    expect(result.needsClarification, true);
+    expect(result.canConfirmVoice, false);
+    expect(result.category, isNull);
+  });
 
   test('no hallucination map rewrites title, date or wallet text', () {
     const raw = 'march other send 120 category diner from JazzCash yesterday';

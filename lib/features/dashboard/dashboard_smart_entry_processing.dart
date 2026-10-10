@@ -44,7 +44,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
             voiceCategoryAliases: source == SmartInputSource.voice
                 ? _readVoiceCategoryAliases() : const {});
     if (expenseCategory?.needsClarification == true) {
-      if (source != SmartInputSource.voice || !expenseCategory!.canSuggest) {
+      if (source != SmartInputSource.voice || !expenseCategory!.canConfirmVoice) {
         _showTransactionInfo(expenseCategory!.issue!, title: 'Choose a category');
         return false;
       }
