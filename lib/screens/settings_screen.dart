@@ -25,6 +25,7 @@ import '../services/audio_feedback_service.dart';
 import '../services/udhar_ledger_link_service.dart';
 import '../widgets/month_selector_control.dart';
 import '../widgets/app_dimmer_slider.dart';
+import '../widgets/language_settings_tile.dart';
 import 'backup_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -697,22 +698,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSettingsGroup(
             isDark: isDark,
             children: [
-              ListTile(
-                leading: const Icon(Icons.language_rounded),
-                title: Text(AppStrings.current.text('settings_language')),
-                subtitle: Text(AppStrings.current.text('settings_language_hint')),
-                trailing: DropdownButton<String>(
-                  key: const ValueKey('settings-language'),
-                  value: settings.appLanguage,
-                  underline: const SizedBox.shrink(),
-                  items: const [
-                    DropdownMenuItem(value: 'english', child: Text('English')),
-                    DropdownMenuItem(value: 'romanUrdu', child: Text('Roman Urdu')),
-                  ],
-                  onChanged: _changingLanguage ? null : (value) {
-                    if (value != null) unawaited(_setLanguage(value));
-                  },
-                ),
+              LanguageSettingsTile(
+                language: settings.appLanguage,
+                onChanged: _changingLanguage ? null : (value) {
+                  unawaited(_setLanguage(value));
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.volume_up_rounded),

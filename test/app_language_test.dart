@@ -7,7 +7,7 @@ import 'package:hive/hive.dart';
 import 'package:student_expense_manager/l10n/app_strings.dart';
 import 'package:student_expense_manager/l10n/material_strings.dart';
 import 'package:student_expense_manager/providers/settings_provider.dart';
-import 'package:student_expense_manager/screens/settings_screen.dart';
+import 'package:student_expense_manager/widgets/language_settings_tile.dart';
 import 'package:student_expense_manager/services/deterministic_feedback_service.dart';
 
 class _LanguageView extends StatelessWidget {
@@ -126,17 +126,27 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      Future<void>? pendingSave;
       await tester.pumpWidget(UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
           locale: language.locale,
           supportedLocales: AppStrings.supportedLocales,
           localizationsDelegates: const [AppStrings.delegate, AppMaterialDelegate(), AppCupertinoDelegate(), AppWidgetsDelegate()],
-          home: const SettingsScreen(),
+          home: Consumer(builder: (context, ref, child) => Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: LanguageSettingsTile(
+                language: ref.watch(settingsProvider).appLanguage,
+                onChanged: (value) {
+                  pendingSave = ref.read(settingsProvider.notifier).updateLanguage(value);
+                },
+              ),
+            ),
+          )),
         ),
       ));
       final selector = find.byKey(const ValueKey('settings-language'));
-      await tester.scrollUntilVisible(selector, 250);
       await tester.pumpAndSettle();
       expect(find.byType(DropdownButton<String>), findsOneWidget);
       expect(tester.widget<DropdownButton<String>>(selector).value, language.name);
@@ -150,10 +160,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(next == AppLanguage.english ? 'English' : 'Roman Urdu').last);
       await tester.pumpAndSettle();
-      // Hive writes run outside the widget test's fake async clock.
-      await tester.runAsync(() async {
-        await settings.flush();
-      });
+      expect(pendingSave, isNotNull);
+      // Await the actual save outside the widget test's fake async clock.
+      await tester.runAsync(() => pendingSave!);
       await tester.pumpAndSettle();
       expect(container.read(settingsProvider).appLanguage, next.name);
       expect(container.read(settingsProvider).smartEntryLanguage, next.name);
