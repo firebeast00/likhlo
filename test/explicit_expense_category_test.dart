@@ -15,6 +15,7 @@ void main() {
 
   for (final input in [
     'milk 120 rs category dinner',
+    'milk 120 rs category dinner.',
     'milk 120 khurch ka dinner me add karo',
     'milk 120 in dinner category',
     'milk 120 into dinner',

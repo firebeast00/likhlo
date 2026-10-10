@@ -127,7 +127,7 @@ class ExplicitExpenseCategoryExtractor {
   // Digits may belong to an unknown category name, not a second entry.
   static final _unknownEnd = _end.replaceAll(r'|\d', '');
   static const _end =
-      r'(?![\w\u0600-\u06ff])(?=\s*(?:$|[,;]|\b(?:category|in|into|and|aur|then|phir|plus|next|from|se|sy|say|on|today|yesterday|aaj|kal|parso|parson|add|save|daal|dalo|daalo|me|mein)\b|\d))';
+      r'(?![\w\u0600-\u06ff])(?=\s*(?:$|[.,;!?]|\b(?:category|in|into|and|aur|then|phir|plus|next|from|se|sy|say|on|today|yesterday|aaj|kal|parso|parson|add|save|daal|dalo|daalo|me|mein)\b|\d))';
 }
 
 class _CategorySpan {
