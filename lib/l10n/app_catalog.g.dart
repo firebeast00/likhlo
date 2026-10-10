@@ -876,6 +876,21 @@ const englishMessages = <String, String>{
   "diagnostics_error": "Could not complete this diagnostic operation. Try again.",
   "diagnostics_select_all": "Select all",
   "diagnostics_use_filtered": "Use filtered list",
+  "settings_language": "Language",
+  "settings_language_hint": "App text, voice and Smart NLP",
+  "settings_voice_preview_hint": "English fallback if Urdu is unavailable",
+  "settings_language_english": "Language is now English.",
+  "settings_language_roman_urdu": "Language is now Roman Urdu.",
+  "settings_dark_hint": "Night-friendly theme",
+  "settings_dimmer_hint": "Lower screen brightness",
+  "settings_quick_entry_hint": "Voice or text from the status bar",
+  "settings_reminders_hint": "Daily expense reminders",
+  "settings_lock_hint": "Fingerprint, face or passcode on return",
+  "settings_cloud_hint": "Cloud speech via a secure gateway",
+  "settings_anonymous_hint": "Timing and errors only; no audio or text",
+  "settings_diagnostics_hint": "Review commands and export reports",
+  "settings_spoken_hint": "Hear transaction confirmations",
+  "settings_backup_hint": "Encrypted backup and restore",
 };
 
 const romanUrduMessages = <String, String>{
@@ -1755,6 +1770,21 @@ const romanUrduMessages = <String, String>{
   "diagnostics_error": "Diagnostics ka yeh kaam mukammal nahi hua. Dobara koshish karein.",
   "diagnostics_select_all": "Sab chunein",
   "diagnostics_use_filtered": "Filter wali list use karein",
+  "settings_language": "Zaban",
+  "settings_language_hint": "App, voice aur Smart NLP ki zaban",
+  "settings_voice_preview_hint": "Urdu na mile to English voice",
+  "settings_language_english": "Zaban ab English hai.",
+  "settings_language_roman_urdu": "Zaban ab Roman Urdu hai.",
+  "settings_dark_hint": "Raat ke liye theme",
+  "settings_dimmer_hint": "Screen ki roshni kam karein",
+  "settings_quick_entry_hint": "Status bar se bol ya likh kar entry",
+  "settings_reminders_hint": "Roz kharch likhne ki yaad",
+  "settings_lock_hint": "Wapsi par fingerprint, face ya passcode",
+  "settings_cloud_hint": "Secure gateway se cloud speech",
+  "settings_anonymous_hint": "Sirf timing aur errors; audio ya text nahi",
+  "settings_diagnostics_hint": "Commands dekhein, report export karein",
+  "settings_spoken_hint": "Transaction ki tasdeeq sunein",
+  "settings_backup_hint": "Encrypted backup banayen ya restore karein",
 };
 
 const urduSpeechMessages = <String, String>{
@@ -2220,5 +2250,7 @@ const urduSpeechMessages = <String, String>{
   "the_receipt_could_not_be_saved_no_items_were_added_6128b3": "رسید محفوظ نہیں ہو سکی۔ کوئی آئٹم شامل نہیں ہوا۔",
   "deleting_this_entry_would_make_a_wallet_balance_ne_eb1cb6": "یہ اندراج حذف کرنے سے والیٹ کا بیلنس منفی ہو جائے گا۔",
   "category_query_suffix": "، {p0}",
+  "settings_language_english": "زبان اب انگریزی ہے۔",
+  "settings_language_roman_urdu": "زبان اب رومن اردو ہے۔",
 };
 

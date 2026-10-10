@@ -47,20 +47,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _selectedPdfMonth = DateTime(now.year, now.month);
   }
 
-  bool _changingAppLanguage = false;
+  bool _changingLanguage = false;
 
-  Future<void> _setAppLanguage(String value) async {
-    if (_changingAppLanguage) return;
-    setState(() => _changingAppLanguage = true);
+  Future<void> _setLanguage(String value, {bool spokenFeedback = true}) async {
+    if (_changingLanguage) return;
+    setState(() => _changingLanguage = true);
     try {
       await AudioFeedbackService().stop();
-      await ref.read(settingsProvider.notifier).updateAppLanguage(value);
+      await ref.read(settingsProvider.notifier).updateLanguage(value);
       if (!mounted) return;
       final confirmation = value == 'romanUrdu'
-          ? 'App language is now Roman Urdu.'
-          : 'App language is now English.';
+          ? 'Language is now Roman Urdu.'
+          : 'Language is now English.';
       _showNlpSettingsResult(confirmation);
-      unawaited(AudioFeedbackService().announceMessage(confirmation));
+      if (spokenFeedback) {
+        unawaited(AudioFeedbackService().announceMessage(confirmation));
+      }
       // Notification/plugin work is best effort and cannot change saved data.
       unawaited(NotificationService().refreshLocalizedContent());
       unawaited(const QuickActions().setShortcutItems([
@@ -72,7 +74,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         debugPrint('Localized shortcuts unavailable: $error');
       }));
     } finally {
-      if (mounted) setState(() => _changingAppLanguage = false);
+      if (mounted) setState(() => _changingLanguage = false);
     }
   }
 
@@ -248,16 +250,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             request.action == AppActionType.smartEntryLanguageRomanUrdu
                 ? 'romanUrdu'
                 : 'english';
-        if (ref.read(settingsProvider).smartEntryLanguage != language) {
-          await ref
-              .read(settingsProvider.notifier)
-              .updateSmartEntryLanguage(language);
-        }
-        showResult(
-          language == 'romanUrdu'
-              ? 'Smart Entry language is now Roman Urdu.'
-              : 'Smart Entry language is now English.',
-        );
+        await _setLanguage(language, spokenFeedback: request.spokenFeedback);
         return;
       case AppActionType.appLockOn:
       case AppActionType.appLockOff:
@@ -571,7 +564,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               _buildSwitchTile(
                 title: AppStrings.current.text('dark_mode_e7f8b9'),
-                subtitle: AppStrings.current.text('sleek_theme_for_night_use_8d3602'),
+                subtitle: AppStrings.current.text('settings_dark_hint'),
                 icon:
                     isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
                 iconColor: Colors.indigo,
@@ -623,7 +616,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 15)),
-                              Text(AppStrings.current.text('dims_the_entire_app_interface_50aa9f'),
+                              Text(AppStrings.current.text('settings_dimmer_hint'),
                                   style: TextStyle(
                                       fontSize: 13, color: Colors.grey)),
                             ],
@@ -671,7 +664,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               _buildSwitchTile(
                 title: AppStrings.current.text('persistent_quick_entry_f95553'),
-                subtitle: AppStrings.current.text('voice_and_direct_text_entry_from_the_status_bar_e28e69'),
+                subtitle: AppStrings.current.text('settings_quick_entry_hint'),
                 icon: Icons.space_dashboard_rounded,
                 iconColor: Colors.teal,
                 value: persistentEnabled,
@@ -680,7 +673,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildDivider(),
               _buildSwitchTile(
                 title: AppStrings.current.text('smart_entry_reminders_e9e662'),
-                subtitle: AppStrings.current.text('receive_daily_nudges_to_log_your_expenses_0dba02'),
+                subtitle: AppStrings.current.text('settings_reminders_hint'),
                 icon: Icons.notifications_active_rounded,
                 iconColor: Colors.amber.shade600,
                 value: remindersEnabled,
@@ -706,51 +699,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.language_rounded),
-                title: Text(AppStrings.current.display('App language')),
-                subtitle: Text(AppStrings.current.display(
-                  'English or Roman Urdu for app text and notifications')),
+                title: Text(AppStrings.current.text('settings_language')),
+                subtitle: Text(AppStrings.current.text('settings_language_hint')),
                 trailing: DropdownButton<String>(
+                  key: const ValueKey('settings-language'),
                   value: settings.appLanguage,
                   underline: const SizedBox.shrink(),
                   items: const [
                     DropdownMenuItem(value: 'english', child: Text('English')),
                     DropdownMenuItem(value: 'romanUrdu', child: Text('Roman Urdu')),
                   ],
-                  onChanged: _changingAppLanguage ? null : (value) {
-                    if (value != null) unawaited(_setAppLanguage(value));
+                  onChanged: _changingLanguage ? null : (value) {
+                    if (value != null) unawaited(_setLanguage(value));
                   },
                 ),
               ),
               ListTile(
                 leading: const Icon(Icons.volume_up_rounded),
                 title: Text(AppStrings.current.display('Preview voice')),
-                subtitle: Text(AppStrings.current.display(
-                  'English voice is used if an Urdu voice or spoken translation is unavailable.')),
+                subtitle: Text(AppStrings.current.text('settings_voice_preview_hint')),
                 onTap: _previewVoice,
-              ),
-              _buildDivider(),
-              ListTile(
-                leading: const Icon(Icons.language_rounded, color: Colors.teal),
-                title: Text(AppStrings.current.text('smart_entry_language_ca86c2')),
-                subtitle: Text(AppStrings.current.text('typing_aur_voice_ki_zaban_both_languages_remain__5e25cb')),
-                trailing: DropdownButton<String>(
-                  value: ref.watch(settingsProvider).smartEntryLanguage,
-                  underline: const SizedBox.shrink(),
-                  items: [
-                    DropdownMenuItem(value: 'romanUrdu', child: Text(AppStrings.current.text('roman_urdu_24aeea'))),
-                    DropdownMenuItem(value: 'english', child: Text(AppStrings.current.text('english_649df0'))),
-                  ],
-                  onChanged: (value) async {
-                    if (value == null) return;
-                    await ref.read(settingsProvider.notifier).updateSmartEntryLanguage(value);
-                  },
-                ),
               ),
               _buildDivider(),
               _buildSwitchTile(
                 title: AppStrings.current.text('likhlo_app_lock_2ef137'),
                 subtitle:
-                    AppStrings.current.text('require_fingerprint_face_id_or_device_passcode_a_eee4b0'),
+                    AppStrings.current.text('settings_lock_hint'),
                 icon: Icons.lock_outline_rounded,
                 iconColor: Colors.indigo,
                 value: appLockEnabled,
@@ -760,7 +734,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSwitchTile(
                 title: AppStrings.current.text('cloud_voice_pilot_fcb911'),
                 subtitle:
-                    AppStrings.current.text('allow_cloud_speech_only_when_a_secure_gateway_is_60fcf1'),
+                    AppStrings.current.text('settings_cloud_hint'),
                 icon: Icons.cloud_outlined,
                 iconColor: Colors.blue,
                 value: voicePrivacy.cloudSpeechEnabled,
@@ -773,7 +747,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSwitchTile(
                 title: AppStrings.current.text('anonymous_voice_diagnostics_4da485'),
                 subtitle:
-                    AppStrings.current.text('share_timing_and_error_categories_never_audio_or_f7281d'),
+                    AppStrings.current.text('settings_anonymous_hint'),
                 icon: Icons.analytics_outlined,
                 iconColor: Colors.purple,
                 value: voicePrivacy.diagnosticsOptIn,
@@ -786,7 +760,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.fact_check_outlined, color: Colors.purple),
                 title: Text(AppStrings.current.text('diagnostics_title')),
-                subtitle: Text(AppStrings.current.text('diagnostics_settings_hint')),
+                subtitle: Text(AppStrings.current.text('settings_diagnostics_hint')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(context, MaterialPageRoute<void>(
                   builder: (_) => const VoiceDiagnosticsScreen())),
@@ -795,7 +769,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSwitchTile(
                 title: AppStrings.current.text('spoken_confirmations_8da677'),
                 subtitle:
-                    AppStrings.current.text('use_fixed_transaction_wording_when_voice_feedbac_c1498b'),
+                    AppStrings.current.text('settings_spoken_hint'),
                 icon: Icons.volume_up_outlined,
                 iconColor: Colors.green,
                 value: voicePrivacy.spokenFeedbackEnabled,
@@ -837,7 +811,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 subtitle: Text(
-                  AppStrings.current.text('create_or_restore_an_encrypted_likhlo_backup_2ad7ac'),
+                  AppStrings.current.text('settings_backup_hint'),
                   style: TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded),

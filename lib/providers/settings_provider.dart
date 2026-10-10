@@ -69,17 +69,24 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     state = state.copyWith(themeMode: mode);
   }
 
-  Future<void> updateSmartEntryLanguage(String language) async {
+  /// One selection for app text/feedback and Smart NLP's input preference.
+  /// Keep both storage keys and setters compatible with existing callers/backups.
+  Future<void> updateLanguage(String language) async {
     if (language != 'romanUrdu' && language != 'english') return;
-    await _box.put('smartEntryLanguage', language);
-    state = state.copyWith(smartEntryLanguage: language);
+    await _box.putAll({
+      'appLanguage': language,
+      'smartEntryLanguage': language,
+    });
+    state = state.copyWith(
+      appLanguage: language,
+      smartEntryLanguage: language,
+    );
   }
 
-  Future<void> updateAppLanguage(String language) async {
-    if (language != 'romanUrdu' && language != 'english') return;
-    await _box.put('appLanguage', language);
-    state = state.copyWith(appLanguage: language);
-  }
+  Future<void> updateSmartEntryLanguage(String language) =>
+      updateLanguage(language);
+
+  Future<void> updateAppLanguage(String language) => updateLanguage(language);
 
   void updateBrightness(double level) {
     _box.put('brightnessLevel', level);

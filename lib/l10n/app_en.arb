@@ -1571,5 +1571,20 @@
   "diagnostics_share_json": "Share JSON",
   "diagnostics_error": "Could not complete this diagnostic operation. Try again.",
   "diagnostics_select_all": "Select all",
-  "diagnostics_use_filtered": "Use filtered list"
+  "diagnostics_use_filtered": "Use filtered list",
+  "settings_language": "Language",
+  "settings_language_hint": "App text, voice and Smart NLP",
+  "settings_voice_preview_hint": "English fallback if Urdu is unavailable",
+  "settings_language_english": "Language is now English.",
+  "settings_language_roman_urdu": "Language is now Roman Urdu.",
+  "settings_dark_hint": "Night-friendly theme",
+  "settings_dimmer_hint": "Lower screen brightness",
+  "settings_quick_entry_hint": "Voice or text from the status bar",
+  "settings_reminders_hint": "Daily expense reminders",
+  "settings_lock_hint": "Fingerprint, face or passcode on return",
+  "settings_cloud_hint": "Cloud speech via a secure gateway",
+  "settings_anonymous_hint": "Timing and errors only; no audio or text",
+  "settings_diagnostics_hint": "Review commands and export reports",
+  "settings_spoken_hint": "Hear transaction confirmations",
+  "settings_backup_hint": "Encrypted backup and restore"
 }

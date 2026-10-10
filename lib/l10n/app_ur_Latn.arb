@@ -1571,5 +1571,20 @@
   "diagnostics_share_json": "JSON share karein",
   "diagnostics_error": "Diagnostics ka yeh kaam mukammal nahi hua. Dobara koshish karein.",
   "diagnostics_select_all": "Sab chunein",
-  "diagnostics_use_filtered": "Filter wali list use karein"
+  "diagnostics_use_filtered": "Filter wali list use karein",
+  "settings_language": "Zaban",
+  "settings_language_hint": "App, voice aur Smart NLP ki zaban",
+  "settings_voice_preview_hint": "Urdu na mile to English voice",
+  "settings_language_english": "Zaban ab English hai.",
+  "settings_language_roman_urdu": "Zaban ab Roman Urdu hai.",
+  "settings_dark_hint": "Raat ke liye theme",
+  "settings_dimmer_hint": "Screen ki roshni kam karein",
+  "settings_quick_entry_hint": "Status bar se bol ya likh kar entry",
+  "settings_reminders_hint": "Roz kharch likhne ki yaad",
+  "settings_lock_hint": "Wapsi par fingerprint, face ya passcode",
+  "settings_cloud_hint": "Secure gateway se cloud speech",
+  "settings_anonymous_hint": "Sirf timing aur errors; audio ya text nahi",
+  "settings_diagnostics_hint": "Commands dekhein, report export karein",
+  "settings_spoken_hint": "Transaction ki tasdeeq sunein",
+  "settings_backup_hint": "Encrypted backup banayen ya restore karein"
 }

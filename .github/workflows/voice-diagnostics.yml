@@ -38,6 +38,7 @@ jobs:
               'lib/features/dashboard/dashboard_smart_entry_queries.dart',
               'lib/features/dashboard/dashboard_smart_entry_matching.dart',
               'lib/features/smart_entry/', 'lib/providers/',
+              ':(exclude)lib/providers/settings_provider.dart',
               'lib/services/local_nlp_service.dart',
               'lib/services/smart_input_engine.dart',
               'lib/services/confidence_evaluator.dart',
@@ -47,6 +48,15 @@ jobs:
               'lib/services/speech_session_controller.dart',
           ]
           subprocess.run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--', *paths], check=True)
+          # The unified language setting is explicitly in scope; all other
+          # settings and their load/default behavior must remain unchanged.
+          path = 'lib/providers/settings_provider.dart'
+          previous = subprocess.check_output(['git', 'show', f'{baseline}:{path}'], text=True)
+          current = Path(path).read_text()
+          start = '  Future<void> updateSmartEntryLanguage('
+          end = '  void updateBrightness('
+          assert current[:current.index('  /// One selection')] == previous[:previous.index(start)], 'Unrelated settings initialization changed'
+          assert current[current.index(end):] == previous[previous.index(end):], 'Unrelated settings behavior changed'
           path = 'lib/screens/debt_screen.dart'
           previous = subprocess.check_output(['git', 'show', f'{baseline}:{path}'], text=True)
           current = Path(path).read_text()
@@ -59,8 +69,8 @@ jobs:
       - name: Format diagnostics and voice timing files
         run: dart format lib/services/voice_diagnostics_service.dart lib/services/voice_diagnostic_observer.dart lib/screens/voice_diagnostics_screen.dart lib/services/speech_timing_policy.dart test/voice_diagnostics*_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - name: Focused diagnostics and voice timing tests
-        run: flutter test --timeout 1m test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart
+      - name: Focused diagnostics, voice timing and language settings tests
+        run: flutter test --timeout 1m test/voice_diagnostics_service_test.dart test/voice_diagnostics_observer_test.dart test/voice_diagnostics_screen_test.dart test/voice_diagnostics_backup_test.dart test/speech_timing_policy_test.dart test/audio_feedback_service_test.dart test/app_language_test.dart
       - if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         name: Compare full suite with current app baseline
         shell: bash
