@@ -70,9 +70,9 @@ class ExplicitExpenseCategoryExtractor {
     // A named category instruction must not disappear into keyword fallback
     // just because the requested category is absent from the dynamic lexicon.
     final unknownPatterns = <RegExp>[
-      RegExp(r'\bcategory\s+(.+?)' + _unknownEnd, caseSensitive: false),
+      RegExp(r'\bcategory\s+(.+?)' + _end, caseSensitive: false),
       RegExp(r'\b(?:in|into)\s+(.+?)\s+category\b', caseSensitive: false),
-      RegExp(r'\binto\s+(.+?)' + _unknownEnd, caseSensitive: false),
+      RegExp(r'\binto\s+(.+?)' + _end, caseSensitive: false),
       RegExp(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+'
           r'(?:mein|me)\b\s+' + _addInstruction, caseSensitive: false),
     ];
@@ -124,10 +124,8 @@ class ExplicitExpenseCategoryExtractor {
       r'(?:\s+(?:mein|me)\b)?(?:\s+' + _addInstruction + r')?';
   // Keep wallet/date/amount clauses available to the existing parser. A word
   // continuing a category name is not a boundary (Dinner != Dinner Party).
-  // Digits may belong to an unknown category name, not a second entry.
-  static final _unknownEnd = _end.replaceAll(r'|\d', '');
   static const _end =
-      r'(?![\w\u0600-\u06ff])(?=\s*(?:$|[.,;!?]|\b(?:category|in|into|and|aur|then|phir|plus|next|from|se|sy|say|on|today|yesterday|aaj|kal|parso|parson|add|save|daal|dalo|daalo|me|mein)\b|\d))';
+      r'(?![\w\u0600-\u06ff]|\.[\w\u0600-\u06ff])(?=\s*(?:$|[.,;!?]|\b(?:category|in|into|and|aur|then|phir|plus|next|from|se|sy|say|on|today|yesterday|aaj|kal|parso|parson|add|save|daal|dalo|daalo|me|mein)\b))';
 }
 
 class _CategorySpan {
