@@ -66,9 +66,17 @@ class SmartEntryController {
         route.intent != RoutedSmartIntent.addIncome) return null;
     const extractor = ExplicitExpenseCategoryExtractor();
     final wallets = accounts.map((account) => account.name);
+    bool preservesExpense(String candidate) {
+      final parsed = _engine.parse(candidate, categories,
+          source: source, accounts: accounts).parsed;
+      return parsed.intent == SmartEntryIntent.addExpense && parsed.amount > 0 &&
+          hasSpecificSmartEntryTitle(parsed.title);
+    }
     // Match saved names before normalization can remove punctuation from them.
-    final raw = extractor.extract(input, categories, walletNames: wallets, voice: voice) ??
-        extractor.extract(text, categories, walletNames: wallets, voice: voice);
+    final raw = extractor.extract(input, categories, walletNames: wallets, voice: voice,
+        preservesExpense: voice ? preservesExpense : null) ??
+        extractor.extract(text, categories, walletNames: wallets, voice: voice,
+            preservesExpense: voice ? preservesExpense : null);
     final extracted = raw == null ? null : raw.withCleanedText(_engine.normalizer.normalize(raw.cleanedText,
         enableContextualAsrRepairs: voice).normalized);
     if (extracted == null) return null;

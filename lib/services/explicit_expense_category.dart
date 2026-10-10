@@ -9,6 +9,7 @@ class ExplicitExpenseCategory {
   final List<String> suggestions;
   final Map<String, double> suggestionScores;
   final String resolution;
+  final List<String> matchedPhrases;
 
   const ExplicitExpenseCategory({
     required this.cleanedText,
@@ -20,6 +21,7 @@ class ExplicitExpenseCategory {
     this.suggestions = const [],
     this.suggestionScores = const {},
     this.resolution = 'exact',
+    this.matchedPhrases = const [],
   });
 
   bool get needsClarification => issue != null;
@@ -38,19 +40,22 @@ class ExplicitExpenseCategory {
     hasAddInstruction: hasAddInstruction, requestedNames: requestedNames,
     hasCategoryLabel: hasCategoryLabel, suggestions: names,
     suggestionScores: scores, resolution: 'suggestion',
+    matchedPhrases: matchedPhrases,
   );
 
   ExplicitExpenseCategory confirmed(String name, {String provenance = 'confirmed'}) =>
       ExplicitExpenseCategory(cleanedText: cleanedText, category: name,
         hasAddInstruction: hasAddInstruction, requestedNames: requestedNames,
         hasCategoryLabel: hasCategoryLabel, suggestions: suggestions,
-        suggestionScores: suggestionScores, resolution: provenance);
+        suggestionScores: suggestionScores, resolution: provenance,
+        matchedPhrases: matchedPhrases);
 
   ExplicitExpenseCategory withCleanedText(String text) => ExplicitExpenseCategory(
     cleanedText: text, category: category, issue: issue,
     hasAddInstruction: hasAddInstruction, requestedNames: requestedNames,
     hasCategoryLabel: hasCategoryLabel, suggestions: suggestions,
     suggestionScores: suggestionScores, resolution: resolution,
+    matchedPhrases: matchedPhrases,
   );
 }
 
@@ -62,6 +67,7 @@ class ExplicitExpenseCategoryExtractor {
     Iterable<String> categories, {
     Iterable<String> walletNames = const [],
     bool voice = false,
+    bool Function(String cleanedText)? preservesExpense,
   }) {
     final names = categories.where((name) => name.trim().isNotEmpty).toList()
       ..sort((a, b) => b.length.compareTo(a.length));
@@ -79,6 +85,32 @@ class ExplicitExpenseCategoryExtractor {
     bool covered(int start, int end) => spans.any(
         (span) => start < span.end && end > span.start);
 
+    String subtract(Iterable<_CategorySpan> removing) {
+      final ordered = removing.toList()..sort((a, b) => a.start.compareTo(b.start));
+      final cleaned = StringBuffer();
+      var cursor = 0;
+      for (final span in ordered) {
+        if (span.start < cursor) continue;
+        cleaned.write(input.substring(cursor, span.start));
+        cleaned.write(' ');
+        cursor = span.end;
+      }
+      cleaned.write(input.substring(cursor));
+      return cleaned.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+    }
+
+    // Reserve complete prefix clauses before any saved-name suffix scan.
+    // "milk category mess" must not depend on whether Milk precedes Mess
+    // in the dynamic lexicon. Empty/instruction-only values are not prefixes.
+    final prefixSpans = voice
+        ? RegExp(r'\b' + label + r'\s+(.+?)' + boundary,
+            caseSensitive: false).allMatches(input)
+            .where((match) => !_missingNames.contains(_key(match.group(1)!)))
+            .map((match) => _CategorySpan(match.start, match.end)).toList()
+        : const <_CategorySpan>[];
+    bool preservesSuffix(RegExpMatch match) => preservesExpense == null ||
+        preservesExpense(subtract([...spans, _CategorySpan(match.start, match.end)]));
+
     for (final name in names) {
       final escaped = pattern(name);
       final patterns = <RegExp>[
@@ -95,6 +127,11 @@ class ExplicitExpenseCategoryExtractor {
       for (var index = 0; index < patterns.length; index++) {
         for (final match in patterns[index].allMatches(input)) {
           if (covered(match.start, match.end)) continue;
+          if (voice && index != 0 && prefixSpans.any(
+              (span) => match.start < span.end && match.end > span.start)) continue;
+          // Subtraction is tentative: a suffix cannot consume the only item
+          // in an amount-first partial such as "120 ka milk category".
+          if (voice && index == 1 && !preservesSuffix(match)) continue;
           final clause = match.group(0)!;
           // Unqualified "in X" / "X mein add karo" can also name a wallet.
           if ((index == 2 || index == 3) &&
@@ -127,6 +164,7 @@ class ExplicitExpenseCategoryExtractor {
     for (final expression in unknownPatterns) {
       for (final match in expression.allMatches(input)) {
         if (covered(match.start, match.end)) continue;
+        if (voice && expression == unknownPatterns.last && !preservesSuffix(match)) continue;
         var requestedName = _key(match.group(1)!);
         if (voice && RegExp(r'\b(?:mein|me)\b\s+' + _addInstruction,
             caseSensitive: false).hasMatch(match.group(0)!)) {
@@ -134,8 +172,7 @@ class ExplicitExpenseCategoryExtractor {
               RegExp(r'^(?:kharch|khurch|expense)\s+ka\s+'), '');
         }
         if (wallets.contains(requestedName)) continue;
-        final missing = voice && const {'me', 'mein', 'add', 'save', 'karo', 'add karo'}
-            .contains(requestedName);
+        final missing = voice && _missingNames.contains(requestedName);
         if (!missing) requested.add(requestedName);
         spans.add(_CategorySpan(match.start, match.end));
         hasAddInstruction |= RegExp(_addInstruction, caseSensitive: false)
@@ -164,27 +201,21 @@ class ExplicitExpenseCategoryExtractor {
       issues.add('Choose one category for this expense.');
     }
     spans.sort((a, b) => a.start.compareTo(b.start));
-    final cleaned = StringBuffer();
-    var cursor = 0;
-    for (final span in spans) {
-      if (span.start < cursor) continue;
-      cleaned.write(input.substring(cursor, span.start));
-      cleaned.write(' ');
-      cursor = span.end;
-    }
-    cleaned.write(input.substring(cursor));
     return ExplicitExpenseCategory(
-      cleanedText: cleaned.toString().replaceAll(RegExp(r'\s+'), ' ').trim(),
+      cleanedText: subtract(spans),
       category: issues.isEmpty && selected.length == 1 ? selected.single : null,
       issue: issues.isEmpty ? null : issues.last,
       hasAddInstruction: hasAddInstruction,
       requestedNames: requested.toList(growable: false),
       hasCategoryLabel: RegExp(r'\b' + label + r'\b', caseSensitive: false).hasMatch(input),
+      matchedPhrases: spans.map((span) => input.substring(span.start, span.end)).toList(),
     );
   }
 
   static String _key(String value) =>
       value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  static const _missingNames = {'me', 'mein', 'add', 'save', 'karo', 'add karo'};
 
   static const _addInstruction =
       r'(?:add(?:\s+karo|\s+kar\s+do)?|save(?:\s+karo)?|(?:daal|dalo|daalo)(?:\s+do)?)\b';

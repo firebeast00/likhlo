@@ -6,6 +6,16 @@ import 'speech_command_completeness.dart';
 class HomeCategorySpeechPolicy {
   const HomeCategorySpeechPolicy();
 
+  /// Only a complete expense body can be completed by choosing a category.
+  /// This must never bypass missing amount/title/wallet or other intent checks.
+  bool canRecoverCategory(SmartInputPlan plan, {
+      Iterable<SmartEntryAccount> accounts = const [],
+      SpeechCommandCompletenessEvaluator evaluator =
+          const SpeechCommandCompletenessEvaluator()}) =>
+      plan.expenseCategory?.isInstructionIncomplete == true &&
+      plan.parsed.intent == SmartEntryIntent.addExpense &&
+      evaluator.evaluate(plan, accounts: accounts).isComplete;
+
   SpeechCommandCompleteness evaluate(SmartInputPlan plan, {
       Iterable<SmartEntryAccount> accounts = const [],
       SpeechCommandCompletenessEvaluator evaluator =

@@ -31,7 +31,9 @@ class _SpeechCategoryDialogState extends State<SpeechCategoryDialog> {
       content: SingleChildScrollView(child: Column(
         mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(strings.text('speech_category_heard', {'p0': widget.heardName})),
+          Text(widget.heardName.isEmpty
+              ? strings.text('expense_category_incomplete')
+              : strings.text('speech_category_heard', {'p0': widget.heardName})),
           if (widget.suggestions.isNotEmpty) ...[
             const SizedBox(height: 12),
             Wrap(spacing: 8, runSpacing: 4, children: [
@@ -53,7 +55,7 @@ class _SpeechCategoryDialogState extends State<SpeechCategoryDialog> {
                 .toList(growable: false),
             onChanged: (name) => setState(() => _selected = name),
           ),
-          CheckboxListTile(contentPadding: EdgeInsets.zero,
+          if (widget.heardName.isNotEmpty) CheckboxListTile(contentPadding: EdgeInsets.zero,
             title: Text(strings.text('speech_category_remember')),
             value: _remember, onChanged: (value) => setState(() => _remember = value ?? false)),
         ],

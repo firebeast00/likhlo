@@ -40,6 +40,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       'provider': _voiceEntry.speech.id,
       'time_zone': DateTime.now().timeZoneName,
       'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+      'build_commit': const String.fromEnvironment('BUILD_COMMIT', defaultValue: 'unknown'),
     });
     _cancelSpeechTimers();
     _voiceEntry.session.reset();
@@ -213,6 +214,13 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       );
     } catch (error) {
       VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_error', {'error_type': error.runtimeType.toString(), 'phase': 'listen'});
+      if (mounted && attempt == _speechAttempt && !_handlingSpeechError &&
+          _speechCompleteness(_voiceEntry.session.latestDraft).reason ==
+              'category_instruction_incomplete') {
+        _handlingSpeechError = true;
+        await _finishSpeechSession();
+        return;
+      }
       VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'listen_failed');
       debugPrint('Speech listen failed: $error');
       if (!mounted || _handlingSpeechError) return;
@@ -264,6 +272,19 @@ extension _DashboardVoiceMethods on _HomeScreenState {
       );
       final result = const HomeCategorySpeechPolicy().evaluate(plan,
           accounts: accounts, evaluator: _voiceEntry.completeness);
+      final category = plan.expenseCategory;
+      if (category != null) {
+        VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'category_slot', {
+          'cycle': _speechAttempt, 'raw_text': normalized,
+          'slot_state': category.isInstructionIncomplete ? 'pending'
+              : category.needsClarification ? 'clarification' : 'resolved',
+          'matched_phrases': category.matchedPhrases,
+          'parsing_text': category.cleanedText, 'requested_names': category.requestedNames,
+          'category': category.category, 'resolution': category.resolution,
+          'amount': plan.parsed.amount, 'title': plan.parsed.title,
+          'complete': result.isComplete, 'reason': result.reason,
+        });
+      }
       _speechCachedCompleteness = result;
       _speechCacheKey = key;
       _speechTiming.mark('parse_completed');
@@ -323,6 +344,11 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     _cancelSpeechTimers();
     _setListening(false);
     _speechTiming.mark('finalization_started');
+    VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'endpoint_cause', {
+      'cycle': attempt, 'manual': manual, 'deadline': deadline,
+      'recognizer_ended': _speechTiming.recognizerEnded,
+      'has_final_result': _speechTiming.hasFinalResult,
+    });
     try {
       _speechTiming.mark('cleanup_started');
       final id = _voiceDiagnosticId;
@@ -353,12 +379,10 @@ extension _DashboardVoiceMethods on _HomeScreenState {
           transcript: transcript, completeness: completeness);
       if (!completeness.isComplete || transcript.isEmpty) {
         if (completeness.reason == 'category_instruction_incomplete') {
-          VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'incomplete',
-              reason: completeness.reason);
-          _voiceEntry.session.reset();
-          _smartInputCtrl.text = transcript;
-          _showTransactionInfo(AppMessage('expense_category_incomplete'),
-              title: AppMessage('expense_category_choose'));
+          // Use the normal single-execution path for category clarification.
+          // A missing name never permits keyword fallback or an automatic save.
+          await _applySpeechDecision(_voiceEntry.session.onRecognizerStopped(
+              isComplete: false));
           return;
         }
         if (manual || deadline) {
@@ -494,6 +518,14 @@ extension _DashboardVoiceMethods on _HomeScreenState {
 
     final normalized = errorMessage.toLowerCase();
     if (normalized.contains('error_client')) _speechInitialized = false;
+    if (_voiceEntry.session.state == SpeechSessionState.listening &&
+        _speechCompleteness(_voiceEntry.session.latestDraft).reason ==
+            'category_instruction_incomplete') {
+      // Stop/reconcile first so a late native result can still supply the name.
+      // Only this Home category case bypasses generic incomplete-draft handling.
+      await _finishSpeechSession();
+      return;
+    }
     final recoverableEnd = normalized.contains('error_speech_timeout') ||
         normalized.contains('error_no_match') ||
         normalized.contains('error_client');

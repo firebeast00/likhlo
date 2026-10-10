@@ -44,7 +44,13 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
             voiceCategoryAliases: source == SmartInputSource.voice
                 ? _readVoiceCategoryAliases() : const {});
     if (expenseCategory?.needsClarification == true) {
-      if (source != SmartInputSource.voice || !expenseCategory!.canConfirmVoice) {
+      final recoverMissing = source == SmartInputSource.voice &&
+          const HomeCategorySpeechPolicy().canRecoverCategory(
+              ref.read(smartEntryControllerProvider).parse(normalized, categories,
+                  source: source, accounts: _parsingAccounts(),
+                  expenseCategory: expenseCategory));
+      if (source != SmartInputSource.voice ||
+          (!expenseCategory!.canConfirmVoice && !recoverMissing)) {
         _showTransactionInfo(expenseCategory!.issue!, title: 'Choose a category');
         return false;
       }
@@ -53,20 +59,23 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         'raw_text': normalized, 'requested_names': pending.requestedNames,
         'suggestions': pending.suggestions,
         'suggestion_scores': pending.suggestionScores,
+        'slot_state': recoverMissing ? 'missing' : 'unknown',
+        'parsing_text': pending.cleanedText, 'matched_phrases': pending.matchedPhrases,
       });
-      VoiceDiagnosticsService.instance.awaitingConfirmation(reason: 'voice_category');
+      VoiceDiagnosticsService.instance.awaitingConfirmation(
+          reason: recoverMissing ? 'voice_category_missing' : 'voice_category');
       final choice = await showDialog<SpeechCategoryChoice>(context: context,
           builder: (_) => SpeechCategoryDialog(
-            heardName: pending.requestedNames.single,
+            heardName: recoverMissing ? '' : pending.requestedNames.single,
             categories: categories, suggestions: pending.suggestions));
       if (!mounted || choice == null) return false;
       // The category may have been removed while the dialog was open.
       if (!ref.read(categoryProvider).contains(choice.category)) return false;
       VoiceDiagnosticsService.instance.stage('category_confirmation', {
-        'requested_name': pending.requestedNames.single,
+        'requested_name': recoverMissing ? null : pending.requestedNames.single,
         'category': choice.category, 'remember': choice.remember,
       });
-      if (choice.remember) {
+      if (choice.remember && !recoverMissing) {
         await _rememberVoiceCategoryAlias(pending.requestedNames.single, choice.category);
         if (!mounted) return false;
       }

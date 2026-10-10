@@ -60,4 +60,36 @@ void main() {
     await tester.pumpAndSettle();
     expect(result, isNull);
   });
+
+  for (final language in AppLanguage.values) {
+    testWidgets('${language.name}: missing name needs selection and cannot create an alias', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.runAsync(() => Hive.box('settings').put('appLanguage', language.name));
+      SpeechCategoryChoice? result;
+      await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) =>
+          Scaffold(body: TextButton(onPressed: () async {
+            result = await showDialog<SpeechCategoryChoice>(context: context,
+                builder: (_) => const SpeechCategoryDialog(heardName: '',
+                  categories: ['General', 'Mess']));
+          }, child: const Text('Open'))))));
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CheckboxListTile), findsNothing);
+      expect(find.text(AppStrings.current.text('expense_category_incomplete')), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNull);
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mess').last);
+      await tester.pumpAndSettle();
+      expect(result, isNull);
+      await tester.tap(find.byType(FilledButton));
+      await tester.pumpAndSettle();
+      expect(result!.category, 'Mess');
+      expect(result!.remember, false);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
