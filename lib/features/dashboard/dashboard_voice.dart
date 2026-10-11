@@ -248,6 +248,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
   String _speechContextKey(String text) {
     final now = DateTime.now();
     return '$text|${now.year}-${now.month}-${now.day}|'
+        '${AppLanguage.read().name}|${_readVoiceCategoryAliases().entries.map((e) => '${e.key}:${e.value}').join('\u0000')}|'
         '${ref.read(categoryProvider).join('\u0000')}|'
         '${ref.read(walletProvider).map((w) => '${w.id}:${w.name}:${w.walletType}:${w.isBackup}').join('\u0000')}';
   }
@@ -268,6 +269,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         normalized, ref.read(categoryProvider),
         source: SmartInputSource.voice, accounts: accounts,
         enableHomeExpenseCategories: true,
+        enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu,
         voiceCategoryAliases: _readVoiceCategoryAliases(),
       );
       final result = const HomeCategorySpeechPolicy().evaluate(plan,
@@ -606,6 +608,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
           final categoryDraft = ref.read(smartEntryControllerProvider)
               .resolveHomeExpenseCategory(decision.transcript, ref.read(categoryProvider),
                   source: SmartInputSource.voice, accounts: _parsingAccounts(),
+                  enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu,
                   voiceCategoryAliases: _readVoiceCategoryAliases());
           final diagnosticId = _voiceDiagnosticId;
           VoiceDiagnosticsService.instance.submitted(diagnosticId, decision.transcript);

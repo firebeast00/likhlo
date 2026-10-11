@@ -41,6 +41,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     var expenseCategory = ref.read(smartEntryControllerProvider)
         .resolveHomeExpenseCategory(normalized, categories,
             source: source, accounts: _parsingAccounts(),
+            enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu,
             voiceCategoryAliases: source == SmartInputSource.voice
                 ? _readVoiceCategoryAliases() : const {});
     if (expenseCategory?.needsClarification == true) {

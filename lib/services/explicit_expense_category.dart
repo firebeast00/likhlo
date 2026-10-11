@@ -1,3 +1,5 @@
+import 'category_vocabulary.dart';
+
 /// Result of extracting category instructions, never item keywords.
 class ExplicitExpenseCategory {
   final String cleanedText;
@@ -68,16 +70,23 @@ class ExplicitExpenseCategoryExtractor {
     Iterable<String> walletNames = const [],
     bool voice = false,
     bool Function(String cleanedText)? preservesExpense,
+    CategoryVocabulary? vocabulary,
+    bool Function(String name)? supportsCategory,
   }) {
-    final names = categories.where((name) => name.trim().isNotEmpty).toList()
+    // The new vocabulary is opt-in and cannot change typed extraction.
+    final lexicon = voice ? vocabulary : null;
+    final names = (lexicon?.names ?? categories)
+        .where((name) => name.trim().isNotEmpty).toList()
       ..sort((a, b) => b.length.compareTo(a.length));
     final spans = <_CategorySpan>[];
     final selected = <String>{};
     final issues = <String>[];
     final requested = <String>{};
+    final pendingPrefixes = <RegExpMatch>[];
     final label = voice ? r'(?:category|catagory)' : 'category';
     final boundary = voice ? _end.replaceFirst('category|', 'category|catagory|') : _end;
     var hasAddInstruction = false;
+    var resolution = 'exact';
     final wallets = {'cash', 'jazzcash', 'easypaisa', ...walletNames.map(_key)};
 
     String pattern(String name) => name.trim().split(RegExp(r'\s+'))
@@ -136,11 +145,15 @@ class ExplicitExpenseCategoryExtractor {
           // Unqualified "in X" / "X mein add karo" can also name a wallet.
           if ((index == 2 || index == 3) &&
               !RegExp(r'\b' + label + r'\b', caseSensitive: false).hasMatch(clause) &&
-              wallets.contains(_key(name))) {
+              (wallets.contains(_key(name)) ||
+                  (lexicon?.targets(name).any((target) => wallets.contains(_key(target))) ?? false))) {
             issues.add('Name both the category and wallet explicitly.');
           }
           spans.add(_CategorySpan(match.start, match.end));
-          selected.add(name);
+          selected.addAll(lexicon?.targets(name) ?? [name]);
+          if (lexicon != null && lexicon.provenance(name) != 'exact') {
+            resolution = lexicon.provenance(name);
+          }
           hasAddInstruction |= RegExp(_addInstruction, caseSensitive: false)
               .hasMatch(clause);
         }
@@ -164,8 +177,45 @@ class ExplicitExpenseCategoryExtractor {
     for (final expression in unknownPatterns) {
       for (final match in expression.allMatches(input)) {
         if (covered(match.start, match.end)) continue;
-        if (voice && expression == unknownPatterns.last && !preservesSuffix(match)) continue;
+        var start = match.start;
         var requestedName = _key(match.group(1)!);
+        // A suffix may supply the name before "category mein add karo".
+        // Defer this instruction-only prefix until suffix recovery has run.
+        if (lexicon != null && expression == unknownPatterns.first &&
+            _missingNames.contains(requestedName)) {
+          pendingPrefixes.add(match);
+          continue;
+        }
+        // "X category mein add karo" belongs to the category suffix pattern,
+        // not the unqualified "X mein add karo" wallet/category pattern.
+        if (lexicon != null && expression == unknownPatterns[3] &&
+            RegExp(r'\b' + label + r'\b', caseSensitive: false).hasMatch(requestedName)) continue;
+        if (voice && expression == unknownPatterns.last) {
+          if (lexicon != null && preservesExpense != null) {
+            final tokens = RegExp(r'[a-z][\w&/+-]*', caseSensitive: false)
+                .allMatches(match.group(1)!).toList();
+            final candidates = <MapEntry<int, String>>[];
+            final separator = tokens.lastIndexWhere((token) => _key(token.group(0)!) == 'ko');
+            for (var i = 0; i < tokens.length; i++) {
+              if (separator >= 0 && i != separator + 1) continue;
+              final name = _key(match.group(1)!.substring(tokens[i].start));
+              if (RegExp(r'^(?:ka|ki|ke|ko|me|mein|in|into)\b').hasMatch(name)) continue;
+              final candidateStart = match.start + tokens[i].start;
+              // With no grammatical boundary, shortening needs evidence from
+              // the active vocabulary. Never learn an arbitrary item suffix.
+              if (i > 0 && separator < 0 && supportsCategory?.call(name) != true) continue;
+              if (preservesExpense(subtract([...spans,
+                  _CategorySpan(candidateStart, match.end)]))) {
+                candidates.add(MapEntry(candidateStart, name));
+              }
+            }
+            if (candidates.length != 1) continue;
+            start = candidates.single.key;
+            requestedName = candidates.single.value;
+          } else if (!preservesSuffix(match)) {
+            continue;
+          }
+        }
         if (voice && RegExp(r'\b(?:mein|me)\b\s+' + _addInstruction,
             caseSensitive: false).hasMatch(match.group(0)!)) {
           requestedName = requestedName.replaceFirst(
@@ -174,12 +224,19 @@ class ExplicitExpenseCategoryExtractor {
         if (wallets.contains(requestedName)) continue;
         final missing = voice && _missingNames.contains(requestedName);
         if (!missing) requested.add(requestedName);
-        spans.add(_CategorySpan(match.start, match.end));
+        spans.add(_CategorySpan(start, match.end));
         hasAddInstruction |= RegExp(_addInstruction, caseSensitive: false)
             .hasMatch(match.group(0)!);
         issues.add(missing ? 'Complete the category name before saving.'
             : 'Choose an existing category; the requested category was not found.');
       }
+    }
+    for (final match in pendingPrefixes) {
+      if (covered(match.start, match.end)) continue;
+      spans.add(_CategorySpan(match.start, match.end));
+      issues.add('Complete the category name before saving.');
+      hasAddInstruction |= RegExp(_addInstruction, caseSensitive: false)
+          .hasMatch(match.group(0)!);
     }
     // A bare/trailing anchor is an unfinished instruction, not an implicit item.
     for (final match in RegExp(r'\b' + label + r'\b', caseSensitive: false).allMatches(input)) {
@@ -208,6 +265,7 @@ class ExplicitExpenseCategoryExtractor {
       hasAddInstruction: hasAddInstruction,
       requestedNames: requested.toList(growable: false),
       hasCategoryLabel: RegExp(r'\b' + label + r'\b', caseSensitive: false).hasMatch(input),
+      resolution: resolution,
       matchedPhrases: spans.map((span) => input.substring(span.start, span.end)).toList(),
     );
   }

@@ -5,6 +5,7 @@ import '../../services/smart_command.dart';
 import '../../services/smart_input_engine.dart';
 import '../../services/explicit_expense_category.dart';
 import '../../services/speech_category_matcher.dart';
+import '../../services/category_vocabulary.dart';
 import '../../services/primary_intent_router.dart';
 import 'multi_entry_parser.dart';
 
@@ -28,10 +29,12 @@ class SmartEntryController {
     ExplicitExpenseCategory? expenseCategory,
     bool enableHomeExpenseCategories = false,
     Map<String, String> voiceCategoryAliases = const {},
+    bool enableRomanUrduCategories = false,
   }) {
     final category = expenseCategory ?? (enableHomeExpenseCategories
         ? resolveHomeExpenseCategory(input, categories, source: source, accounts: accounts,
-            voiceCategoryAliases: voiceCategoryAliases)
+            voiceCategoryAliases: voiceCategoryAliases,
+            enableRomanUrduCategories: enableRomanUrduCategories)
         : null);
     return _engine.parse(
       input,
@@ -53,6 +56,7 @@ class SmartEntryController {
     required SmartInputSource source,
     Iterable<SmartEntryAccount> accounts = const [],
     Map<String, String> voiceCategoryAliases = const {},
+    bool enableRomanUrduCategories = false,
   }) {
     final voice = source == SmartInputSource.voice;
     if (!_categoryAnchor.hasMatch(input) &&
@@ -66,6 +70,16 @@ class SmartEntryController {
         route.intent != RoutedSmartIntent.addIncome) return null;
     const extractor = ExplicitExpenseCategoryExtractor();
     final wallets = accounts.map((account) => account.name);
+    final vocabulary = voice && enableRomanUrduCategories
+        ? CategoryVocabulary.build(categories, confirmedAliases: voiceCategoryAliases) : null;
+    bool supportsCategory(String name) {
+      if (vocabulary!.targets(name).isNotEmpty) return true;
+      return const SpeechCategoryMatcher().match(ExplicitExpenseCategory(
+          cleanedText: '', requestedNames: [name], hasCategoryLabel: true,
+          issue: 'Choose an existing category; the requested category was not found.'),
+          categories, vocabulary: vocabulary, allowSplitWords: true)
+          .suggestions.isNotEmpty;
+    }
     bool preservesExpense(String candidate) {
       final parsed = _engine.parse(candidate, categories,
           source: source, accounts: accounts).parsed;
@@ -74,9 +88,11 @@ class SmartEntryController {
     }
     // Match saved names before normalization can remove punctuation from them.
     final raw = extractor.extract(input, categories, walletNames: wallets, voice: voice,
-        preservesExpense: voice ? preservesExpense : null) ??
+        preservesExpense: voice ? preservesExpense : null, vocabulary: vocabulary,
+        supportsCategory: vocabulary == null ? null : supportsCategory) ??
         extractor.extract(text, categories, walletNames: wallets, voice: voice,
-            preservesExpense: voice ? preservesExpense : null);
+            preservesExpense: voice ? preservesExpense : null, vocabulary: vocabulary,
+            supportsCategory: vocabulary == null ? null : supportsCategory);
     final extracted = raw == null ? null : raw.withCleanedText(_engine.normalizer.normalize(raw.cleanedText,
         enableContextualAsrRepairs: voice).normalized);
     if (extracted == null) return null;
@@ -89,7 +105,8 @@ class SmartEntryController {
     }
     if (const MultiEntryParser().tryParseBatch(extracted.cleanedText) != null) return null;
     return voice ? const SpeechCategoryMatcher().match(extracted, categories,
-        confirmedAliases: voiceCategoryAliases, walletNames: wallets) : extracted;
+        confirmedAliases: voiceCategoryAliases, walletNames: wallets,
+        vocabulary: vocabulary, allowSplitWords: vocabulary != null) : extracted;
   }
 }
 

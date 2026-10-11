@@ -1,4 +1,5 @@
 import 'explicit_expense_category.dart';
+import 'category_vocabulary.dart';
 
 /// Suggestions apply only to an isolated, explicitly requested category.
 /// Scores rank candidates; they are not execution confidence or probabilities.
@@ -10,7 +11,8 @@ class SpeechCategoryMatcher {
 
   ExplicitExpenseCategory match(ExplicitExpenseCategory extracted,
       Iterable<String> categories, {Map<String, String> confirmedAliases = const {},
-      Iterable<String> walletNames = const []}) {
+      Iterable<String> walletNames = const [], CategoryVocabulary? vocabulary,
+      bool allowSplitWords = false}) {
     // Exact matches, unfinished instructions and conflicting instructions win.
     if (!extracted.canSuggest) return extracted;
     final requested = aliasKey(extracted.requestedNames.single);
@@ -26,8 +28,19 @@ class SpeechCategoryMatcher {
       return extracted.confirmed(exact.single, provenance: 'exact');
     }
     if (exact.length > 1) return extracted;
+    if (vocabulary != null) {
+      final targets = vocabulary.targets(requested).where(allowed).toList();
+      if (targets.length == 1) {
+        return extracted.confirmed(targets.single,
+            provenance: vocabulary.provenance(requested));
+      }
+      if (targets.length > 1) {
+        return extracted.withVoiceMatches(targets,
+            {for (final target in targets) target: 1});
+      }
+    }
     final alias = confirmedAliases[requested];
-    if (alias != null && names.contains(alias) && allowed(alias) &&
+    if (vocabulary == null && alias != null && names.contains(alias) && allowed(alias) &&
         _identifiers(requested) == _identifiers(aliasKey(alias))) {
       return extracted.confirmed(alias, provenance: 'confirmed_alias');
     }
@@ -35,13 +48,15 @@ class SpeechCategoryMatcher {
     // Short names are especially collision-prone; never fuzzy-match them.
     final compact = requested.replaceAll(' ', '');
     if (compact.length < 5) return extracted;
-    final ranked = <MapEntry<String, double>>[];
-    for (final name in names) {
+    final scores = <String, double>{};
+    final entries = vocabulary?.entries ?? names.map((name) => MapEntry(name, name));
+    for (final entry in entries) {
+      final name = entry.value;
       if (!allowed(name)) continue;
-      final target = aliasKey(name);
+      final target = aliasKey(entry.key);
       final targetCompact = target.replaceAll(' ', '');
       if (targetCompact.length < 5 || targetCompact.length > 80 ||
-          requested.split(' ').length != target.split(' ').length ||
+          (!allowSplitWords && requested.split(' ').length != target.split(' ').length) ||
           _identifiers(requested) != _identifiers(target)) continue;
       final maxLength = compact.length > targetCompact.length
           ? compact.length : targetCompact.length;
@@ -53,9 +68,10 @@ class SpeechCategoryMatcher {
       final dice = _dice(compact, targetCompact);
       final score = .7 * lexical + .3 * dice;
       if (lexical >= .8 && dice >= .65 && score >= .78) {
-        ranked.add(MapEntry(name, score));
+        if (score > (scores[name] ?? 0)) scores[name] = score;
       }
     }
+    final ranked = scores.entries.toList();
     ranked.sort((a, b) {
       final score = b.value.compareTo(a.value);
       return score == 0 ? a.key.compareTo(b.key) : score;
