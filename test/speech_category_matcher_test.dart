@@ -528,7 +528,7 @@ void main() {
     });
 
     for (final input in ['120 milk category', '120 ka milk category',
-        '120 milk catagory', '120 category', 'milk category']) {
+        '120 milk catagory', '120 category']) {
       test('$input cannot lose its only item through new suffix recovery', () {
         final plan = parse(input, categories: [...active, 'Milk']);
         expect(plan.expenseCategory!.isInstructionIncomplete, true);
@@ -537,6 +537,13 @@ void main() {
         expect(policy.canRecoverCategory(plan), input.contains('120') && input.contains('milk'));
       });
     }
+
+    test('a missing amount cannot be repaired by choosing a category', () {
+      final plan = parse('milk category', categories: [...active, 'Milk']);
+      expect(plan.parsed.amount, 0);
+      expect(plan.expenseCategory?.category, isNull);
+      expect(policy.canRecoverCategory(plan), false);
+    });
 
     for (final ordered in [['Milk', 'Mess', ...active], ['Mess', 'Milk', ...active]]) {
       test('prefix reservation survives vocabulary ordering ${ordered.first}', () {
@@ -589,9 +596,10 @@ void main() {
     test('typed callers ignore Roman Urdu recovery even when explicitly enabled', () {
       for (final input in ['120 milk category mess', 'milk 120 category sehat',
           '120 ka milk category', 'milk 120 category office lunch']) {
-        final previous = controller.parse(input, [...active, 'Milk'],
+        // An explicit day makes dates comparable; implicit dates use now().
+        final previous = controller.parse('$input yesterday', [...active, 'Milk'],
             source: SmartInputSource.typed, enableHomeExpenseCategories: true);
-        final current = controller.parse(input, [...active, 'Milk'],
+        final current = controller.parse('$input yesterday', [...active, 'Milk'],
             source: SmartInputSource.typed, enableHomeExpenseCategories: true,
             enableRomanUrduCategories: true);
         expect(current.parsed.toLegacyMap(), previous.parsed.toLegacyMap());
