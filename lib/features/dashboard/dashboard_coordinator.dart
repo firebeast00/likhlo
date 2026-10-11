@@ -25,8 +25,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   late Animation<double> _fabScale;
 
   final VoiceEntryController _voiceEntry = VoiceEntryController();
+  final SpeechTimingTracker _speechTiming = SpeechTimingTracker();
+  Completer<void>? _speechFinalResult;
+  SpeechCommandCompleteness? _speechCachedCompleteness;
+  String? _speechCacheKey;
   final SpeechNetworkRecovery _speechNetworkRecovery = SpeechNetworkRecovery();
   int _speechAttempt = 0;
+  String? _voiceDiagnosticId;
   final FeedbackCoordinator _feedback = FeedbackCoordinator();
   bool _isListening = false;
   bool _handlingSpeechError = false;
@@ -46,19 +51,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   Timer? _notificationUpdateTimer;
   Timer? _audioWarmupTimer;
   Timer? _speechStabilityTimer;
-  String _speechStableTranscript = '';
-  String _speechStableReason = '';
   Timer? _speechDeadlineTimer;
   Timer? _speechStartupTimer;
   DateTime? _speechListenStartedAt;
   bool _recognizerReportedListening = false;
   bool _finalizingRecognizerStop = false;
+  bool _recognizerCleanupPending = false;
+  bool _voiceStarting = false;
   bool _isProcessingVoiceCommand = false;
 
   void _setListening(bool value) {
     if (_isListening == value) return;
     _isListening = value;
     _smartInputUiRevision.value++;
+  }
+
+  void _setVoiceProcessing(bool value) {
+    if (_isProcessingVoiceCommand == value) return;
+    _isProcessingVoiceCommand = value;
+    if (mounted) _smartInputUiRevision.value++;
   }
 
   void _setScanningReceipt(bool value) {
@@ -93,7 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     quickActions.initialize((String shortcutType) {
       Future.delayed(const Duration(milliseconds: 400), () {
         if (shortcutType == 'action_voice_log') {
-          _listenForExpense();
+          _listenForExpense(entryPoint: 'quick_action');
         } else if (shortcutType == 'action_add_expense') {
           _showAddOrEditModal();
         }
@@ -126,6 +137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
   @override
   void dispose() {
+    VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'interrupted', reason: 'screen_disposed');
     _audioWarmupTimer?.cancel();
     NotificationService().onActionTriggered = null;
     _voiceEntry.speech.cancel();
@@ -338,3 +350,4 @@ class _LearnedSmartEntryPreference {
     'updatedAt': updatedAt,
   };
 }
+

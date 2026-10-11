@@ -1,15 +1,77 @@
 part of '../../screens/home_screen.dart';
 
 extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
+  static const _voiceCategoryAliasKey = 'home_voice_category_aliases_v1';
+
+  Map<String, String> _readVoiceCategoryAliases() {
+    try {
+      final stored = Hive.box('preferences').get(_voiceCategoryAliasKey);
+      if (stored is! Map) return const {};
+      return {for (final entry in stored.entries.take(100))
+        if (entry.key is String && entry.value is String)
+          entry.key as String: entry.value as String};
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> _rememberVoiceCategoryAlias(String heard, String category) async {
+    final key = SpeechCategoryMatcher.aliasKey(heard);
+    if (key.isEmpty || key.length > 80) return;
+    final aliases = Map<String, String>.of(_readVoiceCategoryAliases())..remove(key);
+    if (aliases.length >= 100) aliases.remove(aliases.keys.first);
+    aliases[key] = category;
+    try {
+      await Hive.box('preferences').put(_voiceCategoryAliasKey, aliases);
+      _speechCacheKey = null;
+    } catch (_) {
+      // Learning failure must never block or alter the confirmed transaction.
+    }
+  }
+
   Future<bool> _processNLP(
       String text, {
         SmartInputSource source = SmartInputSource.typed,
+        SmartInputPlan? preparedVoicePlan,
       }) async {
     _dismissKeyboard();
     final normalized = text.trim();
     if (normalized.isEmpty) return false;
 
     final categories = ref.read(categoryProvider);
+    final voicePlan = source == SmartInputSource.voice
+        ? preparedVoicePlan ?? ref.read(smartEntryControllerProvider).parse(
+            normalized, categories, source: source, accounts: _parsingAccounts(),
+            enableHomeExpenseCategories: true,
+            enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu,
+            voiceCategoryAliases: _readVoiceCategoryAliases())
+        : null;
+    final expenseCategory = voicePlan != null ? voicePlan.expenseCategory
+        : ref.read(smartEntryControllerProvider).resolveHomeExpenseCategory(
+            normalized, categories, source: source, accounts: _parsingAccounts(),
+            enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu);
+    final categoryReview = expenseCategory?.needsClarification == true
+        ? expenseCategory : null;
+    if (expenseCategory?.needsClarification == true) {
+      final recoverMissing = voicePlan != null &&
+          const HomeCategorySpeechPolicy().canRecoverCategory(voicePlan);
+      if (source != SmartInputSource.voice ||
+          (!expenseCategory!.canConfirmVoice && !recoverMissing)) {
+        _showTransactionInfo(expenseCategory!.issue!, title: 'Choose a category');
+        return false;
+      }
+      final pending = expenseCategory!;
+      VoiceDiagnosticsService.instance.stage('category_matching', {
+        'raw_text': normalized, 'requested_names': pending.requestedNames,
+        'suggestions': pending.suggestions,
+        'suggestion_scores': pending.suggestionScores,
+        'slot_state': recoverMissing ? 'missing' : 'unknown',
+        'parsing_text': pending.cleanedText,
+        'matched_phrases': pending.matchedPhrases,
+      });
+      // Keep uncertainty attached to the draft. The existing entry sheet
+      // reviews category, amount and wallet together; no preceding dialog.
+    }
 
     if (source == SmartInputSource.typed || source == SmartInputSource.voice) {
       final wallets = ref.read(walletProvider);
@@ -28,7 +90,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           .toList(growable: false);
 
       final batchAttempt = ref.read(smartEntryBatchControllerProvider).tryBuild(
-            rawText: normalized,
+            rawText: expenseCategory?.cleanedText ?? normalized,
             categories: categories,
             source: source,
             accounts: accounts,
@@ -54,10 +116,20 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           return false;
         }
 
+        VoiceDiagnosticsService.instance.stage('parse', {'intent': 'batch', 'raw_text': normalized,
+          'entry_count': batchAttempt.draft!.entries.length,
+          'entries': batchAttempt.draft!.entries.map((entry) => {
+            'title': entry.title, 'amount': entry.amount, 'category': entry.category,
+            'type': entry.type, 'wallet_id': entry.walletId, 'date': entry.date,
+            'source_text': entry.sourceText, 'confidence': entry.confidence,
+          }).toList()});
+        VoiceDiagnosticsService.instance.awaitingConfirmation(reason: 'batch_review');
+        final diagnosticId = VoiceDiagnosticsService.instance.currentId;
         final confirmed = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => BatchTransactionReviewScreen(
               draft: batchAttempt.draft!,
+              diagnosticId: diagnosticId,
             ),
           ),
         );
@@ -78,11 +150,12 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       }
     }
 
-    final plan = ref.read(smartEntryControllerProvider).parse(
+    final plan = voicePlan ?? ref.read(smartEntryControllerProvider).parse(
       normalized,
       categories,
       source: source,
       accounts: _parsingAccounts(),
+      expenseCategory: expenseCategory,
     );
     _debugSmartInputPlan(plan);
     final command = plan.parsed;
@@ -132,6 +205,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
     final result = command.toLegacyMap();
     final learnedPreference = _learnedPreferenceFor(command.title);
     if (result['type'] == 'expense' &&
+        plan.expenseCategory == null &&
         result['category'] == 'General' &&
         learnedPreference != null &&
         categories.contains(learnedPreference.category)) {
@@ -198,6 +272,13 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         (command.confidenceByField['amount'] ?? 0) >= 0.9,
       ),
     );
+    VoiceDiagnosticsService.instance.stage('confidence', {
+      'score': semanticConfidence.score, 'disposition': semanticConfidence.disposition.name,
+      'reasons': semanticConfidence.reasons, 'requires_asr_review': plan.requiresAsrReview,
+      'resolved_wallet_id': resolvedWalletId,
+      'category_resolution': expenseCategory?.resolution,
+      'category_requires_review': categoryReview != null,
+    });
     assert(() {
       debugPrint(
         '[SmartEntry confidence] '
@@ -208,7 +289,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       return true;
     }());
 
-    if (!plan.requiresAsrReview &&
+    if (categoryReview == null && !plan.requiresAsrReview &&
         semanticConfidence.canAutoExecute &&
         shouldAutoSaveSmartEntry(
           result,
@@ -284,6 +365,9 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         defaultAccounts.every((account) => account.availableBalance <= 0);
     final reviewMessage = plan.requiresAsrReview
         ? 'Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.'
+        : categoryReview != null && resolvedWalletId != null &&
+        semanticConfidence.canAutoExecute
+        ? AppStrings.current.text('expense_category_choose')
         : resolvedWalletId != null &&
         !semanticConfidence.canAutoExecute
         ? 'Review the detected title, amount, category, date, and wallet before saving.'
@@ -297,6 +381,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         ? 'Cash and JazzCash are empty. Choose the wallet that should receive or pay this entry.'
         : 'Cash and JazzCash cannot cover this amount. Choose another funded wallet.';
 
+    VoiceDiagnosticsService.instance.awaitingConfirmation(reason: reviewMessage);
     final confirmed = await _showAddOrEditModal(
       prefilledAmount:
       amountValue == amountValue.truncateToDouble()
@@ -312,6 +397,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           learnedWalletId,
       initialType: type,
       reviewMessage: reviewMessage,
+      voiceCategoryReview: categoryReview == null ? null : voicePlan,
     );
 
     if (confirmed == true && mounted) {

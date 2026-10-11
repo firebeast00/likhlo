@@ -1,19 +1,23 @@
 import 'local_nlp_service.dart';
+import 'voice_diagnostic_observer.dart';
 import 'pakistani_language_normalizer.dart';
 import 'smart_command.dart';
+import 'explicit_expense_category.dart';
 
 class SmartInputPlan {
   final String originalText;
   final PakistaniNormalizationResult normalization;
   final SmartCommand command;
+  final ExplicitExpenseCategory? expenseCategory;
 
   const SmartInputPlan({
     required this.originalText,
     required this.normalization,
     required this.command,
+    this.expenseCategory,
   });
 
-  String get normalizedText => normalization.normalized;
+  String get normalizedText => expenseCategory?.cleanedText ?? normalization.normalized;
   ParsedSmartEntryCommand get parsed => command.parsed;
 
   bool get requiresAsrReview =>
@@ -40,21 +44,49 @@ class SmartInputEngine {
     List<String> activeCategories, {
     SmartInputSource source = SmartInputSource.typed,
     Iterable<SmartEntryAccount> accounts = const [],
+    ExplicitExpenseCategory? expenseCategory,
   }) {
     final normalization = normalizer.normalize(
       input,
       enableContextualAsrRepairs: source == SmartInputSource.voice,
     );
     final parsed = nlp.parseCommand(
-      normalization.normalized,
+      expenseCategory?.cleanedText ?? normalization.normalized,
       activeCategories,
       accounts: accounts,
+      explicitExpenseCategory: expenseCategory?.category,
     );
     final command = _toTypedCommand(parsed, source);
+    if (VoiceDiagnosticObserver.active) {
+    VoiceDiagnosticObserver.stage('normalization', {
+      'original': input, 'normalized': normalization.normalized,
+      'applied_rules': normalization.appliedRules,
+    });
+    VoiceDiagnosticObserver.stage('parse', {
+      'intent': parsed.intent.wireName, ...parsed.toLegacyMap(),
+      'query_metric': parsed.queryMetric?.name, 'time_range': parsed.timeRange.name,
+      'navigation_target': parsed.navigationTarget, 'app_action': parsed.appAction?.name,
+      'entry_type_filter': parsed.entryTypeFilter, 'has_explicit_date': parsed.hasExplicitDate,
+      if (expenseCategory != null) 'explicit_category': {
+        'category': expenseCategory.category, 'issue': expenseCategory.issue,
+        'parsing_text': expenseCategory.cleanedText,
+        'requested_names': expenseCategory.requestedNames,
+        'resolution': expenseCategory.resolution,
+        'suggestions': expenseCategory.suggestions,
+        'suggestion_scores': expenseCategory.suggestionScores,
+      },
+      'confidence_by_field': parsed.confidenceByField, 'clarification_reasons': parsed.clarificationReasons,
+      if (command is MutationCommand) 'selector': {'title': command.selector.title,
+        'amount': command.selector.amount, 'date': command.selector.date, 'type': command.selector.transactionType},
+      if (command is MutationCommand) 'patch': {'title': command.patch.title, 'amount': command.patch.amount,
+        'category': command.patch.category, 'date': command.patch.date, 'wallet_id': command.patch.walletId},
+    });
+    }
     return SmartInputPlan(
       originalText: input,
       normalization: normalization,
       command: command,
+      expenseCategory: expenseCategory,
     );
   }
 

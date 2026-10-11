@@ -1,3 +1,4 @@
+import '../services/voice_diagnostics_service.dart';
 import '../l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,8 @@ import '../providers/settings_provider.dart';
 import '../models/expense_model.dart';
 import '../services/transaction_executor.dart';
 import '../services/speech_session_controller.dart';
+import '../services/speech_timing_policy.dart';
+import '../services/audio_feedback_service.dart';
 import '../services/udhar_ledger_link_service.dart';
 import '../providers/expense_provider.dart';
 
@@ -39,9 +42,18 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
+  String? _voiceDiagnosticId;
   bool _voiceFinalizing = false;
+  bool _voiceStarting = false;
+  bool _recognizerCleanupPending = false;
   Timer? _udharVoiceStableTimer;
-  String _udharVoiceStableTranscript = '';
+  final SpeechTimingTracker _udharSpeechTiming = SpeechTimingTracker();
+  Completer<void>? _udharFinalResult;
+  Timer? _udharVoiceDeadline;
+  int _udharVoiceAttempt = 0;
+  bool _udharRecognizerActive = false;
+  String? _udharCompletenessKey;
+  bool _udharCanComplete = false;
   bool _savingDebt = false;
   bool _scanningDebt = false;
   final SpeechSessionController _speechSession =
@@ -241,26 +253,61 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
   @override
   void dispose() {
+    VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'interrupted', reason: 'udhar_screen_disposed');
+    _udharVoiceAttempt++;
     _udharVoiceStableTimer?.cancel();
+    _udharVoiceDeadline?.cancel();
     unawaited(_speech.cancel());
     _smartInputCtrl.dispose();
     super.dispose();
   }
 
   void _listenForInput() async {
+    if (_voiceStarting || _recognizerCleanupPending) return;
+    setState(() => _voiceStarting = true);
+    try { await _listenForInputImpl(); }
+    catch (error) {
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'udhar_voice_${error.runtimeType}');
+      rethrow;
+    } finally {
+      if (mounted) setState(() => _voiceStarting = false);
+    }
+  }
+
+  Future<void> _listenForInputImpl() async {
     if (_voiceFinalizing || _savingDebt) return;
     if (!_isListening) {
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'interrupted', reason: 'new_attempt');
+      _voiceDiagnosticId = VoiceDiagnosticsService.instance.begin(entryPoint: 'udhar_microphone', context: {
+        'app_language': AppLanguage.read().name,
+        'nlp_language': ref.read(settingsProvider).smartEntryLanguage,
+        'provider': 'device', 'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+      });
       _udharVoiceStableTimer?.cancel();
-      _udharVoiceStableTranscript = '';
+      _udharSpeechTiming.start();
+      _udharFinalResult = Completer<void>();
+      _udharCompletenessKey = null;
+      _udharRecognizerActive = false;
+      final attempt = ++_udharVoiceAttempt;
       _speechSession.start();
       bool available = await _speech.initialize(
         onStatus: (val) {
           if (!mounted) return;
+          if (val == 'listening') _udharRecognizerActive = true;
+          if (!_isListening && !_voiceFinalizing) return;
+          if (!_udharRecognizerActive &&
+              _udharSpeechTiming.elapsed < const Duration(milliseconds: 600)) return;
           if (val == 'done' || val == 'notListening') {
-            unawaited(_finishVoiceInput(finalResult: false));
+            _udharSpeechTiming.recordEnd();
+            if (!_voiceFinalizing) _scheduleFastUdharVoiceSave(_speechSession.latestDraft);
           }
         },
         onError: (val) {
+          if (!mounted || _voiceFinalizing || !_isListening) return;
+          _udharVoiceStableTimer?.cancel();
+          _udharVoiceDeadline?.cancel();
+          VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_error', {'code': val.errorMsg});
+          VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: val.errorMsg);
           _speechSession.onRecognizerError(retryable: false);
           if (mounted) {
             setState(() => _isListening = false);
@@ -278,10 +325,20 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
 
       if (available) {
         final localeId = await _preferredSpeechLocale();
+        VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognizer_cycle', {'locale_requested': localeId, 'on_device_requested': false, 'provider': 'device'});
         if (!mounted) return;
         setState(() => _isListening = true);
         _smartInputCtrl.clear();
+        _udharVoiceDeadline?.cancel();
+        _udharVoiceDeadline = Timer(const Duration(seconds: 45), () {
+          if (mounted && attempt == _udharVoiceAttempt) unawaited(_finishVoiceInput());
+        });
         await _speech.listen(
+          onSoundLevelChange: (level) {
+            if (mounted && attempt == _udharVoiceAttempt && !_voiceFinalizing) {
+              _udharSpeechTiming.recordSoundLevel(level);
+            }
+          },
           listenOptions: stt.SpeechListenOptions(
             localeId: localeId,
             cancelOnError: true,
@@ -291,35 +348,36 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
             partialResults: true,
           ),
           onResult: (val) {
-            if (!mounted || !_isListening) return;
+            if (!mounted || attempt != _udharVoiceAttempt ||
+                (!_isListening && !_voiceFinalizing) ||
+                _speechSession.state != SpeechSessionState.listening) return;
+            _udharRecognizerActive = true;
+            VoiceDiagnosticsService.instance.event(_voiceDiagnosticId, 'recognition', {
+              'text': val.recognizedWords, 'is_final': val.finalResult,
+              'confidence': val.hasConfidenceRating ? val.confidence : null, 'provider': 'device',
+            });
             final words = val.recognizedWords.trim();
             if (words.isEmpty) return;
 
-            final decision = _speechSession.recordTranscript(
-              words,
-              isFinal: val.finalResult,
-            );
+            final hadFinal = _udharSpeechTiming.hasFinalResult;
+            final changed = _udharSpeechTiming.recordTranscript(words, isFinal: val.finalResult);
+            if (changed && hadFinal && !val.finalResult) {
+              _udharFinalResult = Completer<void>();
+            }
+            if (val.finalResult && !(_udharFinalResult?.isCompleted ?? true)) {
+              _udharFinalResult!.complete();
+            }
+            _speechSession.recordTranscript(words, isFinal: false);
             _smartInputCtrl.value = TextEditingValue(
               text: words,
               selection: TextSelection.collapsed(offset: words.length),
             );
 
-            if (decision.action == SpeechSessionAction.processFinal) {
-              _udharVoiceStableTimer?.cancel();
-              _udharVoiceStableTranscript = '';
-              unawaited(
-                _finishVoiceInput(
-                  finalResult: true,
-                  decision: decision,
-                ),
-              );
-              return;
-            }
-
             _scheduleFastUdharVoiceSave(words);
           },
         );
       } else {
+        VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed', reason: 'recognizer_unavailable');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -330,7 +388,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         );
       }
     } else {
-      await _finishVoiceInput(finalResult: false);
+      await _finishVoiceInput(manual: true);
     }
   }
 
@@ -353,90 +411,102 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
     return null;
   }
 
-  void _scheduleFastUdharVoiceSave(String transcript) {
-    if (_udharVoiceStableTranscript == transcript &&
-        (_udharVoiceStableTimer?.isActive ?? false)) {
-      return;
-    }
-
-    _udharVoiceStableTimer?.cancel();
-    _udharVoiceStableTranscript = '';
-
+  bool _udharVoiceIsComplete(String transcript) {
     final wallets = ref.read(walletProvider);
+    final key = '$transcript|${wallets.map((w) => '${w.id}:${w.name}:${w.walletType}:${w.isBackup}').join('|')}|$_selectedWalletId';
+    if (key == _udharCompletenessKey) return _udharCanComplete;
+    _udharSpeechTiming.mark('parse_started');
     final draft = const UdharInputService().parse(
-      transcript,
-      walletNames: wallets.map((wallet) => wallet.name),
-      accounts: _udharAccounts(),
-    );
-    final walletId = _walletForCommand(transcript);
-    if (draft == null || !draft.canSaveImmediately || walletId == null) {
-      return;
-    }
-
-    _udharVoiceStableTranscript = transcript;
-    _udharVoiceStableTimer = Timer(
-      const Duration(milliseconds: 850),
-      () {
-        if (!mounted ||
-            !_isListening ||
-            _voiceFinalizing ||
-            _savingDebt ||
-            _speechSession.latestDraft != _udharVoiceStableTranscript) {
-          return;
-        }
-
-        final decision = _speechSession.recordTranscript(
-          _udharVoiceStableTranscript,
-          isFinal: true,
-        );
-        if (decision.action == SpeechSessionAction.processFinal) {
-          unawaited(
-            _finishVoiceInput(
-              finalResult: true,
-              decision: decision,
-            ),
-          );
-        }
-      },
-    );
+        transcript, walletNames: wallets.map((w) => w.name), accounts: _udharAccounts());
+    _udharCanComplete = draft != null && draft.canSaveImmediately &&
+        _walletForCommand(transcript) != null;
+    _udharCompletenessKey = key;
+    _udharSpeechTiming.mark('parse_completed');
+    return _udharCanComplete;
   }
 
-  Future<void> _finishVoiceInput({
-    required bool finalResult,
-    SpeechSessionDecision? decision,
-  }) async {
-    if (!_isListening || _voiceFinalizing) return;
+  void _scheduleFastUdharVoiceSave(String transcript) {
     _udharVoiceStableTimer?.cancel();
-    _udharVoiceStableTranscript = '';
+    if (_voiceFinalizing || _savingDebt || !_isListening) return;
+    final complete = _udharVoiceIsComplete(transcript);
+    final wait = _udharSpeechTiming.waitFor(
+        isComplete: complete, kind: SpeechTimingKind.transaction);
+    if (wait == null) return;
+    final attempt = _udharVoiceAttempt;
+    _udharVoiceStableTimer = Timer(wait, () {
+      if (!mounted || attempt != _udharVoiceAttempt || !_isListening ||
+          _voiceFinalizing || _savingDebt) return;
+      final words = _speechSession.latestDraft;
+      final remaining = _udharSpeechTiming.waitFor(
+          isComplete: _udharVoiceIsComplete(words), kind: SpeechTimingKind.transaction);
+      if (remaining == null) return;
+      if (remaining > Duration.zero) {
+        _scheduleFastUdharVoiceSave(words);
+        return;
+      }
+      unawaited(_finishVoiceInput(
+          stableComplete: !_udharSpeechTiming.recognizerEnded &&
+              _udharVoiceIsComplete(words)));
+    });
+  }
+
+  Future<void> _finishVoiceInput({bool manual = false, bool stableComplete = false}) async {
+    if (!_isListening || _voiceFinalizing) return;
+    final attempt = _udharVoiceAttempt;
+    _udharVoiceStableTimer?.cancel();
+    _udharVoiceDeadline?.cancel();
     _voiceFinalizing = true;
     setState(() => _isListening = false);
+    _udharSpeechTiming.mark('finalization_started');
     try {
-      final result = decision ?? _speechSession.onRecognizerStopped();
-      final fastValidatedFinal =
-          finalResult &&
-          decision?.action == SpeechSessionAction.processFinal &&
-          decision!.transcript.isNotEmpty;
-      if (fastValidatedFinal) {
-        unawaited(_speech.stop().catchError((_) {}));
-      } else {
-        await _speech.stop();
-      }
-      if (!mounted) return;
-      if (result.action == SpeechSessionAction.processFinal &&
-          result.transcript.isNotEmpty) {
-        await _processNLP(
-          result.transcript,
-          fromVoice: true,
-          allowInstantSave: finalResult,
-        );
-      } else {
+      final id = _voiceDiagnosticId;
+      _udharSpeechTiming.mark('cleanup_started');
+      _recognizerCleanupPending = true;
+      final cleanup = Future<void>.sync(_speech.stop);
+      AudioFeedbackService.deferSpokenFeedbackUntil(cleanup);
+      final observedCleanup = cleanup.then((_) {
+        if (mounted && attempt == _udharVoiceAttempt) {
+          _udharSpeechTiming.mark('cleanup_completed');
+          VoiceDiagnosticsService.instance.stage('timing', _udharSpeechTiming.timings, id: id);
+        }
+      }).whenComplete(() {
+        if (mounted && attempt == _udharVoiceAttempt) {
+          setState(() => _recognizerCleanupPending = false);
+        }
+      });
+      await reconcileSpeechEndpoint(
+        timing: _udharSpeechTiming,
+        cleanup: observedCleanup,
+        finalResult: () => _udharFinalResult!.future,
+        isCurrent: () => mounted && attempt == _udharVoiceAttempt,
+      );
+      if (!mounted || attempt != _udharVoiceAttempt) return;
+      final words = _speechSession.latestDraft;
+      if (words.isEmpty) {
+        VoiceDiagnosticsService.instance.finish(id, 'no_speech', reason: 'udhar_no_transcript');
         _smartInputCtrl.clear();
+        return;
       }
-    } catch (_) {
+      final result = _speechSession.recordTranscript(words, isFinal: true);
+      if (result.action == SpeechSessionAction.processFinal) {
+        _udharSpeechTiming.mark('endpoint_accepted');
+        _udharSpeechTiming.mark('processing_started');
+        VoiceDiagnosticsService.instance.submitted(id, result.transcript);
+        await VoiceDiagnosticsService.instance.run(id, () => _processNLP(
+            result.transcript, fromVoice: true,
+            allowInstantSave: !manual &&
+                (stableComplete || _udharSpeechTiming.hasFinalResult)));
+        _udharSpeechTiming.mark('processing_completed');
+        VoiceDiagnosticsService.instance.stage('timing', _udharSpeechTiming.timings, id: id);
+      }
+    } catch (error) {
+      VoiceDiagnosticsService.instance.finish(_voiceDiagnosticId, 'failed',
+          reason: 'udhar_processing_${error.runtimeType}');
       if (mounted) _smartInputCtrl.clear();
     } finally {
       _speechSession.reset();
       _voiceFinalizing = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -452,6 +522,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
       accounts: _udharAccounts(),
     );
     if (draft == null) {
+      VoiceDiagnosticsService.instance.finish(VoiceDiagnosticsService.instance.currentId, 'not_understood', reason: 'udhar_amount_person_or_direction_ambiguous');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -470,9 +541,12 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         type: draft.type,
         walletId: walletId,
       );
+      VoiceDiagnosticsService.instance.finishProcessing(VoiceDiagnosticsService.instance.currentId, saved);
       if (saved && mounted) _smartInputCtrl.clear();
     } else {
+      VoiceDiagnosticsService.instance.awaitingConfirmation(reason: 'udhar_review');
       _showAddDialog(
+        diagnosticId: VoiceDiagnosticsService.instance.currentId,
         initialName: draft.person,
         initialAmount: draft.amount.toStringAsFixed(
           draft.amount == draft.amount.truncateToDouble() ? 0 : 2,
@@ -548,6 +622,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
         amount <= 0 ||
         !amount.isFinite ||
         !wallets.any((wallet) => wallet.id == walletId)) {
+      VoiceDiagnosticsService.instance.stage('execution', {'status': 'rejected', 'reason': 'udhar_invalid_person_amount_or_wallet'});
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -561,6 +636,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           .read(walletProvider.notifier)
           .getBalanceForWallet(walletId);
       if (available + 0.000001 < amount) {
+        VoiceDiagnosticsService.instance.stage('execution', {'status': 'rejected', 'reason': 'udhar_insufficient_balance', 'available': available});
         if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -625,6 +701,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           ),
         );
       }
+      VoiceDiagnosticsService.instance.stage('response', {'message_key': 'udhaar_recorded_rs_d8137b', 'amount': amount, 'person': person});
       if (mounted) {
         _smartInputCtrl.clear();
         setState(() {});
@@ -723,6 +800,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
   }
 
   void _showAddDialog({
+    String? diagnosticId,
     String initialName = "",
     String initialAmount = "",
     String initialType = 'lent',
@@ -931,7 +1009,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                   );
                                   return;
                                 }
-                                final saved = await _saveDebtRecord(
+                                final saved = await VoiceDiagnosticsService.instance.run(diagnosticId, () => _saveDebtRecord(
                                   name: nameCtrl.text,
                                   amount: double.tryParse(
                                         amountCtrl.text.trim(),
@@ -940,7 +1018,8 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
                                   type: type,
                                   walletId: walletId,
                                   dueDate: selectedDate,
-                                );
+                                ));
+                                if (saved) VoiceDiagnosticsService.instance.finish(diagnosticId, 'completed', reason: 'udhar_committed');
                                 if (saved) {
                                   unawaited(
                                     NotificationService()
@@ -968,6 +1047,7 @@ class _DebtScreenState extends ConsumerState<DebtScreen> {
           },
         ),
       ).whenComplete(() {
+        VoiceDiagnosticsService.instance.finish(diagnosticId, 'cancelled', reason: 'udhar_confirmation_dismissed');
         nameCtrl.dispose();
         amountCtrl.dispose();
       }),

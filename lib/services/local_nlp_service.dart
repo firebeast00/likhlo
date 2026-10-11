@@ -1457,6 +1457,7 @@ class LocalNlpService {
     String input,
     List<String> activeCategories, {
     Iterable<SmartEntryAccount> accounts = const [],
+    String? explicitExpenseCategory,
   }) {
     final rawInput = PakistaniLanguageNormalizer().normalize(input).normalized;
     String lowerInput = rawInput.toLowerCase().replaceAll(
@@ -1602,7 +1603,14 @@ class LocalNlpService {
       matchedCategoryTokens.addAll(candidate.split(' '));
     }
 
-    for (final candidate in candidates) {
+    if (intent == SmartEntryIntent.addExpense &&
+        explicitExpenseCategory != null &&
+        activeCategories.contains(explicitExpenseCategory)) {
+      category = explicitExpenseCategory;
+      categoryFound = true;
+    }
+
+    for (final candidate in categoryFound ? const <String>[] : candidates) {
       final mappedCategory = _normalizedLexicon[_normalize(candidate)];
       if (mappedCategory != null &&
           lowerActiveCategories.contains(mappedCategory.toLowerCase())) {

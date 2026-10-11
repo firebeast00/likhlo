@@ -1,3 +1,4 @@
+import '../services/voice_diagnostics_service.dart';
 import '../l10n/app_strings.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -44,6 +45,10 @@ import '../services/smart_input_engine.dart';
 import '../services/confidence_evaluator.dart';
 import '../services/speech_recognition_provider.dart';
 import '../services/speech_command_completeness.dart';
+import '../services/home_category_speech_policy.dart';
+import '../services/speech_category_matcher.dart';
+import '../widgets/speech_category_dialog.dart';
+import '../services/speech_timing_policy.dart';
 import '../services/transaction_title_policy.dart';
 import './income_accounts_screen.dart';
 import './receipt_review_screen.dart';
@@ -79,3 +84,4 @@ class HomeScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
+

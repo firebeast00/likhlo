@@ -7,6 +7,7 @@ import 'package:hive/hive.dart';
 import 'package:student_expense_manager/l10n/app_strings.dart';
 import 'package:student_expense_manager/l10n/material_strings.dart';
 import 'package:student_expense_manager/providers/settings_provider.dart';
+import 'package:student_expense_manager/widgets/language_settings_tile.dart';
 import 'package:student_expense_manager/services/deterministic_feedback_service.dart';
 
 class _LanguageView extends StatelessWidget {
@@ -31,6 +32,7 @@ void main() {
     directory = await Directory.systemTemp.createTemp('likhlo_language_');
     Hive.init(directory.path);
     settings = await Hive.openBox('settings');
+    await Hive.openBox('preferences');
     container = ProviderContainer();
   });
   tearDown(() async {
@@ -54,7 +56,7 @@ void main() {
     final before = Map.from(ledger.toMap());
     final notifier = container.read(settingsProvider.notifier);
     await notifier.updateAppLanguage('romanUrdu');
-    expect(container.read(settingsProvider).smartEntryLanguage, 'english');
+    expect(container.read(settingsProvider).smartEntryLanguage, 'romanUrdu');
     expect(container.read(settingsProvider).themeMode, 'dark');
     expect(ledger.toMap(), before);
     await notifier.updateAppLanguage('invalid');
@@ -63,7 +65,115 @@ void main() {
     expect(container.read(settingsProvider).appLanguage, 'romanUrdu');
     await container.read(settingsProvider.notifier).updateAppLanguage('english');
     expect(AppLanguage.read(), AppLanguage.english);
+    expect(container.read(settingsProvider).smartEntryLanguage, 'english');
+    expect(settings.get('smartEntryLanguage'), 'english');
   });
+
+  test('one language selection updates both preferences and survives reload', () async {
+    final notifier = container.read(settingsProvider.notifier);
+    for (final language in ['romanUrdu', 'english']) {
+      await notifier.updateLanguage(language);
+      expect(container.read(settingsProvider).appLanguage, language);
+      expect(container.read(settingsProvider).smartEntryLanguage, language);
+      expect(settings.get('appLanguage'), language);
+      expect(settings.get('smartEntryLanguage'), language);
+      expect(AppLanguage.read().name, language);
+    }
+    container.invalidate(settingsProvider);
+    expect(container.read(settingsProvider).appLanguage, 'english');
+    expect(container.read(settingsProvider).smartEntryLanguage, 'english');
+  });
+
+  test('existing Smart NLP language callers use the shared selection', () async {
+    await container.read(settingsProvider.notifier)
+        .updateSmartEntryLanguage('romanUrdu');
+    expect(container.read(settingsProvider).appLanguage, 'romanUrdu');
+    expect(container.read(settingsProvider).smartEntryLanguage, 'romanUrdu');
+    expect(AppLanguage.read(), AppLanguage.romanUrdu);
+    expect(settings.get('appLanguage'), 'romanUrdu');
+    expect(settings.get('smartEntryLanguage'), 'romanUrdu');
+  });
+
+  test('choosing the displayed legacy language synchronizes Smart NLP', () async {
+    await settings.putAll({
+      'appLanguage': 'english', 'smartEntryLanguage': 'romanUrdu',
+    });
+    final language = container.read(settingsProvider).appLanguage;
+    await container.read(settingsProvider.notifier).updateLanguage(language);
+    expect(container.read(settingsProvider).smartEntryLanguage, 'english');
+    expect(settings.get('smartEntryLanguage'), 'english');
+  });
+
+  test('invalid shared language leaves both preferences untouched', () async {
+    final notifier = container.read(settingsProvider.notifier);
+    await notifier.updateLanguage('romanUrdu');
+    final before = Map.from(settings.toMap());
+    for (final invalid in ['', 'unknown', 'ur']) {
+      await notifier.updateLanguage(invalid);
+      await notifier.updateSmartEntryLanguage(invalid);
+      await notifier.updateAppLanguage(invalid);
+    }
+    expect(settings.toMap(), before);
+    expect(container.read(settingsProvider).appLanguage, 'romanUrdu');
+    expect(container.read(settingsProvider).smartEntryLanguage, 'romanUrdu');
+  });
+
+  for (final language in AppLanguage.values) {
+    testWidgets('Settings has one language control in ${language.name} on a narrow phone', (tester) async {
+      await tester.runAsync(() =>
+          container.read(settingsProvider.notifier).updateLanguage(language.name));
+      tester.view.physicalSize = const Size(320, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      String? selection;
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          locale: language.locale,
+          supportedLocales: AppStrings.supportedLocales,
+          localizationsDelegates: const [AppStrings.delegate, AppMaterialDelegate(), AppCupertinoDelegate(), AppWidgetsDelegate()],
+          home: Consumer(builder: (context, ref, child) => Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: LanguageSettingsTile(
+                language: ref.watch(settingsProvider).appLanguage,
+                onChanged: (value) {
+                  selection = value;
+                },
+              ),
+            ),
+          )),
+        ),
+      ));
+      final selector = find.byKey(const ValueKey('settings-language'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DropdownButton<String>), findsOneWidget);
+      expect(tester.widget<DropdownButton<String>>(selector).value, language.name);
+      expect(find.text(AppStrings(language).text('settings_language')), findsOneWidget);
+      expect(find.text(AppStrings(language).text('settings_language_hint')), findsOneWidget);
+      expect(find.text(AppStrings(language).text('smart_entry_language_ca86c2')), findsNothing);
+      expect(tester.takeException(), isNull);
+      final next = language == AppLanguage.english
+          ? AppLanguage.romanUrdu : AppLanguage.english;
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(next == AppLanguage.english ? 'English' : 'Roman Urdu').last);
+      await tester.pumpAndSettle();
+      expect(selection, next.name);
+      // Persist the emitted value outside the widget test's fake async clock.
+      await tester.runAsync(() =>
+          container.read(settingsProvider.notifier).updateLanguage(selection!));
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).appLanguage, next.name);
+      expect(container.read(settingsProvider).smartEntryLanguage, next.name);
+      expect(settings.get('appLanguage'), next.name);
+      expect(settings.get('smartEntryLanguage'), next.name);
+      expect(tester.widget<DropdownButton<String>>(selector).value, next.name);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   test('committed finance values and user names remain opaque parameters', () {
     const data = FinancialFeedbackData(

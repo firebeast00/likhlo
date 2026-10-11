@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'voice_diagnostics_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -194,9 +195,24 @@ class TransactionExecutor {
   }) : audioFeedback = audioFeedback ?? AudioFeedbackService();
 
   Future<TransactionResult> execute(LedgerCommand command) async {
+    final diagnostics = VoiceDiagnosticsService.instance;
+    diagnostics.stage('execution', {'action': command.action.name, 'status': 'started'});
+    try {
+      final result = await _execute(command);
+      diagnostics.stage('execution', {'action': result.action.name, 'status': result.status.name,
+        'affected_ids': result.affectedIds, 'reason': result.reason});
+      return result;
+    } catch (error) {
+      diagnostics.stage('execution', {'action': command.action.name, 'status': 'failed', 'error_type': error.runtimeType.toString()});
+      rethrow;
+    }
+  }
+
+  Future<TransactionResult> _execute(LedgerCommand command) async {
     switch (command) {
       case CreateTransactionCommand():
         final entry = _prepareForMainLedger(command.entry);
+        _recordDiagnosticEntries([entry]);
         final saved = await store.add(entry);
         if (saved && enableAudio) {
           unawaited(
@@ -255,6 +271,7 @@ class TransactionExecutor {
           );
         }
         final entries = command.entries.map(_prepareForMainLedger).toList();
+        _recordDiagnosticEntries(entries);
         final saved = await store.addAll(entries);
         if (saved && enableAudio) {
           final feedbackAction = entries.every((entry) => entry.type == 'income')
@@ -290,6 +307,7 @@ class TransactionExecutor {
         }
         final outgoing = _prepareForMainLedger(command.outgoing);
         final incoming = _prepareForMainLedger(command.incoming);
+        _recordDiagnosticEntries([outgoing, incoming]);
         final saved = await store.addAll([outgoing, incoming]);
         if (saved && enableAudio) {
           unawaited(
@@ -311,6 +329,7 @@ class TransactionExecutor {
         );
       case UpdateTransactionCommand():
         final updatedEntry = _prepareForMainLedger(command.updated);
+        _recordDiagnosticEntries([updatedEntry]);
         final updated = await store.update(
           command.existingId,
           updatedEntry,
@@ -427,6 +446,18 @@ class TransactionExecutor {
           action: TransactionAction.emptyTrash,
         );
     }
+  }
+
+  void _recordDiagnosticEntries(Iterable<Expense> entries) {
+    final diagnostics = VoiceDiagnosticsService.instance;
+    if (!diagnostics.enabled || diagnostics.currentId == null) return;
+    try {
+      diagnostics.stage('execution_input', {'entries': entries.map((entry) => {
+        'id': entry.id, 'title': entry.title, 'amount': entry.amount,
+        'type': entry.type, 'category': entry.category, 'date': entry.date,
+        'wallet_id': entry.walletId,
+      }).toList()});
+    } catch (_) { /* Observations never change ledger behavior. */ }
   }
 
   FinancialFeedbackAction _feedbackAction(

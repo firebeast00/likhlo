@@ -456,6 +456,10 @@ extension _DashboardSmartEntryQueryMethods on _HomeScreenState {
     final spending = matching
         .where((entry) => entry.type == 'expense')
         .fold<double>(0, (sum, entry) => sum + entry.amount);
+    VoiceDiagnosticsService.instance.stage('query_result', {
+      'metric': metric.name, 'matched_entries': matching.length,
+      'income': income, 'spending': spending, 'net': income - spending,
+    });
     final period = referencedMonth == null
         ? _smartTimeRangeLabel(command.timeRange)
         : DateFormat.yMMMM().format(referencedMonth);

@@ -79,7 +79,7 @@ extension _DashboardNotificationMethods on _HomeScreenState {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _listenForExpense,
+                    onPressed: () => _listenForExpense(entryPoint: 'notification_voice'),
                     icon: const Icon(Icons.mic_rounded),
                     label: Text(AppStrings.current.text('speak_7a8171')),
                   ),

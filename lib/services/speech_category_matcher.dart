@@ -1,0 +1,156 @@
+import 'explicit_expense_category.dart';
+import 'category_vocabulary.dart';
+
+/// Matching applies only to an isolated, explicitly requested category.
+/// Scores rank candidates; they are not execution confidence or probabilities.
+class SpeechCategoryMatcher {
+  const SpeechCategoryMatcher();
+
+  static String aliasKey(String name) => name.trim().toLowerCase()
+      .replaceAll(RegExp(r'\s+'), ' ');
+
+  ExplicitExpenseCategory match(ExplicitExpenseCategory extracted,
+      Iterable<String> categories, {Map<String, String> confirmedAliases = const {},
+      Iterable<String> walletNames = const [], CategoryVocabulary? vocabulary,
+      bool allowSplitWords = false, bool allowTrustedRecovery = false}) {
+    // Exact matches, unfinished instructions and conflicting instructions win.
+    if (!extracted.canSuggest) return extracted;
+    final requested = aliasKey(extracted.requestedNames.single);
+    if (requested.isEmpty || requested.length > 80) return extracted;
+    final names = categories.toList(growable: false);
+    bool allowed(String name) => extracted.hasCategoryLabel ||
+        !{'cash', 'jazzcash', 'easypaisa', ...walletNames.map(aliasKey)}
+            .contains(aliasKey(name));
+
+    // User-confirmed aliases only. A new exact category always supersedes one.
+    final exact = names.where((name) => aliasKey(name) == requested);
+    if (exact.length == 1 && allowed(exact.single)) {
+      return extracted.confirmed(exact.single, provenance: 'exact');
+    }
+    if (exact.length > 1) return extracted;
+    if (vocabulary != null) {
+      final targets = vocabulary.targets(requested)
+          .where((name) => names.contains(name) && allowed(name)).toList();
+      if (targets.length == 1) {
+        return extracted.confirmed(targets.single,
+            provenance: vocabulary.provenance(requested));
+      }
+      if (targets.length > 1) {
+        return extracted.withVoiceMatches(targets,
+            {for (final target in targets) target: 1});
+      }
+    }
+    final alias = confirmedAliases[requested];
+    if (vocabulary == null && alias != null && names.contains(alias) && allowed(alias) &&
+        _identifiers(requested) == _identifiers(aliasKey(alias))) {
+      return extracted.confirmed(alias, provenance: 'confirmed_alias');
+    }
+
+    if (allowTrustedRecovery && vocabulary != null) {
+      final targets = vocabulary.spellingTargets(requested)
+          .where((name) => names.contains(name) && allowed(name)).toList();
+      if (targets.length == 1) {
+        return extracted.confirmed(targets.single, provenance: 'roman_spelling');
+      }
+      if (targets.length > 1) {
+        return extracted.withVoiceMatches(targets,
+            {for (final target in targets) target: 1});
+      }
+    }
+
+    // Short names are especially collision-prone; never fuzzy-match them.
+    final compact = requested.replaceAll(' ', '');
+    if (compact.length < 5) return extracted;
+    final scores = <String, double>{};
+    final trusted = <String>{};
+    final entries = vocabulary?.entries ?? names.map((name) => MapEntry(name, name));
+    for (final entry in entries) {
+      final name = entry.value;
+      if (!names.contains(name) || !allowed(name)) continue;
+      final target = aliasKey(entry.key);
+      final targetCompact = target.replaceAll(' ', '');
+      if (targetCompact.length < 5 || targetCompact.length > 80 ||
+          (!allowSplitWords && requested.split(' ').length != target.split(' ').length) ||
+          _identifiers(requested) != _identifiers(target)) continue;
+      final maxLength = compact.length > targetCompact.length
+          ? compact.length : targetCompact.length;
+      final budget = maxLength >= 9 ? 2 : 1;
+      if ((compact.length - targetCompact.length).abs() > budget) continue;
+      final edits = _distance(compact, targetCompact);
+      if (edits > budget) continue;
+      final lexical = 1 - edits / maxLength;
+      final dice = _dice(compact, targetCompact);
+      final score = .7 * lexical + .3 * dice;
+      if (lexical >= .8 && dice >= .65 && score >= .78) {
+        if (score > (scores[name] ?? 0)) scores[name] = score;
+        // Full-span, long names only. One edit needs strong agreement from
+        // both metrics; short ASR substitutions remain suggestions.
+        if (allowTrustedRecovery && compact.length >= 9 &&
+            targetCompact.length >= 9 && edits <= 1 &&
+            _trustedIdentifiers(requested) == _trustedIdentifiers(target) &&
+            lexical >= .9 && dice >= .85 && score >= .9) trusted.add(name);
+      }
+    }
+    final ranked = scores.entries.toList();
+    ranked.sort((a, b) {
+      final score = b.value.compareTo(a.value);
+      return score == 0 ? a.key.compareTo(b.key) : score;
+    });
+    if (ranked.isEmpty) return extracted;
+    // Deduplicated canonical competitors must be clearly behind the winner.
+    if (trusted.contains(ranked.first.key) &&
+        (ranked.length == 1 || ranked.first.value - ranked[1].value > .12)) {
+      return extracted.confirmed(ranked.first.key, provenance: 'near_exact');
+    }
+    // Keep close alternatives visible instead of guessing between them.
+    final candidates = ranked.where((entry) =>
+        entry.value >= ranked.first.value - .12).take(3).toList();
+    return extracted.withVoiceMatches(
+        candidates.map((entry) => entry.key).toList(growable: false),
+        {for (final entry in candidates) entry.key: entry.value});
+  }
+
+  // Digits and punctuation are identifiers, not spelling mistakes.
+  static String _identifiers(String text) =>
+      RegExp(r'\d+|[^\w\s\u0600-\u06ff]').allMatches(text)
+          .map((match) => match.group(0)).join('|');
+
+  // Underscores are also literal identifiers for automatic recovery.
+  static String _trustedIdentifiers(String text) =>
+      RegExp(r'\d+|_+|[^\w\s\u0600-\u06ff]').allMatches(text)
+          .map((match) => match.group(0)).join('|');
+
+  static int _distance(String a, String b) {
+    var previous = List<int>.generate(b.length + 1, (i) => i);
+    for (var i = 0; i < a.length; i++) {
+      final row = List<int>.filled(b.length + 1, 0)..[0] = i + 1;
+      for (var j = 0; j < b.length; j++) {
+        final insertion = row[j] + 1;
+        final deletion = previous[j + 1] + 1;
+        final substitution = previous[j] + (a[i] == b[j] ? 0 : 1);
+        row[j + 1] = insertion < deletion ? insertion : deletion;
+        if (substitution < row[j + 1]) row[j + 1] = substitution;
+      }
+      previous = row;
+    }
+    return previous.last;
+  }
+
+  static double _dice(String a, String b) {
+    final pairs = <String, int>{};
+    for (var i = 0; i < a.length - 1; i++) {
+      final pair = a.substring(i, i + 2);
+      pairs[pair] = (pairs[pair] ?? 0) + 1;
+    }
+    var overlap = 0;
+    for (var i = 0; i < b.length - 1; i++) {
+      final pair = b.substring(i, i + 2);
+      final count = pairs[pair] ?? 0;
+      if (count > 0) {
+        overlap++;
+        pairs[pair] = count - 1;
+      }
+    }
+    return 2 * overlap / (a.length + b.length - 2);
+  }
+}

@@ -197,10 +197,15 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                                 index >= stats.monthLabels.length) {
                               return const SizedBox();
                             }
+                            final monthLabel = AppStrings.current
+                                .dateLabel(stats.monthLabels[index]);
+                            final compactMonthLabel = monthLabel.length > 4
+                                ? monthLabel.substring(0, 3)
+                                : monthLabel;
                             return Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
-                                AppStrings.current.dateLabel(stats.monthLabels[index]),
+                                compactMonthLabel,
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,

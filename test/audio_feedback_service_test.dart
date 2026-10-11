@@ -63,6 +63,7 @@ void main() {
   bool silent = false;
 
   setUp(() async {
+    AudioFeedbackService.deferSpokenFeedbackUntil(Future<void>.value());
     temporaryDirectory = await Directory.systemTemp.createTemp('likhlo_audio_');
     Hive.init(temporaryDirectory.path);
     preferences = await Hive.openBox('preferences');
@@ -94,6 +95,39 @@ void main() {
       'Showing October 2026 Stats.',
       'Spoken confirmations are enabled.',
     ]);
+  });
+
+  test('spoken feedback waits for microphone cleanup', () async {
+    final cleanup = Completer<void>();
+    AudioFeedbackService.deferSpokenFeedbackUntil(cleanup.future);
+    final pending = service.announceMessage('Opening Stats.');
+    await Future<void>.delayed(Duration.zero);
+    expect(tts.spoken, isEmpty);
+    cleanup.complete();
+    await pending;
+    expect(tts.spoken, ['Opening Stats.']);
+  });
+
+  test('starting another session cancels feedback waiting for cleanup', () async {
+    final cleanup = Completer<void>();
+    AudioFeedbackService.deferSpokenFeedbackUntil(cleanup.future);
+    final pending = service.announceMessage('Opening Stats.');
+    await service.stop();
+    cleanup.complete();
+    await pending;
+    expect(tts.spoken, isEmpty);
+  });
+
+  test('failed microphone cleanup does not fail committed feedback', () async {
+    final cleanup = Completer<void>();
+    AudioFeedbackService.deferSpokenFeedbackUntil(cleanup.future);
+    final pending = service.announceMessage('Opening Stats.');
+    cleanup.completeError(StateError('microphone cleanup failed'));
+    await expectLater(pending, completes);
+    expect(tts.spoken, isEmpty);
+    AudioFeedbackService.deferSpokenFeedbackUntil(Future<void>.value());
+    await service.announceMessage('Opening Stats.');
+    expect(tts.spoken, ['Opening Stats.']);
   });
 
   test('notifications read totals and periods from the title as well as body', () async {
@@ -296,3 +330,4 @@ void main() {
     expect(container.read(appActionProvider), isNull);
   });
 }
+
