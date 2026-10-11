@@ -276,6 +276,8 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       'score': semanticConfidence.score, 'disposition': semanticConfidence.disposition.name,
       'reasons': semanticConfidence.reasons, 'requires_asr_review': plan.requiresAsrReview,
       'resolved_wallet_id': resolvedWalletId,
+      'category_resolution': expenseCategory?.resolution,
+      'category_requires_review': categoryReview != null,
     });
     assert(() {
       debugPrint(
@@ -363,6 +365,9 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         defaultAccounts.every((account) => account.availableBalance <= 0);
     final reviewMessage = plan.requiresAsrReview
         ? 'Voice recognition corrected a similar-sounding financial word. Verify the title and amount before saving.'
+        : categoryReview != null && resolvedWalletId != null &&
+        semanticConfidence.canAutoExecute
+        ? AppStrings.current.text('expense_category_choose')
         : resolvedWalletId != null &&
         !semanticConfidence.canAutoExecute
         ? 'Review the detected title, amount, category, date, and wallet before saving.'

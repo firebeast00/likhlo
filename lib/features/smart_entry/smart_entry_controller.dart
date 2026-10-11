@@ -83,7 +83,8 @@ class SmartEntryController {
     final wallets = accounts.map((account) => account.name);
     final vocabulary = voice && enableRomanUrduCategories ? _voiceCache.vocabulary : null;
     bool supportsCategory(String name) {
-      if (vocabulary!.targets(name).isNotEmpty) return true;
+      if (vocabulary!.targets(name).isNotEmpty ||
+          vocabulary.spellingTargets(name).isNotEmpty) return true;
       return const SpeechCategoryMatcher().match(ExplicitExpenseCategory(
           cleanedText: '', requestedNames: [name], hasCategoryLabel: true,
           issue: 'Choose an existing category; the requested category was not found.'),
@@ -121,7 +122,8 @@ class SmartEntryController {
     if (const MultiEntryParser().tryParseBatch(extracted.cleanedText) != null) return null;
     return voice ? const SpeechCategoryMatcher().match(extracted, categories,
         confirmedAliases: voiceCategoryAliases, walletNames: wallets,
-        vocabulary: vocabulary, allowSplitWords: vocabulary != null) : extracted;
+        vocabulary: vocabulary, allowSplitWords: vocabulary != null,
+        allowTrustedRecovery: vocabulary != null) : extracted;
   }
 }
 

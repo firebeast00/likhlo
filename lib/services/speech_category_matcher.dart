@@ -1,7 +1,7 @@
 import 'explicit_expense_category.dart';
 import 'category_vocabulary.dart';
 
-/// Suggestions apply only to an isolated, explicitly requested category.
+/// Matching applies only to an isolated, explicitly requested category.
 /// Scores rank candidates; they are not execution confidence or probabilities.
 class SpeechCategoryMatcher {
   const SpeechCategoryMatcher();
@@ -12,7 +12,7 @@ class SpeechCategoryMatcher {
   ExplicitExpenseCategory match(ExplicitExpenseCategory extracted,
       Iterable<String> categories, {Map<String, String> confirmedAliases = const {},
       Iterable<String> walletNames = const [], CategoryVocabulary? vocabulary,
-      bool allowSplitWords = false}) {
+      bool allowSplitWords = false, bool allowTrustedRecovery = false}) {
     // Exact matches, unfinished instructions and conflicting instructions win.
     if (!extracted.canSuggest) return extracted;
     final requested = aliasKey(extracted.requestedNames.single);
@@ -46,10 +46,23 @@ class SpeechCategoryMatcher {
       return extracted.confirmed(alias, provenance: 'confirmed_alias');
     }
 
+    if (allowTrustedRecovery && vocabulary != null) {
+      final targets = vocabulary.spellingTargets(requested)
+          .where((name) => names.contains(name) && allowed(name)).toList();
+      if (targets.length == 1) {
+        return extracted.confirmed(targets.single, provenance: 'roman_spelling');
+      }
+      if (targets.length > 1) {
+        return extracted.withVoiceMatches(targets,
+            {for (final target in targets) target: 1});
+      }
+    }
+
     // Short names are especially collision-prone; never fuzzy-match them.
     final compact = requested.replaceAll(' ', '');
     if (compact.length < 5) return extracted;
     final scores = <String, double>{};
+    final trusted = <String>{};
     final entries = vocabulary?.entries ?? names.map((name) => MapEntry(name, name));
     for (final entry in entries) {
       final name = entry.value;
@@ -70,6 +83,11 @@ class SpeechCategoryMatcher {
       final score = .7 * lexical + .3 * dice;
       if (lexical >= .8 && dice >= .65 && score >= .78) {
         if (score > (scores[name] ?? 0)) scores[name] = score;
+        // Full-span, long names only. One edit needs strong agreement from
+        // both metrics; short ASR substitutions remain suggestions.
+        if (allowTrustedRecovery && compact.length >= 9 &&
+            targetCompact.length >= 9 && edits <= 1 &&
+            lexical >= .9 && dice >= .85 && score >= .9) trusted.add(name);
       }
     }
     final ranked = scores.entries.toList();
@@ -77,8 +95,13 @@ class SpeechCategoryMatcher {
       final score = b.value.compareTo(a.value);
       return score == 0 ? a.key.compareTo(b.key) : score;
     });
-    // Keep close alternatives visible; no top-one automatic selection.
     if (ranked.isEmpty) return extracted;
+    // Deduplicated canonical competitors must be clearly behind the winner.
+    if (trusted.contains(ranked.first.key) &&
+        (ranked.length == 1 || ranked.first.value - ranked[1].value > .12)) {
+      return extracted.confirmed(ranked.first.key, provenance: 'near_exact');
+    }
+    // Keep close alternatives visible instead of guessing between them.
     final candidates = ranked.where((entry) =>
         entry.value >= ranked.first.value - .12).take(3).toList();
     return extracted.withVoiceMatches(

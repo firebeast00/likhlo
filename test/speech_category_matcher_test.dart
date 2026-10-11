@@ -17,6 +17,171 @@ void main() {
   const matcher = SpeechCategoryMatcher();
   const policy = HomeCategorySpeechPolicy();
 
+  group('trusted Roman Urdu category spelling recovery', () {
+    const accounts = [SmartEntryAccount(id: 'cash', name: 'Cash', type: 'cash', availableBalance: 10000)];
+    SmartInputPlan parse(String input, List<String> categories,
+        {bool roman = true, SmartInputSource source = SmartInputSource.voice,
+        SmartEntryController? parser}) => (parser ?? SmartEntryController()).parse(
+          input, categories, source: source, accounts: accounts,
+          enableHomeExpenseCategories: true, enableRomanUrduCategories: roman);
+
+    for (final input in ['750 ke shampoo category ghar ka saman',
+        '750 ke shampoo ko ghar ka saman category mein add karo']) {
+      test('phone spelling $input locks the saved category without review', () {
+        final plan = parse(input, ['General', 'Ghar K saman']);
+        expect(plan.expenseCategory!.category, 'Ghar K saman');
+        expect(plan.expenseCategory!.resolution, 'roman_spelling');
+        expect(plan.expenseCategory!.needsClarification, false);
+        expect(plan.parsed.category, 'Ghar K saman');
+        expect(plan.parsed.amount, 750);
+        expect(plan.parsed.title, 'Shampoo');
+        expect(plan.requiresAsrReview, false);
+        final confidence = const ConfidenceEvaluator().evaluate(plan.command,
+            context: const ConfidenceContext(hasExactAmount: true, hasResolvedWallet: true));
+        expect(confidence.canAutoExecute, true);
+        expect(shouldAutoSaveSmartEntry(plan.parsed.toLegacyMap(),
+            hasResolvedWallet: true, semanticConfidence: confidence.score), true);
+      });
+    }
+
+    test('connector recovery is symmetric and keeps the canonical spelling', () {
+      final plan = parse('120 milk category ghar k saman', ['General', 'Ghar Ka Saman']);
+      expect(plan.expenseCategory!.category, 'Ghar Ka Saman');
+      expect(plan.expenseCategory!.resolution, 'roman_spelling');
+    });
+
+    test('literal new category wins over connector-equivalent names', () {
+      final plan = parse('120 milk category ghar ka saman',
+          ['General', 'Ghar K Saman', 'Ghar Ka Saman']);
+      expect(plan.expenseCategory!.category, 'Ghar Ka Saman');
+      expect(plan.expenseCategory!.resolution, 'exact');
+    });
+
+    test('connector collisions require clarification instead of ordering names', () {
+      for (final names in [
+        ['General', 'Ghar K Saman Ka Kharch', 'Ghar Ka Saman K Kharch'],
+        ['General', 'Ghar Ka Saman K Kharch', 'Ghar K Saman Ka Kharch'],
+      ]) {
+        final plan = parse('120 milk category ghar ka saman ka kharch', names);
+        expect(plan.expenseCategory!.category, isNull);
+        expect(plan.expenseCategory!.needsClarification, true);
+        expect(plan.expenseCategory!.suggestions.toSet(), names.skip(1).toSet());
+      }
+    });
+
+    for (final pair in [
+      ['office lunchh', 'Office Lunch'], ['office lunch', 'OfficeLunch'],
+      ['gharr ka kharch', 'Ghar Ka Kharch'],
+    ]) {
+      test('unique long near-exact ${pair.first} resolves ${pair.last}', () {
+        final plan = parse('120 milk category ${pair.first}', ['General', pair.last]);
+        expect(plan.expenseCategory!.category, pair.last);
+        expect(plan.expenseCategory!.resolution, 'near_exact');
+        expect(plan.expenseCategory!.needsClarification, false);
+        expect(plan.parsed.amount, 120);
+        expect(plan.parsed.title, 'Milk');
+      });
+    }
+
+    test('close long competitors remain suggestions regardless of category order', () {
+      for (final names in [
+        ['General', 'Office Lunch', 'Office Lunches'],
+        ['General', 'Office Lunches', 'Office Lunch'],
+      ]) {
+        final plan = parse('120 milk category office lunchh', names);
+        expect(plan.expenseCategory!.category, isNull);
+        expect(plan.expenseCategory!.needsClarification, true);
+        expect(plan.expenseCategory!.suggestions.toSet(), names.skip(1).toSet());
+      }
+    });
+
+    test('identical compact spellings for two saved names remain ambiguous', () {
+      final plan = parse('120 milk category office lun ch',
+          ['General', 'Office Lunch', 'Off iceLunch']);
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.suggestions.toSet(), {'Office Lunch', 'Off iceLunch'});
+    });
+
+    test('two-edit suggestions do not become automatic recoveries', () {
+      final plan = parse('120 milk category office lunnchh', ['General', 'Office Lunch']);
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.needsClarification, true);
+      expect(plan.expenseCategory!.suggestions, ['Office Lunch']);
+    });
+
+    test('user-confirmed alias remains authoritative over spelling recovery', () {
+      final plan = SmartEntryController().parse('120 milk category ghar ka saman',
+          ['General', 'Food', 'Ghar K Saman'], source: SmartInputSource.voice,
+          enableHomeExpenseCategories: true, enableRomanUrduCategories: true,
+          voiceCategoryAliases: {'ghar ka saman': 'Food'});
+      expect(plan.expenseCategory!.category, 'Food');
+      expect(plan.expenseCategory!.resolution, 'confirmed_alias');
+    });
+
+    for (final pair in [
+      ['match', 'Mess'], ['sehatt', 'Health'], ['ghar ke saman', 'Ghar K Saman'],
+      ['ghar ki saman', 'Ghar K Saman'], ['ghar ka saman 3', 'Ghar K Saman 2'],
+      ['office lunch 3', 'Office Lunch 2'], ['office lunch+', 'Office Lunch++'],
+    ]) {
+      test('${pair.first} cannot silently select ${pair.last}', () {
+        final plan = parse('120 milk category ${pair.first}', ['General', pair.last]);
+        expect(plan.expenseCategory!.category, isNull);
+        expect(plan.expenseCategory!.needsClarification, true);
+      });
+    }
+
+    test('trusted recovery is scoped to Roman Urdu Home voice', () {
+      for (final input in ['120 milk category ghar ka saman',
+          '120 milk category office lunchh']) {
+        for (final source in SmartInputSource.values) {
+          final plan = parse(input, ['General', 'Ghar K Saman', 'Office Lunch'],
+              source: source, roman: source != SmartInputSource.voice);
+          expect(plan.expenseCategory?.category, isNull);
+        }
+      }
+      const request = ExplicitExpenseCategory(cleanedText: 'milk 120',
+          issue: 'Choose an existing category; the requested category was not found.',
+          requestedNames: ['office lunchh'], hasCategoryLabel: true);
+      expect(matcher.match(request, ['Office Lunch'], allowSplitWords: true).category, isNull);
+    });
+
+    test('category spelling cannot change amount, wallet or date clauses', () {
+      final parser = SmartEntryController();
+      final before = parse('750 ke shampoo category Ghar K Saman wallet cash yesterday',
+          ['General', 'Ghar K Saman'], parser: parser);
+      final recovered = parse('750 ke shampoo category ghar ka saman wallet cash yesterday',
+          ['General', 'Ghar K Saman'], parser: parser);
+      final a = before.parsed.toLegacyMap()..remove('date');
+      final b = recovered.parsed.toLegacyMap()..remove('date');
+      expect(b, a);
+      expect(recovered.parsed.date.day, before.parsed.date.day);
+      expect(recovered.normalizedText, before.normalizedText);
+      expect(findMentionedSmartEntryAccountId(recovered.normalizedText, accounts), 'cash');
+      expect(recovered.expenseCategory!.needsClarification, false);
+      expect(resolveSmartEntryAccount(input: recovered.normalizedText, accounts: const [
+        SmartEntryAccount(id: 'cash', name: 'Cash', type: 'cash', availableBalance: 10),
+      ], transactionType: 'expense', amount: 750), isNull);
+    });
+
+    test('dynamic categories invalidate cached spelling targets', () {
+      final parser = SmartEntryController();
+      const input = '120 milk category ghar ka saman';
+      expect(parse(input, ['General', 'Ghar K Saman'], parser: parser)
+          .expenseCategory!.category, 'Ghar K Saman');
+      expect(parse(input, ['General'], parser: parser).expenseCategory!.category, isNull);
+      expect(parse(input, ['General', 'Ghar Ka Saman'], parser: parser)
+          .expenseCategory!.resolution, 'exact');
+    });
+
+    test('untrusted category overrides remain blocked', () {
+      for (final input in ['120 milk category ghar ka saman category food',
+          '120 milk category ghar ka saman nahi']) {
+        expect(parse(input, ['General', 'Ghar K Saman', 'Food'])
+            .expenseCategory?.category, isNull);
+      }
+    });
+  });
+
   group('phone category review and parse reuse', () {
     const active = ['General', 'Food', 'Mess', 'Health', 'Ghar Ka Saman', 'Karobar'];
     const wallets = [SmartEntryAccount(id: 'jazz', name: 'JazzCash', type: 'jazzcash', availableBalance: 10000)];
@@ -650,14 +815,14 @@ void main() {
 
     for (final input in ['milk 120 category office lunch',
         '120 milk office lunch category mein add karo']) {
-      test('$input offers a joined-name suggestion without selecting it', () {
+      test('$input resolves a unique long joined name without review', () {
         final plan = parse(input, categories: ['General', 'OfficeLunch']);
         expect(plan.parsed.amount, 120);
         expect(plan.parsed.title, 'Milk');
         expect(plan.expenseCategory!.requestedNames, ['office lunch']);
-        expect(plan.expenseCategory!.suggestions, ['OfficeLunch']);
-        expect(plan.expenseCategory!.category, isNull);
-        expect(plan.expenseCategory!.needsClarification, true);
+        expect(plan.expenseCategory!.category, 'OfficeLunch');
+        expect(plan.expenseCategory!.resolution, 'near_exact');
+        expect(plan.expenseCategory!.needsClarification, false);
       });
     }
 
