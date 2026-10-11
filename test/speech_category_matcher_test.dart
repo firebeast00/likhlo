@@ -550,7 +550,9 @@ void main() {
     test('ambiguous suffix boundaries retain the draft instead of learning item text', () {
       final plan = parse('120 milk family lunchh category',
           categories: ['General', 'Family Lunch', 'Lunch']);
-      expect(plan.expenseCategory!.isInstructionIncomplete, true);
+      expect(plan.expenseCategory!.isInstructionIncomplete, false);
+      expect(plan.expenseCategory!.needsClarification, true);
+      expect(policy.canRecoverCategory(plan), false);
       expect(plan.expenseCategory!.requestedNames, isEmpty);
       expect(plan.expenseCategory!.category, isNull);
       expect(plan.expenseCategory!.cleanedText, contains('milk family lunchh'));

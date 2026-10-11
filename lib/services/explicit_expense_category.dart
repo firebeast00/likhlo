@@ -87,6 +87,7 @@ class ExplicitExpenseCategoryExtractor {
     final boundary = voice ? _end.replaceFirst('category|', 'category|catagory|') : _end;
     var hasAddInstruction = false;
     var resolution = 'exact';
+    var ambiguousSuffix = false;
     final wallets = {'cash', 'jazzcash', 'easypaisa', ...walletNames.map(_key)};
 
     String pattern(String name) => name.trim().split(RegExp(r'\s+'))
@@ -209,7 +210,10 @@ class ExplicitExpenseCategoryExtractor {
                 candidates.add(MapEntry(candidateStart, name));
               }
             }
-            if (candidates.length != 1) continue;
+            if (candidates.length != 1) {
+              ambiguousSuffix |= candidates.length > 1;
+              continue;
+            }
             start = candidates.single.key;
             requestedName = candidates.single.value;
           } else if (!preservesSuffix(match)) {
@@ -253,7 +257,7 @@ class ExplicitExpenseCategoryExtractor {
       }
     }
     if (spans.isEmpty) return null;
-    if (selected.length > 1 || (voice &&
+    if (ambiguousSuffix || selected.length > 1 || (voice &&
         (requested.length > 1 || (selected.isNotEmpty && requested.isNotEmpty)))) {
       issues.add('Choose one category for this expense.');
     }
