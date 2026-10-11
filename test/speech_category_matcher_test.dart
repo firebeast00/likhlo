@@ -466,6 +466,16 @@ void main() {
       expect(plan.expenseCategory!.requestedNames, ['sehat']);
     });
 
+    test('a stale vocabulary snapshot cannot resolve a removed category', () {
+      const request = ExplicitExpenseCategory(cleanedText: 'milk 120',
+          issue: 'Choose an existing category; the requested category was not found.',
+          requestedNames: ['sehat'], hasCategoryLabel: true);
+      final result = matcher.match(request, ['General'],
+          vocabulary: CategoryVocabulary.build(active), allowSplitWords: true);
+      expect(result.category, isNull);
+      expect(result.suggestions, isEmpty);
+    });
+
     for (final pair in [['the free', 'Entertainment'], ['match', 'Mess'], ['set', 'Health']]) {
       test('confirmed ${pair.first} alias handles prefix and suffix without guessing', () {
         for (final input in ['120 milk category ${pair.first}',

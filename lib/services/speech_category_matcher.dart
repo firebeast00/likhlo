@@ -29,7 +29,8 @@ class SpeechCategoryMatcher {
     }
     if (exact.length > 1) return extracted;
     if (vocabulary != null) {
-      final targets = vocabulary.targets(requested).where(allowed).toList();
+      final targets = vocabulary.targets(requested)
+          .where((name) => names.contains(name) && allowed(name)).toList();
       if (targets.length == 1) {
         return extracted.confirmed(targets.single,
             provenance: vocabulary.provenance(requested));
@@ -52,7 +53,7 @@ class SpeechCategoryMatcher {
     final entries = vocabulary?.entries ?? names.map((name) => MapEntry(name, name));
     for (final entry in entries) {
       final name = entry.value;
-      if (!allowed(name)) continue;
+      if (!names.contains(name) || !allowed(name)) continue;
       final target = aliasKey(entry.key);
       final targetCompact = target.replaceAll(' ', '');
       if (targetCompact.length < 5 || targetCompact.length > 80 ||
