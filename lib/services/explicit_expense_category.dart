@@ -83,8 +83,15 @@ class ExplicitExpenseCategoryExtractor {
     final issues = <String>[];
     final requested = <String>{};
     final pendingPrefixes = <RegExpMatch>[];
-    final label = voice ? r'(?:category|catagory)' : 'category';
-    final boundary = voice ? _end.replaceFirst('category|', 'category|catagory|') : _end;
+    final label = lexicon != null ? r'(?:category|catagory|categrate)'
+        : voice ? r'(?:category|catagory)' : 'category';
+    // A following wallet instruction is a separate slot, not part of an
+    // unknown category name. Exact full saved names are still tried first.
+    final boundary = lexicon != null
+        ? _end.replaceFirst('category|', 'category|catagory|categrate|wallet|')
+        : voice ? _end.replaceFirst('category|', 'category|catagory|') : _end;
+    RegExp compile(String expression) => lexicon == null
+        ? RegExp(expression, caseSensitive: false) : _cachedExpression(expression);
     var hasAddInstruction = false;
     var resolution = 'exact';
     var ambiguousSuffix = false;
@@ -113,8 +120,7 @@ class ExplicitExpenseCategoryExtractor {
     // "milk category mess" must not depend on whether Milk precedes Mess
     // in the dynamic lexicon. Empty/instruction-only values are not prefixes.
     final prefixSpans = voice
-        ? RegExp(r'\b' + label + r'\s+(.+?)' + boundary,
-            caseSensitive: false).allMatches(input)
+        ? compile(r'\b' + label + r'\s+(.+?)' + boundary).allMatches(input)
             .where((match) => !_missingNames.contains(_key(match.group(1)!)))
             .map((match) => _CategorySpan(match.start, match.end)).toList()
         : const <_CategorySpan>[];
@@ -124,15 +130,13 @@ class ExplicitExpenseCategoryExtractor {
     for (final name in names) {
       final escaped = pattern(name);
       final patterns = <RegExp>[
-        RegExp(r'\b(?:in\s+|into\s+)?' + label + r'\s+' + escaped +
-            boundary + _optionalInstruction, caseSensitive: false),
-        RegExp(r'\b(?:in\s+|into\s+)?' + escaped +
-            r'\s+' + label + r'\b(?:\s+(?:mein|me)\b)?' + _optionalInstruction,
-            caseSensitive: false),
-        RegExp(r'\b' + escaped + r'\s+(?:mein|me)\b\s+' + _addInstruction,
-            caseSensitive: false),
-        RegExp(r'\b(?:in|into)\s+' + escaped + boundary +
-            r'(?:\s+' + label + r')?' + _optionalInstruction, caseSensitive: false),
+        compile(r'\b(?:in\s+|into\s+)?' + label + r'\s+' + escaped +
+            boundary + _optionalInstruction),
+        compile(r'\b(?:in\s+|into\s+)?' + escaped +
+            r'\s+' + label + r'\b(?:\s+(?:mein|me)\b)?' + _optionalInstruction),
+        compile(r'\b' + escaped + r'\s+(?:mein|me)\b\s+' + _addInstruction),
+        compile(r'\b(?:in|into)\s+' + escaped + boundary +
+            r'(?:\s+' + label + r')?' + _optionalInstruction),
       ];
       for (var index = 0; index < patterns.length; index++) {
         for (final match in patterns[index].allMatches(input)) {
@@ -145,7 +149,7 @@ class ExplicitExpenseCategoryExtractor {
           final clause = match.group(0)!;
           // Unqualified "in X" / "X mein add karo" can also name a wallet.
           if ((index == 2 || index == 3) &&
-              !RegExp(r'\b' + label + r'\b', caseSensitive: false).hasMatch(clause) &&
+              !compile(r'\b' + label + r'\b').hasMatch(clause) &&
               (wallets.contains(_key(name)) ||
                   (lexicon?.targets(name).any((target) => wallets.contains(_key(target))) ?? false))) {
             issues.add('Name both the category and wallet explicitly.');
@@ -155,7 +159,7 @@ class ExplicitExpenseCategoryExtractor {
           if (lexicon != null && lexicon.provenance(name) != 'exact') {
             resolution = lexicon.provenance(name);
           }
-          hasAddInstruction |= RegExp(_addInstruction, caseSensitive: false)
+          hasAddInstruction |= compile(_addInstruction)
               .hasMatch(clause);
         }
       }
@@ -164,16 +168,16 @@ class ExplicitExpenseCategoryExtractor {
     // A named category instruction must not disappear into keyword fallback
     // just because the requested category is absent from the dynamic lexicon.
     final unknownPatterns = <RegExp>[
-      RegExp(r'\b' + label + r'\s+(.+?)' + boundary +
-          (voice ? _optionalInstruction : ''), caseSensitive: false),
-      RegExp(r'\b(?:in|into)\s+(.+?)\s+' + label + r'\b' +
-          (voice ? _optionalInstruction : ''), caseSensitive: false),
-      RegExp((voice ? r'\b(?:in|into)\s+(.+?)' : r'\binto\s+(.+?)') + boundary +
-          (voice ? _optionalInstruction : ''), caseSensitive: false),
-      RegExp(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+'
-          r'(?:mein|me)\b\s+' + _addInstruction, caseSensitive: false),
-      if (voice) RegExp(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+' +
-          label + r'\b' + _optionalInstruction, caseSensitive: false),
+      compile(r'\b' + label + r'\s+(.+?)' + boundary +
+          (voice ? _optionalInstruction : '')),
+      compile(r'\b(?:in|into)\s+(.+?)\s+' + label + r'\b' +
+          (voice ? _optionalInstruction : '')),
+      compile((voice ? r'\b(?:in|into)\s+(.+?)' : r'\binto\s+(.+?)') + boundary +
+          (voice ? _optionalInstruction : '')),
+      compile(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+'
+          r'(?:mein|me)\b\s+' + _addInstruction),
+      if (voice) compile(r'\b([a-z][\w&/+-]*(?:\s+[a-z][\w&/+-]*){0,3})\s+' +
+          label + r'\b' + _optionalInstruction),
     ];
     for (final expression in unknownPatterns) {
       for (final match in expression.allMatches(input)) {
@@ -272,6 +276,16 @@ class ExplicitExpenseCategoryExtractor {
       resolution: resolution,
       matchedPhrases: spans.map((span) => input.substring(span.start, span.end)).toList(),
     );
+  }
+
+  static final _compiledExpressions = <String, RegExp>{};
+  static RegExp _cachedExpression(String expression) {
+    final cached = _compiledExpressions[expression];
+    if (cached != null) return cached;
+    if (_compiledExpressions.length >= 256) {
+      _compiledExpressions.remove(_compiledExpressions.keys.first);
+    }
+    return _compiledExpressions[expression] = RegExp(expression, caseSensitive: false);
   }
 
   static String _key(String value) =>

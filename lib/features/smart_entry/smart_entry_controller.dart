@@ -5,7 +5,7 @@ import '../../services/smart_command.dart';
 import '../../services/smart_input_engine.dart';
 import '../../services/explicit_expense_category.dart';
 import '../../services/speech_category_matcher.dart';
-import '../../services/category_vocabulary.dart';
+import '../../services/home_voice_parse_cache.dart';
 import '../../services/primary_intent_router.dart';
 import 'multi_entry_parser.dart';
 
@@ -17,9 +17,12 @@ import 'multi_entry_parser.dart';
 /// directly.
 class SmartEntryController {
   final SmartInputEngine _engine;
+  late final HomeVoiceParseCache _voiceCache = HomeVoiceParseCache(_engine);
 
   SmartEntryController({SmartInputEngine? engine})
       : _engine = engine ?? SmartInputEngine();
+
+  void clearHomeVoiceCache() => _voiceCache.clear();
 
   SmartInputPlan parse(
     String input,
@@ -31,11 +34,17 @@ class SmartEntryController {
     Map<String, String> voiceCategoryAliases = const {},
     bool enableRomanUrduCategories = false,
   }) {
+    final homeVoice = enableHomeExpenseCategories && source == SmartInputSource.voice;
+    final accountList = homeVoice ? accounts.toList(growable: false) : accounts;
+    if (homeVoice) {
+      _voiceCache.prepare(categories, accountList, voiceCategoryAliases, enableRomanUrduCategories);
+    }
     final category = expenseCategory ?? (enableHomeExpenseCategories
-        ? resolveHomeExpenseCategory(input, categories, source: source, accounts: accounts,
+        ? resolveHomeExpenseCategory(input, categories, source: source, accounts: accountList,
             voiceCategoryAliases: voiceCategoryAliases,
             enableRomanUrduCategories: enableRomanUrduCategories)
         : null);
+    if (homeVoice) return _voiceCache.parse(input, categories, accountList, category);
     return _engine.parse(
       input,
       categories,
@@ -60,9 +69,11 @@ class SmartEntryController {
   }) {
     final voice = source == SmartInputSource.voice;
     if (!_categoryAnchor.hasMatch(input) &&
-        !(voice && RegExp(r'\bcatagory\b', caseSensitive: false).hasMatch(input))) return null;
-    final text = _engine.normalizer.normalize(input,
-        enableContextualAsrRepairs: source == SmartInputSource.voice).normalized;
+        !(voice && RegExp(enableRomanUrduCategories ? r'\b(?:catagory|categrate)\b'
+            : r'\bcatagory\b', caseSensitive: false).hasMatch(input))) return null;
+    if (voice) _voiceCache.prepare(categories, accounts, voiceCategoryAliases, enableRomanUrduCategories);
+    final text = voice ? _voiceCache.normalize(input).normalized
+        : _engine.normalizer.normalize(input, enableContextualAsrRepairs: false).normalized;
     if (RegExp(r'\b(nahi|nahin|mat|dont|don\x27t|ya|or)\b').hasMatch(text)) return null;
     final route = const PrimaryIntentRouter().classify(text);
     if (route.intent != RoutedSmartIntent.addExpense &&
@@ -70,8 +81,7 @@ class SmartEntryController {
         route.intent != RoutedSmartIntent.addIncome) return null;
     const extractor = ExplicitExpenseCategoryExtractor();
     final wallets = accounts.map((account) => account.name);
-    final vocabulary = voice && enableRomanUrduCategories
-        ? CategoryVocabulary.build(categories, confirmedAliases: voiceCategoryAliases) : null;
+    final vocabulary = voice && enableRomanUrduCategories ? _voiceCache.vocabulary : null;
     bool supportsCategory(String name) {
       if (vocabulary!.targets(name).isNotEmpty) return true;
       return const SpeechCategoryMatcher().match(ExplicitExpenseCategory(
@@ -80,12 +90,16 @@ class SmartEntryController {
           categories, vocabulary: vocabulary, allowSplitWords: true)
           .suggestions.isNotEmpty;
     }
-    bool preservesExpense(String candidate) {
-      final parsed = _engine.parse(candidate, categories,
-          source: source, accounts: accounts).parsed;
+    final checkedBodies = <String, bool>{};
+    bool preservesExpense(String candidate) => checkedBodies.putIfAbsent(candidate, () {
+      // Numeric-only subtraction cannot retain a specific expense item.
+      if (voice && !RegExp(r'[a-z\u0600-\u06ff]', caseSensitive: false).hasMatch(candidate)) return false;
+      final parsed = (voice ? _voiceCache.parse(candidate, categories, accounts, null,
+          validatingBody: true) : _engine.parse(candidate, categories,
+          source: source, accounts: accounts)).parsed;
       return parsed.intent == SmartEntryIntent.addExpense && parsed.amount > 0 &&
           hasSpecificSmartEntryTitle(parsed.title);
-    }
+    });
     // Match saved names before normalization can remove punctuation from them.
     final raw = extractor.extract(input, categories, walletNames: wallets, voice: voice,
         preservesExpense: voice ? preservesExpense : null, vocabulary: vocabulary,
@@ -93,8 +107,9 @@ class SmartEntryController {
         extractor.extract(text, categories, walletNames: wallets, voice: voice,
             preservesExpense: voice ? preservesExpense : null, vocabulary: vocabulary,
             supportsCategory: vocabulary == null ? null : supportsCategory);
-    final extracted = raw == null ? null : raw.withCleanedText(_engine.normalizer.normalize(raw.cleanedText,
-        enableContextualAsrRepairs: voice).normalized);
+    final extracted = raw == null ? null : raw.withCleanedText(voice
+        ? _voiceCache.normalize(raw.cleanedText).normalized
+        : _engine.normalizer.normalize(raw.cleanedText, enableContextualAsrRepairs: false).normalized);
     if (extracted == null) return null;
     if (route.intent == RoutedSmartIntent.editEntry ||
         route.intent == RoutedSmartIntent.addIncome) {

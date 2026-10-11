@@ -32,24 +32,29 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
   Future<bool> _processNLP(
       String text, {
         SmartInputSource source = SmartInputSource.typed,
+        SmartInputPlan? preparedVoicePlan,
       }) async {
     _dismissKeyboard();
     final normalized = text.trim();
     if (normalized.isEmpty) return false;
 
-    var categories = ref.read(categoryProvider);
-    var expenseCategory = ref.read(smartEntryControllerProvider)
-        .resolveHomeExpenseCategory(normalized, categories,
-            source: source, accounts: _parsingAccounts(),
+    final categories = ref.read(categoryProvider);
+    final voicePlan = source == SmartInputSource.voice
+        ? preparedVoicePlan ?? ref.read(smartEntryControllerProvider).parse(
+            normalized, categories, source: source, accounts: _parsingAccounts(),
+            enableHomeExpenseCategories: true,
             enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu,
-            voiceCategoryAliases: source == SmartInputSource.voice
-                ? _readVoiceCategoryAliases() : const {});
+            voiceCategoryAliases: _readVoiceCategoryAliases())
+        : null;
+    final expenseCategory = voicePlan != null ? voicePlan.expenseCategory
+        : ref.read(smartEntryControllerProvider).resolveHomeExpenseCategory(
+            normalized, categories, source: source, accounts: _parsingAccounts(),
+            enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu);
+    final categoryReview = expenseCategory?.needsClarification == true
+        ? expenseCategory : null;
     if (expenseCategory?.needsClarification == true) {
-      final recoverMissing = source == SmartInputSource.voice &&
-          const HomeCategorySpeechPolicy().canRecoverCategory(
-              ref.read(smartEntryControllerProvider).parse(normalized, categories,
-                  source: source, accounts: _parsingAccounts(),
-                  expenseCategory: expenseCategory));
+      final recoverMissing = voicePlan != null &&
+          const HomeCategorySpeechPolicy().canRecoverCategory(voicePlan);
       if (source != SmartInputSource.voice ||
           (!expenseCategory!.canConfirmVoice && !recoverMissing)) {
         _showTransactionInfo(expenseCategory!.issue!, title: 'Choose a category');
@@ -61,28 +66,11 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
         'suggestions': pending.suggestions,
         'suggestion_scores': pending.suggestionScores,
         'slot_state': recoverMissing ? 'missing' : 'unknown',
-        'parsing_text': pending.cleanedText, 'matched_phrases': pending.matchedPhrases,
+        'parsing_text': pending.cleanedText,
+        'matched_phrases': pending.matchedPhrases,
       });
-      VoiceDiagnosticsService.instance.awaitingConfirmation(
-          reason: recoverMissing ? 'voice_category_missing' : 'voice_category');
-      final choice = await showDialog<SpeechCategoryChoice>(context: context,
-          builder: (_) => SpeechCategoryDialog(
-            heardName: recoverMissing ? '' : pending.requestedNames.single,
-            categories: categories, suggestions: pending.suggestions));
-      if (!mounted || choice == null) return false;
-      // The category may have been removed while the dialog was open.
-      if (!ref.read(categoryProvider).contains(choice.category)) return false;
-      VoiceDiagnosticsService.instance.stage('category_confirmation', {
-        'requested_name': recoverMissing ? null : pending.requestedNames.single,
-        'category': choice.category, 'remember': choice.remember,
-      });
-      if (choice.remember && !recoverMissing) {
-        await _rememberVoiceCategoryAlias(pending.requestedNames.single, choice.category);
-        if (!mounted) return false;
-      }
-      categories = ref.read(categoryProvider);
-      if (!categories.contains(choice.category)) return false;
-      expenseCategory = pending.confirmed(choice.category);
+      // Keep uncertainty attached to the draft. The existing entry sheet
+      // reviews category, amount and wallet together; no preceding dialog.
     }
 
     if (source == SmartInputSource.typed || source == SmartInputSource.voice) {
@@ -162,7 +150,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       }
     }
 
-    final plan = ref.read(smartEntryControllerProvider).parse(
+    final plan = voicePlan ?? ref.read(smartEntryControllerProvider).parse(
       normalized,
       categories,
       source: source,
@@ -299,7 +287,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
       return true;
     }());
 
-    if (!plan.requiresAsrReview &&
+    if (categoryReview == null && !plan.requiresAsrReview &&
         semanticConfidence.canAutoExecute &&
         shouldAutoSaveSmartEntry(
           result,
@@ -404,6 +392,7 @@ extension _DashboardSmartEntryProcessingMethods on _HomeScreenState {
           learnedWalletId,
       initialType: type,
       reviewMessage: reviewMessage,
+      voiceCategoryReview: categoryReview == null ? null : voicePlan,
     );
 
     if (confirmed == true && mounted) {

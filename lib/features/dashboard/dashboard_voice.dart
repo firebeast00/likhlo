@@ -78,6 +78,7 @@ extension _DashboardVoiceMethods on _HomeScreenState {
     _voiceEntry.session.start();
     _speechTiming.start();
     _speechCacheKey = null;
+    ref.read(smartEntryControllerProvider).clearHomeVoiceCache();
     _speechDeadlineTimer = Timer(
       VoiceEntryController.sessionLimit,
           () => unawaited(_finishSpeechSession(deadline: true)),
@@ -605,17 +606,20 @@ extension _DashboardVoiceMethods on _HomeScreenState {
         _setVoiceProcessing(true);
         _speechTiming.mark('processing_started');
         try {
-          final categoryDraft = ref.read(smartEntryControllerProvider)
-              .resolveHomeExpenseCategory(decision.transcript, ref.read(categoryProvider),
-                  source: SmartInputSource.voice, accounts: _parsingAccounts(),
-                  enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu,
-                  voiceCategoryAliases: _readVoiceCategoryAliases());
           final diagnosticId = _voiceDiagnosticId;
           VoiceDiagnosticsService.instance.submitted(diagnosticId, decision.transcript);
-          final accepted = await VoiceDiagnosticsService.instance.run(diagnosticId, () => _processNLP(
-            decision.transcript,
-            source: SmartInputSource.voice,
-          ));
+          SmartInputPlan? preparedPlan;
+          final accepted = await VoiceDiagnosticsService.instance.run(diagnosticId, () {
+            preparedPlan = ref.read(smartEntryControllerProvider).parse(
+                decision.transcript, ref.read(categoryProvider),
+                source: SmartInputSource.voice, accounts: _parsingAccounts(),
+                enableHomeExpenseCategories: true,
+                enableRomanUrduCategories: AppLanguage.read() == AppLanguage.romanUrdu,
+                voiceCategoryAliases: _readVoiceCategoryAliases());
+            return _processNLP(decision.transcript, source: SmartInputSource.voice,
+                preparedVoicePlan: preparedPlan);
+          });
+          final categoryDraft = preparedPlan?.expenseCategory;
           _speechTiming.mark('processing_completed');
           VoiceDiagnosticsService.instance.stage('timing', _speechTiming.timings, id: diagnosticId);
           VoiceDiagnosticsService.instance.finishProcessing(diagnosticId, accepted);

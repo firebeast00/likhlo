@@ -17,6 +17,154 @@ void main() {
   const matcher = SpeechCategoryMatcher();
   const policy = HomeCategorySpeechPolicy();
 
+  group('phone category review and parse reuse', () {
+    const active = ['General', 'Food', 'Mess', 'Health', 'Ghar Ka Saman', 'Karobar'];
+    const wallets = [SmartEntryAccount(id: 'jazz', name: 'JazzCash', type: 'jazzcash', availableBalance: 10000)];
+    SmartInputPlan voice(SmartEntryController parser, String text,
+        {List<String> categories = active, Iterable<SmartEntryAccount> accounts = wallets,
+        Map<String, String> aliases = const {}}) => parser.parse(text, categories,
+        source: SmartInputSource.voice, accounts: accounts,
+        enableHomeExpenseCategories: true, enableRomanUrduCategories: true,
+        voiceCategoryAliases: aliases);
+
+    for (final category in ['Karobar', 'Karobarr']) {
+      test('category $category cannot consume the following wallet', () {
+        final plan = voice(SmartEntryController(),
+            '8000 rakshe pe kharch hue category $category wallet jazzcash');
+        expect(plan.normalizedText, '8000 rakshe pe kharch hue wallet jazzcash');
+        expect(plan.parsed.amount, 8000);
+        expect(plan.parsed.title.toLowerCase(), contains('rakshe'));
+        expect(findMentionedSmartEntryAccountId(plan.normalizedText, wallets), 'jazz');
+        expect(resolveSmartEntryAccount(input: plan.normalizedText, accounts: wallets,
+            transactionType: 'expense', amount: 8000), 'jazz');
+        if (category == 'Karobar') {
+          expect(plan.parsed.category, 'Karobar');
+          expect(plan.expenseCategory!.needsClarification, false);
+          expect(const ConfidenceEvaluator().evaluate(plan.command,
+              context: const ConfidenceContext(hasExactAmount: true, hasResolvedWallet: true))
+              .canAutoExecute, true);
+        } else {
+          expect(plan.expenseCategory!.requestedNames, ['karobarr']);
+          expect(plan.expenseCategory!.needsClarification, true);
+        }
+      });
+    }
+
+    test('wallet inside an exact full category name remains part of that name', () {
+      final plan = voice(SmartEntryController(),
+          '120 milk category Karobar Wallet Plan wallet jazzcash',
+          categories: [...active, 'Karobar Wallet Plan']);
+      expect(plan.parsed.category, 'Karobar Wallet Plan');
+      expect(plan.normalizedText, '120 milk wallet jazzcash');
+    });
+
+    test('observed categrate anchor is scoped to Roman Urdu Home voice', () {
+      const input = '250 ki shakkar categrate ghar ka saman';
+      final plan = voice(SmartEntryController(), input);
+      expect(plan.parsed.amount, 250);
+      expect(plan.parsed.title, 'Shakkar');
+      expect(plan.parsed.category, 'Ghar Ka Saman');
+      expect(plan.normalizedText, '250 ki shakkar');
+      for (final source in SmartInputSource.values) {
+        final legacy = SmartEntryController().parse(input, active, source: source,
+            enableHomeExpenseCategories: true);
+        expect(legacy.expenseCategory, isNull);
+      }
+    });
+
+    test('category-only partials and final processing reuse an unchanged body', () {
+      final engine = _CountingEngine();
+      final parser = SmartEntryController(engine: engine);
+      voice(parser, '120 milk');
+      expect(engine.calls, 1);
+      for (final input in ['120 milk category', '120 milk category off',
+          '120 milk category office', '120 milk category office lunch']) {
+        final plan = voice(parser, input);
+        expect(plan.parsed.amount, 120);
+        expect(plan.parsed.title, 'Milk');
+      }
+      expect(engine.calls, 1);
+      final resolved = voice(parser, '120 milk category Mess');
+      expect(resolved.parsed.category, 'Mess');
+      expect(engine.calls, 2);
+      final finalPlan = voice(parser, '120 milk category Mess');
+      expect(finalPlan.expenseCategory!.matchedPhrases, resolved.expenseCategory!.matchedPhrases);
+      expect(engine.calls, 2);
+    });
+
+    test('amount, title and wallet changes must be parsed again', () {
+      final engine = _CountingEngine();
+      final parser = SmartEntryController(engine: engine);
+      final first = voice(parser, '120 milk category Mess');
+      expect(first.parsed.amount, 120);
+      expect(voice(parser, '250 milk category Mess').parsed.amount, 250);
+      expect(voice(parser, '250 bread category Mess').parsed.title, 'Bread');
+      final wallet = voice(parser, '250 bread category Mess wallet jazzcash');
+      expect(wallet.normalizedText, contains('wallet jazzcash'));
+      expect(engine.calls, 4);
+    });
+
+    test('active names, balances, aliases and session reset invalidate reuse', () {
+      final engine = _CountingEngine();
+      final parser = SmartEntryController(engine: engine);
+      const raw = '120 milk category match';
+      voice(parser, raw);
+      voice(parser, raw, aliases: {'match': 'Mess'});
+      expect(engine.calls, 2);
+      final changedBalance = voice(parser, raw, aliases: {'match': 'Mess'}, accounts: const [
+        SmartEntryAccount(id: 'jazz', name: 'JazzCash', type: 'jazzcash', availableBalance: 0)]);
+      expect(changedBalance.parsed.category, 'Mess');
+      expect(engine.calls, 3);
+      final exact = voice(parser, raw, categories: [...active, 'match'], aliases: {'match': 'Mess'});
+      expect(exact.parsed.category, 'match');
+      expect(engine.calls, 4);
+      parser.clearHomeVoiceCache();
+      voice(parser, raw, categories: [...active, 'match'], aliases: {'match': 'Mess'});
+      expect(engine.calls, 5);
+    });
+
+    test('reused body retains primary transcript ASR review and calendar date', () {
+      final parser = SmartEntryController();
+      final plain = voice(parser, '120 milk category office yesterday');
+      final corrected = voice(parser, '120:00 milk category office yesterday');
+      expect(corrected.originalText, '120:00 milk category office yesterday');
+      expect(corrected.requiresAsrReview, true);
+      expect(corrected.parsed.date.year, plain.parsed.date.year);
+      expect(corrected.parsed.date.month, plain.parsed.date.month);
+      expect(corrected.parsed.date.day, plain.parsed.date.day);
+    });
+
+    test('word amount confidence and unresolved wallet still require review', () {
+      final plan = voice(SmartEntryController(), 'dhai sau ki shakkar category ghar ka saman');
+      expect(plan.parsed.amount, 250);
+      final confidence = const ConfidenceEvaluator().evaluate(plan.command,
+          context: ConfidenceContext(hasResolvedWallet: true,
+              hasExactAmount: (plan.parsed.confidenceByField['amount'] ?? 0) >= .9));
+      expect(confidence.canAutoExecute, false);
+      final unknown = voice(SmartEntryController(), '250 shakkar category gharr');
+      expect(unknown.expenseCategory!.needsClarification, true);
+      expect(const ConfidenceEvaluator().evaluate(unknown.command,
+          context: const ConfidenceContext(hasResolvedWallet: false, hasExactAmount: true))
+          .canAutoExecute, false);
+    });
+
+    test('partial stream latency reports cold body parsing separately from reuse', () {
+      final parser = SmartEntryController();
+      final watch = Stopwatch()..start();
+      voice(parser, '120 milk');
+      watch.stop();
+      final cold = watch.elapsedMicroseconds;
+      watch.reset();
+      watch.start();
+      for (final suffix in ['category', 'category off', 'category office',
+          'category office lunch', 'category office lunch']) {
+        voice(parser, '120 milk $suffix');
+      }
+      watch.stop();
+      print('Phone-flow latency sample: cold_body_us=$cold category_update_mean_us=${watch.elapsedMicroseconds / 5}');
+    });
+  });
+
   for (final input in [
     '120 milk category mess',
     '120 ka milk category mess',
@@ -647,4 +795,18 @@ void main() {
       }
     });
   });
+}
+
+class _CountingEngine extends SmartInputEngine {
+  int calls = 0;
+  @override
+  SmartInputPlan parse(String input, List<String> activeCategories, {
+    SmartInputSource source = SmartInputSource.typed,
+    Iterable<SmartEntryAccount> accounts = const [],
+    ExplicitExpenseCategory? expenseCategory,
+  }) {
+    calls++;
+    return super.parse(input, activeCategories, source: source,
+        accounts: accounts, expenseCategory: expenseCategory);
+  }
 }

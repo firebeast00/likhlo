@@ -10,7 +10,11 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
     String? preselectedWalletId,
     String initialType = 'expense',
     String? reviewMessage,
+    SmartInputPlan? voiceCategoryReview,
   }) async {
+    final pendingCategory = voiceCategoryReview?.expenseCategory;
+    var categoryConfirmed = pendingCategory == null;
+    var rememberCategory = false;
     final diagnosticId = VoiceDiagnosticsService.instance.currentId;
     _dismissKeyboard();
     if (existing?.category == 'Transfer') {
@@ -195,11 +199,15 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                             decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: categories.contains(selectedCategory) ? selectedCategory : (categories.isNotEmpty ? categories.first : "General"),
+                                value: !categoryConfirmed ? null : categories.contains(selectedCategory) ? selectedCategory : (categories.isNotEmpty ? categories.first : "General"),
                                 isExpanded: true,
+                                hint: Text(AppStrings.current.text('expense_category_choose')),
                                 icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey.shade500),
                                 items: categories.map((c) => DropdownMenuItem(value: c, child: Text(AppStrings.current.display(c), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis))).toList(),
-                                onChanged: (v) => setModalState(() => selectedCategory = v!),
+                                onChanged: (v) => setModalState(() {
+                                  selectedCategory = v!;
+                                  categoryConfirmed = true;
+                                }),
                               ),
                             ),
                           ),
@@ -208,12 +216,33 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                     ],
                   ),
 
+                  if (pendingCategory != null && transactionType == 'expense') ...[
+                    const SizedBox(height: 12),
+                    SpeechCategoryReview(
+                      heardName: pendingCategory.canSuggest
+                          ? pendingCategory.requestedNames.single : '',
+                      suggestions: pendingCategory.suggestions,
+                      selectedCategory: categoryConfirmed ? selectedCategory : null,
+                      remember: rememberCategory,
+                      onCategoryChanged: (name) => setModalState(() {
+                        selectedCategory = name;
+                        categoryConfirmed = true;
+                      }),
+                      onRememberChanged: (value) => setModalState(() => rememberCategory = value),
+                    ),
+                  ],
+
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity, height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: transactionType == 'transfer' ? Colors.blue : primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                       onPressed: () => VoiceDiagnosticsService.instance.run(diagnosticId, () async {
+                        if (pendingCategory != null && transactionType == 'expense' &&
+                            (!categoryConfirmed || !ref.read(categoryProvider).contains(selectedCategory))) {
+                          _showTransactionInfo(AppStrings.current.text('expense_category_choose'));
+                          return;
+                        }
                         final amt = double.tryParse(amountCtrl.text.trim());
                         if (amt == null || !amt.isFinite || amt <= 0) {
                           _showTransactionError(AppMessage('enter_a_valid_amount_above_zero_8262af'));
@@ -324,6 +353,18 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
                             preferenceEntry = editedEntry;
                           }
                         }
+                        final reviewedEntry = preferenceEntry;
+                        if (pendingCategory != null && reviewedEntry != null && reviewedEntry.type == 'expense') {
+                          VoiceDiagnosticsService.instance.stage('category_confirmation', {
+                            'requested_name': pendingCategory.canSuggest
+                                ? pendingCategory.requestedNames.single : null,
+                            'category': reviewedEntry.category, 'remember': rememberCategory,
+                          });
+                          if (rememberCategory && pendingCategory.canSuggest) {
+                            unawaited(_rememberVoiceCategoryAlias(
+                                pendingCategory.requestedNames.single, reviewedEntry.category));
+                          }
+                        }
                         if (ctx.mounted) Navigator.pop(ctx, true);
                         if (reviewMessage == null && mounted) {
                           final notificationTitle = transactionType == 'transfer'
@@ -418,3 +459,4 @@ extension _DashboardTransactionFormMethods on _HomeScreenState {
 
 
 }
+

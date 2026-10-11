@@ -1,6 +1,40 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
 
+/// Optional category controls within the existing transaction review sheet.
+/// No suggestion or remembered alias is accepted without user selection.
+class SpeechCategoryReview extends StatelessWidget {
+  final String heardName;
+  final List<String> suggestions;
+  final String? selectedCategory;
+  final bool remember;
+  final ValueChanged<String> onCategoryChanged;
+  final ValueChanged<bool> onRememberChanged;
+
+  const SpeechCategoryReview({super.key, required this.heardName,
+    this.suggestions = const [], this.selectedCategory, this.remember = false,
+    required this.onCategoryChanged, required this.onRememberChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings.current;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(heardName.isEmpty ? strings.text('expense_category_incomplete')
+          : strings.text('speech_category_heard', {'p0': heardName})),
+      if (suggestions.isNotEmpty) Wrap(spacing: 8, runSpacing: 4, children: [
+        for (final name in suggestions) ChoiceChip(
+          label: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(strings.display(name), maxLines: 1, overflow: TextOverflow.ellipsis)),
+          selected: selectedCategory == name,
+          onSelected: (_) => onCategoryChanged(name)),
+      ]),
+      if (heardName.isNotEmpty) CheckboxListTile(contentPadding: EdgeInsets.zero,
+        title: Text(strings.text('speech_category_remember')),
+        value: remember, onChanged: (value) => onRememberChanged(value ?? false)),
+    ]);
+  }
+}
+
 class SpeechCategoryChoice {
   final String category;
   final bool remember;
