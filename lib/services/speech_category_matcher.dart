@@ -87,6 +87,7 @@ class SpeechCategoryMatcher {
         // both metrics; short ASR substitutions remain suggestions.
         if (allowTrustedRecovery && compact.length >= 9 &&
             targetCompact.length >= 9 && edits <= 1 &&
+            _trustedIdentifiers(requested) == _trustedIdentifiers(target) &&
             lexical >= .9 && dice >= .85 && score >= .9) trusted.add(name);
       }
     }
@@ -112,6 +113,11 @@ class SpeechCategoryMatcher {
   // Digits and punctuation are identifiers, not spelling mistakes.
   static String _identifiers(String text) =>
       RegExp(r'\d+|[^\w\s\u0600-\u06ff]').allMatches(text)
+          .map((match) => match.group(0)).join('|');
+
+  // Underscores are also literal identifiers for automatic recovery.
+  static String _trustedIdentifiers(String text) =>
+      RegExp(r'\d+|_+|[^\w\s\u0600-\u06ff]').allMatches(text)
           .map((match) => match.group(0)).join('|');
 
   static int _distance(String a, String b) {

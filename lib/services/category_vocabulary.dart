@@ -54,8 +54,8 @@ class CategoryVocabulary {
         spellings.putIfAbsent(spelling, () => <String>{}).add(target);
       }
     }
-    for (final entry in exact.entries) {
-      index(entry.key, entry.value);
+    for (final name in active) {
+      index(name, name);
     }
     for (final entry in aliases.entries) {
       for (final target in entry.value) {

@@ -69,6 +69,13 @@ void main() {
       }
     });
 
+    test('case-colliding canonical names remain ambiguous under connector recovery', () {
+      final plan = parse('120 milk category ghar ka saman',
+          ['General', 'Ghar K Saman', 'ghar k saman']);
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.suggestions.toSet(), {'Ghar K Saman', 'ghar k saman'});
+    });
+
     for (final pair in [
       ['office lunchh', 'Office Lunch'], ['office lunch', 'OfficeLunch'],
       ['gharr ka kharch', 'Ghar Ka Kharch'],
@@ -122,6 +129,7 @@ void main() {
       ['match', 'Mess'], ['sehatt', 'Health'], ['ghar ke saman', 'Ghar K Saman'],
       ['ghar ki saman', 'Ghar K Saman'], ['ghar ka saman 3', 'Ghar K Saman 2'],
       ['office lunch 3', 'Office Lunch 2'], ['office lunch+', 'Office Lunch++'],
+      ['office lunch', 'Office_Lunch'],
     ]) {
       test('${pair.first} cannot silently select ${pair.last}', () {
         final plan = parse('120 milk category ${pair.first}', ['General', pair.last]);
