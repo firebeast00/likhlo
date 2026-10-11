@@ -6,6 +6,7 @@ import 'package:student_expense_manager/services/local_nlp_service.dart';
 import 'package:student_expense_manager/services/smart_command.dart';
 import 'package:student_expense_manager/services/smart_input_engine.dart';
 import 'package:student_expense_manager/services/speech_category_matcher.dart';
+import 'package:student_expense_manager/services/category_vocabulary.dart';
 import 'package:student_expense_manager/services/confidence_evaluator.dart';
 import 'package:student_expense_manager/services/speech_session_controller.dart';
 import 'package:student_expense_manager/services/speech_timing_policy.dart';
@@ -402,5 +403,224 @@ void main() {
     expect(selection.cleanedText, contains('JazzCash'));
     expect(selection.cleanedText, contains('yesterday'));
     expect(selection.requestedNames, ['diner']);
+  });
+
+  group('Roman Urdu Home category vocabulary', () {
+    const active = ['General', 'Food', 'Transport', 'Shopping', 'Entertainment',
+      'Health', 'Education', 'Mess', 'Office Lunch', 'Ghar ka kharch'];
+    SmartInputPlan parse(String input, {List<String> categories = active,
+        Map<String, String> aliases = const {}}) => controller.parse(input, categories,
+        source: SmartInputSource.voice, enableHomeExpenseCategories: true,
+        enableRomanUrduCategories: true, voiceCategoryAliases: aliases);
+
+    for (final pair in [
+      ['Aam', 'General'], ['Khana', 'Food'], ['Safar', 'Transport'],
+      ['Khareedari', 'Shopping'], ['kharidari', 'Shopping'],
+      ['Tafreeh', 'Entertainment'], ['Sehat', 'Health'], ['Taleem', 'Education'],
+    ]) {
+      for (final input in [
+        '200 ka charger category ${pair.first}',
+        '200 ka charger ko ${pair.first} category mein add karo',
+      ]) {
+        test('$input resolves the active canonical category instantly', () {
+          final plan = parse(input);
+          expect(plan.parsed.amount, 200);
+          expect(plan.parsed.title, 'Charger');
+          expect(plan.parsed.category, pair.last);
+          expect(plan.expenseCategory!.needsClarification, false);
+          expect(plan.expenseCategory!.resolution, 'translated_alias');
+          expect(policy.evaluate(plan).isComplete, true);
+          final confidence = const ConfidenceEvaluator().evaluate(plan.command,
+              context: const ConfidenceContext(hasExactAmount: true, hasResolvedWallet: true));
+          expect(confidence.canAutoExecute, true);
+        });
+      }
+    }
+
+    for (final name in ['Sehat', 'Office Lunch', 'Ghar ka kharch', 'C++', 'Food 2']) {
+      test('new custom $name remains an exact canonical name', () {
+        final plan = parse('milk 120 category $name', categories: [...active, name],
+            aliases: {name.toLowerCase(): 'Food'});
+        expect(plan.parsed.category, name);
+        expect(plan.expenseCategory!.resolution, 'exact');
+        expect(plan.expenseCategory!.needsClarification, false);
+      });
+    }
+
+    test('translation and learned-alias disagreement cannot silently win', () {
+      final plan = parse('milk 120 category sehat', aliases: {'sehat': 'Food'});
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.needsClarification, true);
+    });
+
+    for (final aliases in [{' SEHAT  ': 'Deleted'}, {'sehat': 'Medical'}]) {
+      test('inactive learned alias ${aliases.values.single} does not replace Health', () {
+        expect(parse('milk 120 category sehat', aliases: aliases).parsed.category, 'Health');
+      });
+    }
+
+    test('inactive built-in names are never restored by translation', () {
+      final plan = parse('milk 120 category sehat', categories: ['General', 'Food']);
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.needsClarification, true);
+      expect(plan.expenseCategory!.requestedNames, ['sehat']);
+    });
+
+    for (final pair in [['the free', 'Entertainment'], ['match', 'Mess'], ['set', 'Health']]) {
+      test('confirmed ${pair.first} alias handles prefix and suffix without guessing', () {
+        for (final input in ['120 milk category ${pair.first}',
+            '120 milk ko ${pair.first} category mein add karo']) {
+          final plan = parse(input, aliases: {'  ${pair.first.toUpperCase()}  ': pair.last});
+          expect(plan.parsed.amount, 120);
+          expect(plan.parsed.title, 'Milk');
+          expect(plan.parsed.category, pair.last);
+          expect(plan.expenseCategory!.resolution, 'confirmed_alias');
+        }
+      });
+    }
+
+    test('unknown suffix after ko retains the item and clean learnable phrase', () {
+      final plan = parse('200 ka charger ko set category mein add karo');
+      expect(plan.expenseCategory!.requestedNames, ['set']);
+      expect(plan.expenseCategory!.cleanedText, '200 ka charger ko');
+      expect(plan.parsed.amount, 200);
+      expect(plan.parsed.title, 'Charger');
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.canConfirmVoice, true);
+      expect(plan.expenseCategory!.suggestions, isEmpty);
+    });
+
+    for (final input in ['milk 120 category office lunch',
+        '120 milk office lunch category mein add karo']) {
+      test('$input offers a joined-name suggestion without selecting it', () {
+        final plan = parse(input, categories: ['General', 'OfficeLunch']);
+        expect(plan.parsed.amount, 120);
+        expect(plan.parsed.title, 'Milk');
+        expect(plan.expenseCategory!.requestedNames, ['office lunch']);
+        expect(plan.expenseCategory!.suggestions, ['OfficeLunch']);
+        expect(plan.expenseCategory!.category, isNull);
+        expect(plan.expenseCategory!.needsClarification, true);
+      });
+    }
+
+    test('fuzzy matching compares localized labels but returns canonical suggestions', () {
+      final plan = parse('milk 120 category sehatt');
+      expect(plan.expenseCategory!.suggestions, ['Health']);
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.needsClarification, true);
+    });
+
+    test('split-word recovery does not weaken the edit budget', () {
+      final plan = parse('milk 120 category the free');
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.suggestions, isEmpty);
+      expect(plan.expenseCategory!.canConfirmVoice, true);
+    });
+
+    for (final input in ['120 milk category', '120 ka milk category',
+        '120 milk catagory', '120 category', 'milk category']) {
+      test('$input cannot lose its only item through new suffix recovery', () {
+        final plan = parse(input, categories: [...active, 'Milk']);
+        expect(plan.expenseCategory!.isInstructionIncomplete, true);
+        expect(plan.expenseCategory!.category, isNull);
+        if (input.contains('milk')) expect(plan.parsed.title, 'Milk');
+        expect(policy.canRecoverCategory(plan), input.contains('120') && input.contains('milk'));
+      });
+    }
+
+    for (final ordered in [['Milk', 'Mess', ...active], ['Mess', 'Milk', ...active]]) {
+      test('prefix reservation survives vocabulary ordering ${ordered.first}', () {
+        final plan = parse('120 milk category mess', categories: ordered);
+        expect(plan.parsed.title, 'Milk');
+        expect(plan.parsed.amount, 120);
+        expect(plan.parsed.category, 'Mess');
+      });
+    }
+
+    test('ambiguous suffix boundaries retain the draft instead of learning item text', () {
+      final plan = parse('120 milk family lunchh category',
+          categories: ['General', 'Family Lunch', 'Lunch']);
+      expect(plan.expenseCategory!.isInstructionIncomplete, true);
+      expect(plan.expenseCategory!.requestedNames, isEmpty);
+      expect(plan.expenseCategory!.category, isNull);
+      expect(plan.expenseCategory!.cleanedText, contains('milk family lunchh'));
+    });
+
+    test('ordinary item synonyms are not approved category translations', () {
+      final vocabulary = CategoryVocabulary.build(active);
+      for (final word in ['dinner', 'movie', 'medical', 'clothes', 'school']) {
+        expect(vocabulary.targets(word), isEmpty);
+      }
+    });
+
+    test('digits and punctuation remain protected even in learned aliases', () {
+      final vocabulary = CategoryVocabulary.build(['Food 2', 'C++', 'Health'],
+          confirmedAliases: {'food 3': 'Food 2', 'c+': 'C++', 'sehat': 'Health'});
+      expect(vocabulary.targets('food 3'), isEmpty);
+      expect(vocabulary.targets('c+'), isEmpty);
+      expect(vocabulary.targets('sehat'), ['Health']);
+    });
+
+    for (final input in [
+      'salary 5000 category sehat', 'delete milk 120 category sehat',
+      'change milk 120 category sehat', 'search category sehat',
+      'total spent in march', 'send 120 from cash to jazzcash',
+      'udhar 120 category sehat', 'milk 120 and bread 80 category sehat',
+      'milk 120 category sehat nahi',
+    ]) {
+      test('$input remains outside new Roman Urdu recovery', () {
+        expect(controller.resolveHomeExpenseCategory(input, active,
+            source: SmartInputSource.voice, enableRomanUrduCategories: true), isNull);
+      });
+    }
+
+    test('typed callers ignore Roman Urdu recovery even when explicitly enabled', () {
+      for (final input in ['120 milk category mess', 'milk 120 category sehat',
+          '120 ka milk category', 'milk 120 category office lunch']) {
+        final previous = controller.parse(input, [...active, 'Milk'],
+            source: SmartInputSource.typed, enableHomeExpenseCategories: true);
+        final current = controller.parse(input, [...active, 'Milk'],
+            source: SmartInputSource.typed, enableHomeExpenseCategories: true,
+            enableRomanUrduCategories: true);
+        expect(current.parsed.toLegacyMap(), previous.parsed.toLegacyMap());
+        expect(current.expenseCategory!.cleanedText, previous.expenseCategory!.cleanedText);
+        expect(current.expenseCategory!.issue, previous.expenseCategory!.issue);
+      }
+    });
+
+    test('English/default and opted-out callers keep translation recovery disabled', () {
+      final english = controller.parse('milk 120 category sehat', active,
+          source: SmartInputSource.voice, enableHomeExpenseCategories: true);
+      expect(english.expenseCategory!.category, isNull);
+      final optedOut = controller.parse('milk 120 category sehat', active,
+          source: SmartInputSource.voice, enableRomanUrduCategories: true);
+      expect(optedOut.expenseCategory, isNull);
+    });
+
+    test('translated category leaves wallet and date clauses untouched', () {
+      const raw = 'milk 120 category sehat from JazzCash yesterday';
+      final selection = const ExplicitExpenseCategoryExtractor().extract(raw, active,
+          voice: true, vocabulary: CategoryVocabulary.build(active))!;
+      expect(selection.cleanedText, 'milk 120 from JazzCash yesterday');
+      expect(selection.category, 'Health');
+      expect(selection.matchedPhrases.single.toLowerCase(), 'category sehat');
+    });
+
+    test('new category path latency sample uses the unchanged parser and timing', () {
+      final samples = ['milk 120 category Mess', '200 ka charger category sehat',
+        '200 ka charger ko set category mein add karo'];
+      for (final enabled in [false, true]) {
+        final watch = Stopwatch()..start();
+        for (var i = 0; i < 30; i++) {
+          for (final input in samples) {
+            controller.parse(input, active, source: SmartInputSource.voice,
+                enableHomeExpenseCategories: true, enableRomanUrduCategories: enabled);
+          }
+        }
+        watch.stop();
+        print('Category latency sample: enabled=$enabled '
+            'mean_us=${watch.elapsedMicroseconds / 90} (not an endpoint delay)');
+      }
+    });
   });
 }
