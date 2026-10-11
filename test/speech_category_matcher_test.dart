@@ -594,15 +594,19 @@ void main() {
     }
 
     test('typed callers ignore Roman Urdu recovery even when explicitly enabled', () {
+      Map<String, dynamic> comparable(ParsedSmartEntryCommand parsed) =>
+          parsed.toLegacyMap()..['date'] = DateTime(
+              parsed.date.year, parsed.date.month, parsed.date.day);
       for (final input in ['120 milk category mess', 'milk 120 category sehat',
           '120 ka milk category', 'milk 120 category office lunch']) {
-        // An explicit day makes dates comparable; implicit dates use now().
+        // The parser retains clock time even for yesterday. Compare calendar
+        // dates and every other field, rather than two separate now() values.
         final previous = controller.parse('$input yesterday', [...active, 'Milk'],
             source: SmartInputSource.typed, enableHomeExpenseCategories: true);
         final current = controller.parse('$input yesterday', [...active, 'Milk'],
             source: SmartInputSource.typed, enableHomeExpenseCategories: true,
             enableRomanUrduCategories: true);
-        expect(current.parsed.toLegacyMap(), previous.parsed.toLegacyMap());
+        expect(comparable(current.parsed), comparable(previous.parsed));
         expect(current.expenseCategory!.cleanedText, previous.expenseCategory!.cleanedText);
         expect(current.expenseCategory!.issue, previous.expenseCategory!.issue);
       }
