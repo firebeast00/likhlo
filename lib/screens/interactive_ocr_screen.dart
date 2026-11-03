@@ -31,8 +31,18 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
     _scanImage();
   }
 
-  bool _shouldAutoSelect(TextLine line) =>
-      _receiptParser.isLikelyUsefulLine(line.text);
+  bool _shouldAutoSelect(TextLine line, ScannedReceipt receipt) {
+    final text = line.text.trim();
+    if (_receiptParser.isReceiptContextLine(text)) return true;
+    // The merchant is context for parsing, never an individual product.
+    if (text == receipt.vendor) return true;
+    if (!_receiptParser.isLikelyUsefulLine(text)) return false;
+    if (RegExp(r'\d').hasMatch(text)) return true;
+    final lower = text.toLowerCase();
+    return receipt.items.any((item) =>
+        item.name.toLowerCase().contains(lower) ||
+        lower.contains(item.name.toLowerCase()));
+  }
 
   Future<void> _scanImage() async {
     try {
@@ -44,6 +54,7 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
         decodedImage.width.toDouble(),
         decodedImage.height.toDouble(),
       );
+      decodedImage.dispose();
 
       final inputImage = InputImage.fromFile(widget.imageFile);
       final recognizedText = await _textRecognizer.processImage(inputImage);
@@ -56,12 +67,14 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
         }
       }
 
+      final receipt =
+          _receiptParser.parseSpatialRows(receiptSpatialRows(lines));
       setState(() {
         _lines = lines;
         _selectedLines.clear();
 
         for (final line in lines) {
-          if (_shouldAutoSelect(line)) {
+          if (_shouldAutoSelect(line, receipt)) {
             _selectedLines.add(line);
           }
         }
@@ -85,9 +98,8 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
   }
 
   ScannedReceipt _buildReceipt() {
-    final reconstructedRows =
-        _receiptParser.reconstructRows(_selectedLines.toList());
-    return _receiptParser.parseRows(reconstructedRows);
+    final reconstructedRows = receiptSpatialRows(_selectedLines);
+    return _receiptParser.parseSpatialRows(reconstructedRows);
   }
 
   @override
@@ -95,11 +107,16 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
     AppStrings.of(context);
     if (_scanError != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(AppStrings.current.text('receipt_scan_706316'))),
+        appBar: AppBar(
+          title: Text(AppStrings.current.text('receipt_scan_706316')),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(AppStrings.current.display(_scanError!), textAlign: TextAlign.center),
+            child: Text(
+              AppStrings.current.display(_scanError!),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       );
@@ -138,7 +155,9 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    AppStrings.current.text('smart_selection_applied_tap_any_box_to_manually__362bef'),
+                    AppStrings.current.text(
+                      'smart_selection_applied_tap_any_box_to_manually__362bef',
+                    ),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 13,
@@ -218,7 +237,9 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
                 color: Colors.white,
               ),
               label: Text(
-                AppStrings.current.text('continue_d65c29', {'p0': _selectedLines.length}),
+                AppStrings.current.text('continue_d65c29', {
+                  'p0': _selectedLines.length,
+                }),
                 style: const TextStyle(color: Colors.white),
               ),
             )

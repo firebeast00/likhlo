@@ -19,7 +19,10 @@ extension _DashboardOcrMethods on _HomeScreenState {
             children: [
               Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text(AppStrings.current.text('add_receipt_943857'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(
+                  AppStrings.current.text('add_receipt_943857'),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded),
@@ -28,13 +31,17 @@ extension _DashboardOcrMethods on _HomeScreenState {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded),
-                title: Text(AppStrings.current.text('choose_from_gallery_5b17ab')),
+                title: Text(
+                  AppStrings.current.text('choose_from_gallery_5b17ab'),
+                ),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
                 child: Text(
-                  AppStrings.current.text('for_best_results_keep_the_full_receipt_flat_fill_b7a128'),
+                  AppStrings.current.text(
+                    'for_best_results_keep_the_full_receipt_flat_fill_b7a128',
+                  ),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
@@ -57,30 +64,17 @@ extension _DashboardOcrMethods on _HomeScreenState {
       );
       if (!mounted || image == null) return;
 
-      // 🚀 FIXED: Navigate to Interactive Screen
-      final scannedReceipt = await Navigator.push<ScannedReceipt>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => InteractiveOcrScreen(imageFile: File(image.path)),
-        ),
-      );
-
-      if (!mounted || scannedReceipt == null) return;
-
-      // 🚀 FIXED: Open the Review Screen for bulk saving if data was found!
-      if (scannedReceipt.items.isNotEmpty || scannedReceipt.total > 0) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ReceiptReviewScreen(receipt: scannedReceipt),
-          ),
-        );
-      }
-
+      final receipt = await OcrScannerService().readReceiptPath(image.path);
+      if (!mounted) return;
+      await _reviewScannedReceipt(receipt, imageFile: File(image.path));
     } catch (e) {
       debugPrint("Scanner Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.current.text('camera_or_scanner_error_occurred_4a27da'))),
+        SnackBar(
+          content: Text(
+            AppStrings.current.text('camera_or_scanner_error_occurred_4a27da'),
+          ),
+        ),
       );
     } finally {
       if (mounted) _setScanningReceipt(false);
@@ -100,8 +94,11 @@ extension _DashboardOcrMethods on _HomeScreenState {
     }
   }
 
-  Future<void> _reviewScannedReceipt(ScannedReceipt receipt) async {
-    if (receipt.total <= 0 && receipt.items.isEmpty) {
+  Future<void> _reviewScannedReceipt(
+    ScannedReceipt receipt, {
+    File? imageFile,
+  }) async {
+    if (receipt.total <= 0 && receipt.items.isEmpty && imageFile == null) {
       _showTransactionError(
         AppMessage('no_reliable_receipt_items_or_total_were_detected_f8eee3'),
         title: AppMessage('receipt_details_not_found_d29e07'),
@@ -111,7 +108,16 @@ extension _DashboardOcrMethods on _HomeScreenState {
 
     final confirmed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => ReceiptReviewScreen(receipt: receipt),
+        builder: (_) => ReceiptReviewScreen(
+          receipt: receipt,
+          onAdjustSelection: imageFile == null
+              ? null
+              : () => Navigator.of(context).push<ScannedReceipt>(
+                  MaterialPageRoute(
+                    builder: (_) => InteractiveOcrScreen(imageFile: imageFile),
+                  ),
+                ),
+        ),
       ),
     );
     if (confirmed == true && mounted) {
@@ -121,6 +127,4 @@ extension _DashboardOcrMethods on _HomeScreenState {
       );
     }
   }
-
-
 }
