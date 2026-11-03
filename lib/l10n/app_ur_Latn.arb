@@ -1594,5 +1594,16 @@
   "expense_category_conflict": "Is kharch ke liye ek category chunen.",
   "speech_category_heard": "“{p0}” suna. Apni category chunen.",
   "speech_category_remember": "Voice entries ke liye yaad rakhein",
-  "speech_category_use": "Category chunen"
+  "speech_category_use": "Category chunen",
+  "receipt_adjust_selection": "Selection theek karein",
+  "receipt_ready": "Receipt ki maloomat save karne ke liye tayyar hain.",
+  "receipt_check_highlighted": "Save karne se pehle sirf highlight ki hui raqam check karein.",
+  "receipt_amount_uncertain": "Is raqam ko receipt se mila kar check karein.",
+  "receipt_quantity_mismatch": "Quantity aur unit price ka hasil is raqam se nahi milta. Raqam check karein.",
+  "receipt_total_mismatch": "Items, tax aur discount ka hisaab receipt ke total se nahi milta.",
+  "receipt_conflicting_totals": "Mukhtalif total mile hain. Ada ki jane wali raqam check karein.",
+  "receipt_checked_amount": "Maine yeh raqam check kar li hai",
+  "receipt_checked_total": "Maine ada ki jane wali kul raqam check kar li hai",
+  "receipt_adjustments_total": "Tax ya discount kul raqam mein shamil hai. Sahi raqam save karne ke liye aik receipt entry chuni gai hai.",
+  "receipt_not_detected": "Products ya kul raqam wazeh nahi mili. Selection theek karein ya maloomat likhein."
 }

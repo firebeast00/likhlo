@@ -899,6 +899,17 @@ const englishMessages = <String, String>{
   "speech_category_heard": "Heard “{p0}”. Choose the category you meant.",
   "speech_category_remember": "Remember for voice entries",
   "speech_category_use": "Use category",
+  "receipt_adjust_selection": "Adjust selection",
+  "receipt_ready": "Detected receipt details are ready to save.",
+  "receipt_check_highlighted": "Check only the highlighted amounts before saving.",
+  "receipt_amount_uncertain": "This amount needs checking against the receipt.",
+  "receipt_quantity_mismatch": "Quantity × unit price does not match this amount. Check the amount.",
+  "receipt_total_mismatch": "The item sum, tax and discounts do not match the printed total.",
+  "receipt_conflicting_totals": "More than one different total was found. Check the payable amount.",
+  "receipt_checked_amount": "I checked this amount",
+  "receipt_checked_total": "I checked the payable total",
+  "receipt_adjustments_total": "Tax or discounts are included in the payable total. One receipt entry is selected to keep the recorded amount correct.",
+  "receipt_not_detected": "No reliable products or total were found. Adjust selection or enter the missing details.",
 };
 
 const romanUrduMessages = <String, String>{
@@ -1801,6 +1812,17 @@ const romanUrduMessages = <String, String>{
   "speech_category_heard": "“{p0}” suna. Apni category chunen.",
   "speech_category_remember": "Voice entries ke liye yaad rakhein",
   "speech_category_use": "Category chunen",
+  "receipt_adjust_selection": "Selection theek karein",
+  "receipt_ready": "Receipt ki maloomat save karne ke liye tayyar hain.",
+  "receipt_check_highlighted": "Save karne se pehle sirf highlight ki hui raqam check karein.",
+  "receipt_amount_uncertain": "Is raqam ko receipt se mila kar check karein.",
+  "receipt_quantity_mismatch": "Quantity aur unit price ka hasil is raqam se nahi milta. Raqam check karein.",
+  "receipt_total_mismatch": "Items, tax aur discount ka hisaab receipt ke total se nahi milta.",
+  "receipt_conflicting_totals": "Mukhtalif total mile hain. Ada ki jane wali raqam check karein.",
+  "receipt_checked_amount": "Maine yeh raqam check kar li hai",
+  "receipt_checked_total": "Maine ada ki jane wali kul raqam check kar li hai",
+  "receipt_adjustments_total": "Tax ya discount kul raqam mein shamil hai. Sahi raqam save karne ke liye aik receipt entry chuni gai hai.",
+  "receipt_not_detected": "Products ya kul raqam wazeh nahi mili. Selection theek karein ya maloomat likhein.",
 };
 
 const urduSpeechMessages = <String, String>{
