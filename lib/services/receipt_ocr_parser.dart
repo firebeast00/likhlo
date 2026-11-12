@@ -1,3 +1,5 @@
+part 'digital_receipt_parser.dart';
+
 /// Receipt-specific interpretation. No ledger mutations or general NLP parsing.
 class ReceiptOcrCell {
   final String text;
@@ -29,12 +31,12 @@ class ReceiptItem {
   });
   bool get needsReview => issue != null;
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'price': price,
-        'category': category,
-        'issue': issue,
-        'confidence': confidence,
-      };
+    'name': name,
+    'price': price,
+    'category': category,
+    'issue': issue,
+    'confidence': confidence,
+  };
   @override
   String toString() => '$name: $price';
 }
@@ -56,6 +58,7 @@ class ScannedReceipt {
   final List<ReceiptAdjustment> adjustments;
   final List<String> issues;
   final bool hasPrintedTotal;
+  final DigitalReceiptDetails? payment;
   const ScannedReceipt({
     required this.vendor,
     required this.total,
@@ -67,25 +70,31 @@ class ScannedReceipt {
     this.adjustments = const [],
     this.issues = const [],
     this.hasPrintedTotal = false,
+    this.payment,
   });
   double get itemSum => items.fold(0, (sum, item) => sum + item.price);
   double get adjustmentTotal =>
       adjustments.fold(0, (sum, item) => sum + item.amount);
   bool get needsReview =>
       issues.isNotEmpty || items.any((item) => item.needsReview);
-  String get purchaseTitle => items.isEmpty
-      ? vendor
-      : items.map((item) => item.name).take(3).join(', ');
+  bool get isDigitalPayment => payment != null;
+  String get purchaseTitle =>
+      payment?.purpose ??
+      (payment?.recipient == null ? null : 'To ${payment!.recipient}') ??
+      (items.isEmpty
+          ? vendor
+          : items.map((item) => item.name).take(3).join(', '));
   Map<String, dynamic> toJson() => {
-        'title': purchaseTitle,
-        'amount': total,
-        'category': category,
-        'description': description,
-        'items': items.map((item) => item.toJson()).toList(),
-        'rawText': rawText,
-        'confidence': confidence,
-        'issues': issues,
-      };
+    'title': purchaseTitle,
+    'amount': total,
+    'category': category,
+    'description': description,
+    'items': items.map((item) => item.toJson()).toList(),
+    'rawText': rawText,
+    'confidence': confidence,
+    'issues': issues,
+    if (payment != null) 'payment': payment!.toJson(),
+  };
 }
 
 class ReceiptOcrParser {
@@ -156,12 +165,15 @@ class ReceiptOcrParser {
     if (_header.hasMatch(normalized) ||
         _adjustment.hasMatch(normalized) ||
         _subtotal.hasMatch(normalized) ||
-        _payment.hasMatch(normalized)) return false;
+        _payment.hasMatch(normalized))
+      return false;
     return _goodName(normalized) || _amounts(normalized).isNotEmpty;
   }
 
   ScannedReceipt parseSpatialRows(Iterable<ReceiptOcrRow> source) {
     final rows = source.where((row) => row.text.trim().isNotEmpty).toList();
+    final digital = _parseDigitalReceipt(rows);
+    if (digital != null) return digital;
     final items = <ReceiptItem>[];
     final totals = <_Total>[];
     final adjustments = <ReceiptAdjustment>[];
@@ -180,10 +192,14 @@ class ReceiptOcrParser {
       }
     }
 
-    final tableStart = rows.indexWhere((row) =>
-        _header.hasMatch(_normalize(row.text)) &&
-        RegExp(r'\b(?:qty|quantity|rate|price|amount)\b', caseSensitive: false)
-            .hasMatch(row.text));
+    final tableStart = rows.indexWhere(
+      (row) =>
+          _header.hasMatch(_normalize(row.text)) &&
+          RegExp(
+            r'\b(?:qty|quantity|rate|price|amount)\b',
+            caseSensitive: false,
+          ).hasMatch(row.text),
+    );
     String? pendingName;
     ReceiptOcrRow? pendingRow;
     var inSummary = false;
@@ -227,16 +243,18 @@ class ReceiptOcrParser {
           final discount = text.toLowerCase().startsWith('discount');
           final roundOff = text.toLowerCase().startsWith('round');
           final negative = discount || (roundOff && text.contains('-'));
-          final percentOnly =
-              text.substring(amounts.last.end).trim().startsWith('%');
+          final percentOnly = text
+              .substring(amounts.last.end)
+              .trim()
+              .startsWith('%');
           if (!percentOnly) {
             adjustments.add(
               ReceiptAdjustment(
                 discount
                     ? 'Discount'
                     : roundOff
-                        ? 'Rounding'
-                        : 'Tax / charges',
+                    ? 'Rounding'
+                    : 'Tax / charges',
                 amounts.last.value * (negative ? -1 : 1),
               ),
             );
@@ -277,8 +295,9 @@ class ReceiptOcrParser {
       if (amounts.isEmpty) {
         if (_goodName(text) && (i >= 2 || vendorIndex < 0)) {
           final near = pendingRow == null || _adjacent(pendingRow, row);
-          pendingName =
-              pendingName != null && near ? '$pendingName $text' : text;
+          pendingName = pendingName != null && near
+              ? '$pendingName $text'
+              : text;
           pendingRow = row;
         } else {
           pendingName = null;
@@ -379,6 +398,17 @@ class ReceiptOcrParser {
       );
     }
 
+    if (items.isEmpty && totals.isEmpty) {
+      for (var i = 0; i < rows.length; i++) {
+        final money = _currencyAmount(rows[i].text);
+        if (money != null &&
+            money > 0 &&
+            money <= maxAmount &&
+            (i == 0 || !_feeLabel.hasMatch(rows[i - 1].text))) {
+          totals.add(_Total(money, 60));
+        }
+      }
+    }
     totals.sort((a, b) => b.score.compareTo(a.score));
     final itemSum = items.fold<double>(0, (sum, item) => sum + item.price);
     final adjustmentSum = adjustments.fold<double>(
@@ -428,7 +458,7 @@ class ReceiptOcrParser {
   static String categoryFor(String name) {
     const words = {
       'Food':
-          r'\b(?:milk|bread|rice|water|chips|chicken|burger|coffee|tea|sugar|flour|eggs?|juice|biscuits?|doodh|chawal|atta|chai|roti)\b',
+          r'\b(?:food|groceries|grocery|milk|bread|rice|water|chips|chicken|burger|coffee|tea|sugar|flour|eggs?|juice|biscuits?|doodh|chawal|atta|chai|roti)\b',
       'Health':
           r'\b(?:medicine|panadol|paracetamol|tablets?|capsules?|syrup|bandage)\b',
       'Education':
@@ -446,6 +476,9 @@ class ReceiptOcrParser {
   }
 
   bool _blocked(String text) =>
+      _accountMask.hasMatch(text) ||
+      _partyLabel.hasMatch(text) ||
+      _feeLabel.hasMatch(text) ||
       _date.hasMatch(text) ||
       _namedDate.hasMatch(text) ||
       _metadata.hasMatch(text) ||
@@ -479,17 +512,20 @@ class ReceiptOcrParser {
     if (RegExp(
       r'^(?:net\s*(?:payable|amount|total)|amount\s*(?:paid|due|payable))\b',
       caseSensitive: false,
-    ).hasMatch(text)) return 95;
+    ).hasMatch(text))
+      return 95;
     if (RegExp(
       r'^(?:total\s*(?:amount|payable|due)|bill\s*total|invoice\s*total|transaction\s*amount)\b',
       caseSensitive: false,
-    ).hasMatch(text)) return 90;
+    ).hasMatch(text))
+      return 90;
     if (RegExp(r'^total\b', caseSensitive: false).hasMatch(text) &&
         !_letters(
           text
               .replaceFirst(RegExp(r'^total\b', caseSensitive: false), '')
               .replaceAll(_currency, ''),
-        )) return 80;
+        ))
+      return 80;
     return 0;
   }
 
@@ -498,7 +534,8 @@ class ReceiptOcrParser {
     for (final match in _number.allMatches(text)) {
       if (match.start > 0 &&
           text[match.start - 1] == '-' &&
-          !_adjustment.hasMatch(text)) continue;
+          !_adjustment.hasMatch(text))
+        continue;
       if (_unit.hasMatch(text.substring(match.end))) continue;
       if (text.substring(match.end).trimLeft().startsWith('%')) continue;
       final value = _parseNumber(match.group(0)!);

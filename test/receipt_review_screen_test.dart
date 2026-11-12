@@ -8,6 +8,7 @@ import 'package:student_expense_manager/models/wallet_model.dart';
 import 'package:student_expense_manager/screens/receipt_review_screen.dart';
 import 'package:student_expense_manager/services/ocr_scanner_service.dart';
 import 'package:student_expense_manager/services/transaction_executor.dart';
+import 'fixtures/jazzcash_receipt.dart';
 
 class _ReceiptStore implements TransactionStore {
   final List<Expense> entries = [];
@@ -48,10 +49,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         transactionExecutorProvider.overrideWith(
-          (ref) => TransactionExecutor(
-            store,
-            enableAudio: false,
-          ),
+          (ref) => TransactionExecutor(store, enableAudio: false),
         ),
       ],
     );
@@ -93,6 +91,60 @@ void main() {
   }
 
   const parser = ReceiptOcrParser();
+
+  testWidgets(
+    'JazzCash saves one 570 Food expense using the purchase purpose',
+    (tester) async {
+      await show(tester, parser.parseRows(jazzcashRows));
+      expect(find.text('Save Rs. 570.00'), findsOneWidget);
+      expect(find.textContaining('7632'), findsNothing);
+      await tester.tap(find.text('Save Rs. 570.00'));
+      await tester.pumpAndSettle();
+      expect(store.entries, hasLength(1));
+      expect(store.entries.single.amount, 570);
+      expect(store.entries.single.title, 'Food Groceries Purchases');
+      expect(store.entries.single.category, 'Food');
+    },
+  );
+  testWidgets('adjusting to amount and To does not reset 570 to zero', (
+    tester,
+  ) async {
+    await show(
+      tester,
+      parser.parseRows(jazzcashRows),
+      adjust: () async => parser.parseSelection(
+        allRows: jazzcashRows.map(
+          (text) => ReceiptOcrRow([ReceiptOcrCell(text)]),
+        ),
+        selectedRows: [
+          const ReceiptOcrRow([ReceiptOcrCell('Rs. 570.00')]),
+          const ReceiptOcrRow([ReceiptOcrCell('To')]),
+        ],
+      ),
+    );
+    await tester.tap(find.text('Adjust selection'));
+    await tester.pumpAndSettle();
+    expect(find.text('Save Rs. 570.00'), findsOneWidget);
+    await tester.tap(find.text('Save Rs. 570.00'));
+    await tester.pumpAndSettle();
+    expect(store.entries.single.amount, 570);
+  });
+  testWidgets('no usable receipt amount disables saving zero', (tester) async {
+    await show(
+      tester,
+      parser.parseRows([
+        'Transaction Successful',
+        'Fee Rs. 0.00',
+        'To Test Recipient',
+        '*******7632',
+      ]),
+    );
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
+    expect(store.entries, isEmpty);
+  });
 
   testWidgets(
     'clear products save in one tap with inferred categories and no total duplicate',
@@ -183,13 +235,19 @@ void main() {
         parser.parseRows(['SHOP', 'Items', 'Milk 300', 'Total 500']),
       );
       final confirm = find.text('Save despite this difference');
-      await tester.scrollUntilVisible(confirm, 250,
-          scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        confirm,
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       await tester.tap(confirm);
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Milk'), -250,
-          scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        find.text('Milk'),
+        -250,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Milk'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, '350');

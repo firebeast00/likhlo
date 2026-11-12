@@ -32,6 +32,7 @@ import 'dashboard_screen.dart';
 import '../widgets/primary_ledger_tabs.dart';
 import '../widgets/dashboard_app_bar.dart';
 import '../widgets/transaction_message_card.dart';
+import '../widgets/ledger_entry_content.dart';
 import '../services/local_nlp_service.dart';
 import '../services/month_reference_parser.dart';
 import '../services/smart_entry_query_service.dart';

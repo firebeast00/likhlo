@@ -295,23 +295,14 @@ extension _DashboardTransactionWidgetMethods on _HomeScreenState {
         onTap: isTransfer ? null : () => _showAddOrEditModal(existing: e),
         child: Container(
             margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(18), border: Border.all(color: isDark ? primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.12), width: 1.2)),
-            child: Row(
-              children: [
-                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: (isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor)).withValues(alpha: 0.15), shape: BoxShape.circle), child: Icon(displayIcon, color: isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor), size: 20)),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(e.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 4),
-                      Row(children: [Icon(Icons.schedule_rounded, size: 11, color: Colors.grey.shade500), const SizedBox(width: 4), Text(AppStrings.current.dateLabel(DateFormat.MMMEd().format(e.date)), style: TextStyle(fontSize: 11, color: Colors.grey.shade500))]),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(AppStrings.current.text('rs_0a1fb6', {'p0': amountSign, 'p1': e.amount.toStringAsFixed(0)}), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: amountColor)),
-              ],
+            child: LedgerEntryContent(
+              title: e.title,
+              dateLabel: AppStrings.current.dateLabel(DateFormat.MMMEd().format(e.date)),
+              amountLabel: AppStrings.current.text('rs_0a1fb6', {'p0': amountSign, 'p1': e.amount.toStringAsFixed(0)}),
+              icon: displayIcon,
+              iconColor: isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor),
+              iconBackground: (isTransfer ? Colors.blue : (isIncome ? Colors.green : eColor)).withValues(alpha: 0.15),
+              amountColor: amountColor,
             )
         ),
       ),

@@ -222,7 +222,13 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.all(16),
         child: FilledButton.icon(
-          onPressed: _saving || _adjusting ? null : _save,
+          onPressed:
+              _saving ||
+                  _adjusting ||
+                  !(_currentCalculatedTotal > 0) ||
+                  !_currentCalculatedTotal.isFinite
+              ? null
+              : _save,
           icon: _saving
               ? const SizedBox.square(
                   dimension: 18,

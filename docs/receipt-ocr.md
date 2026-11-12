@@ -55,3 +55,18 @@ quantity/rate columns, product sizes, wrapped names, tax/discounts and long IDs.
 Check that the saved amounts and wallet movement equal the intended purchase.
 Unrecognizable text or unsupported layouts can still require correction; no
 trained language model or cloud OCR service has been added.
+
+## JazzCash regression and card layout
+
+Digital payment receipts now produce one payment from the labelled or standalone
+currency amount. Masked account tails, phone numbers and TIDs cannot supply item
+prices. Fee values remain separate; a printed payable total is not charged twice.
+Selection keeps the original party/purpose as context while respecting selected
+amounts. Selecting only the amount and `To` retains the amount; deselecting the
+amount never restores it from the original receipt. Zero amounts cannot be saved.
+The fixture reproduces the reported Rs 570 / account-tail 7632 layout using
+anonymized names and identifiers.
+
+Ledger card date text has a bounded single line, and large amounts can scale to
+fit without dropping digits. Regression tests cover narrow cards and large text.
+This is presentation only; edit/delete/transfer behavior stays in the caller.

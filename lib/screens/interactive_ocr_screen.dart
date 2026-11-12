@@ -33,15 +33,19 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
 
   bool _shouldAutoSelect(TextLine line, ScannedReceipt receipt) {
     final text = line.text.trim();
+    if (receipt.isDigitalPayment)
+      return _receiptParser.isDigitalSelectionLine(text, receipt);
     if (_receiptParser.isReceiptContextLine(text)) return true;
     // The merchant is context for parsing, never an individual product.
     if (text == receipt.vendor) return true;
     if (!_receiptParser.isLikelyUsefulLine(text)) return false;
     if (RegExp(r'\d').hasMatch(text)) return true;
     final lower = text.toLowerCase();
-    return receipt.items.any((item) =>
-        item.name.toLowerCase().contains(lower) ||
-        lower.contains(item.name.toLowerCase()));
+    return receipt.items.any(
+      (item) =>
+          item.name.toLowerCase().contains(lower) ||
+          lower.contains(item.name.toLowerCase()),
+    );
   }
 
   Future<void> _scanImage() async {
@@ -67,8 +71,9 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
         }
       }
 
-      final receipt =
-          _receiptParser.parseSpatialRows(receiptSpatialRows(lines));
+      final receipt = _receiptParser.parseSpatialRows(
+        receiptSpatialRows(lines),
+      );
       setState(() {
         _lines = lines;
         _selectedLines.clear();
@@ -99,7 +104,10 @@ class _InteractiveOcrScreenState extends State<InteractiveOcrScreen> {
 
   ScannedReceipt _buildReceipt() {
     final reconstructedRows = receiptSpatialRows(_selectedLines);
-    return _receiptParser.parseSpatialRows(reconstructedRows);
+    return _receiptParser.parseSelection(
+      allRows: receiptSpatialRows(_lines),
+      selectedRows: reconstructedRows,
+    );
   }
 
   @override
