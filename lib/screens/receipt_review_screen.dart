@@ -14,10 +14,12 @@ enum _ReceiptSaveMode { items, total }
 
 class ReceiptReviewScreen extends ConsumerStatefulWidget {
   final ScannedReceipt receipt;
+  final Future<ScannedReceipt?> Function()? onAdjustSelection;
 
   const ReceiptReviewScreen({
     super.key,
     required this.receipt,
+    this.onAdjustSelection,
   });
 
   @override
@@ -26,57 +28,70 @@ class ReceiptReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
-  late final List<_ReceiptRow> _rows;
-  late final TextEditingController _totalTitleController;
-  late final TextEditingController _totalController;
-
+  final List<_ReceiptRow> _rows = [];
+  final _totalTitleController = TextEditingController();
+  final _totalController = TextEditingController();
+  late ScannedReceipt _receipt;
   _ReceiptSaveMode _mode = _ReceiptSaveMode.items;
-
   String? _globalWalletId;
   String? _globalCategory;
-
   bool _confirmDiscrepancy = false;
+  bool _totalConfirmed = false;
   bool _saving = false;
+  bool _adjusting = false;
 
   @override
   void initState() {
     super.initState();
-    _rows = widget.receipt.items
-        .map(
-          (item) => _ReceiptRow(
-        title: TextEditingController(text: item.name),
-        amount: TextEditingController(text: _formatAmount(item.price)),
-      ),
-    )
-        .toList();
+    _applyReceipt(widget.receipt);
+  }
 
-    if (_rows.isEmpty && widget.receipt.total > 0) {
-      _rows.add(
-        _ReceiptRow(
-          title: TextEditingController(
-            text: widget.receipt.vendor.trim().isEmpty
-                ? 'Receipt purchase'
-                : widget.receipt.vendor.trim(),
-          ),
-          amount: TextEditingController(
-            text: _formatAmount(widget.receipt.total),
-          ),
-        ),
-      );
+  void _applyReceipt(ScannedReceipt receipt) {
+    for (final row in _rows) {
+      row.dispose();
     }
-
-    _mode = widget.receipt.items.isEmpty
+    _rows.clear();
+    _receipt = receipt;
+    _rows.addAll(
+      receipt.items.map(
+        (item) => _ReceiptRow(
+          title: TextEditingController(text: item.name),
+          amount: TextEditingController(text: _formatAmount(item.price)),
+          category: item.category,
+          issue: item.issue,
+        ),
+      ),
+    );
+    // Adjustments must not silently disappear from the recorded purchase.
+    _mode = receipt.items.isEmpty || receipt.adjustmentTotal.abs() > 0.01
         ? _ReceiptSaveMode.total
         : _ReceiptSaveMode.items;
+    _totalTitleController.text = receipt.purchaseTitle;
+    _totalController.text = _formatAmount(receipt.total);
+    _globalCategory = null;
+    _confirmDiscrepancy = false;
+    _totalConfirmed = false;
+  }
 
-    _totalTitleController = TextEditingController(
-      text: widget.receipt.vendor.trim().isEmpty
-          ? 'Receipt purchase'
-          : widget.receipt.vendor.trim(),
-    );
-    _totalController = TextEditingController(
-      text: _formatAmount(widget.receipt.total),
-    );
+  bool get _totalNeedsReview =>
+      !_totalConfirmed &&
+      ((!_receipt.hasPrintedTotal &&
+              _receipt.items.any((item) => item.needsReview)) ||
+          _receipt.issues.any(
+            (issue) =>
+                issue == 'receipt_amount_uncertain' ||
+                issue == 'receipt_conflicting_totals',
+          ));
+
+  Future<void> _adjustSelection() async {
+    if (widget.onAdjustSelection == null || _adjusting || _saving) return;
+    setState(() => _adjusting = true);
+    try {
+      final receipt = await widget.onAdjustSelection!();
+      if (mounted && receipt != null) setState(() => _applyReceipt(receipt));
+    } finally {
+      if (mounted) setState(() => _adjusting = false);
+    }
   }
 
   @override
@@ -89,17 +104,16 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
     super.dispose();
   }
 
-  static String _formatAmount(double value) =>
-      value == value.truncateToDouble()
-          ? value.toStringAsFixed(0)
-          : value.toStringAsFixed(2);
+  static String _formatAmount(double value) => value == value.truncateToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(2);
 
   double get _selectedTotal => _rows
       .where((row) => row.included)
       .fold<double>(
-    0,
+        0,
         (sum, row) => sum + (double.tryParse(row.amount.text) ?? 0),
-  );
+      );
 
   double get _currentCalculatedTotal {
     if (_mode == _ReceiptSaveMode.total) {
@@ -109,13 +123,11 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
     }
   }
 
-  double get _difference => _selectedTotal - widget.receipt.total;
+  double get _difference => _selectedTotal - _receipt.total;
 
   bool get _hasSuspiciousDifference {
-    if (widget.receipt.total <= 0) return false;
-    final limit = widget.receipt.total * 0.05 > 5
-        ? widget.receipt.total * 0.05
-        : 5.0;
+    if (_receipt.total <= 0) return false;
+    final limit = _receipt.total * 0.001 > 1 ? _receipt.total * 0.001 : 1.0;
     return _difference.abs() > limit;
   }
 
@@ -126,17 +138,30 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
     final categories = ref.watch(categoryProvider);
 
     _globalWalletId ??= wallets.isEmpty ? null : wallets.first.id;
-    _globalCategory ??= categories.contains(widget.receipt.category)
-        ? widget.receipt.category
+    _globalCategory ??= categories.contains(_receipt.category)
+        ? _receipt.category
         : (categories.isEmpty ? 'General' : categories.first);
 
     return Scaffold(
-      appBar: AppBar(title: Text(AppStrings.current.text('review_receipt_c65cbb'))),
+      appBar: AppBar(
+        title: Text(AppStrings.current.text('review_receipt_c65cbb')),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           children: [
             _buildConfidenceCard(),
+            if (widget.onAdjustSelection != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _saving || _adjusting ? null : _adjustSelection,
+                  icon: const Icon(Icons.crop_free),
+                  label: Text(
+                    AppStrings.current.text('receipt_adjust_selection'),
+                  ),
+                ),
+              ),
             const SizedBox(height: 16),
             _buildGlobalSettings(wallets, categories),
             SegmentedButton<_ReceiptSaveMode>(
@@ -144,7 +169,9 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
                 ButtonSegment(
                   value: _ReceiptSaveMode.items,
                   icon: Icon(Icons.receipt_long_outlined),
-                  label: Text(AppStrings.current.text('individual_items_75b5eb')),
+                  label: Text(
+                    AppStrings.current.text('individual_items_75b5eb'),
+                  ),
                 ),
                 ButtonSegment(
                   value: _ReceiptSaveMode.total,
@@ -153,12 +180,14 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
                 ),
               ],
               selected: {_mode},
-              onSelectionChanged: (value) {
-                setState(() {
-                  _mode = value.first;
-                  _confirmDiscrepancy = false;
-                });
-              },
+              onSelectionChanged: _saving
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _mode = value.first;
+                        _confirmDiscrepancy = false;
+                      });
+                    },
             ),
             const SizedBox(height: 20),
             if (_mode == _ReceiptSaveMode.items)
@@ -169,14 +198,20 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
               title: Text(AppStrings.current.text('raw_scanned_text_f7d374')),
-              subtitle: Text(AppStrings.current.text('use_this_to_verify_any_uncertain_fields_6ecd91')),
+              subtitle: Text(
+                AppStrings.current.text(
+                  'use_this_to_verify_any_uncertain_fields_6ecd91',
+                ),
+              ),
               children: [
                 Align(
                   alignment: Alignment.centerLeft,
                   child: SelectableText(
-                    widget.receipt.rawText.trim().isEmpty
-                        ? AppStrings.current.display('No raw text was recognized.')
-                        : widget.receipt.rawText,
+                    _receipt.rawText.trim().isEmpty
+                        ? AppStrings.current.display(
+                            'No raw text was recognized.',
+                          )
+                        : _receipt.rawText,
                   ),
                 ),
               ],
@@ -187,17 +222,25 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.all(16),
         child: FilledButton.icon(
-          onPressed: _saving ? null : _save,
+          onPressed:
+              _saving ||
+                  _adjusting ||
+                  !(_currentCalculatedTotal > 0) ||
+                  !_currentCalculatedTotal.isFinite
+              ? null
+              : _save,
           icon: _saving
               ? const SizedBox.square(
-            dimension: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Icon(Icons.check_rounded),
           label: Text(
             _saving
                 ? AppStrings.current.text('saving_ae7e88')
-                : AppStrings.current.text('save_rs_c7ccc7', {'p0': _currentCalculatedTotal.toStringAsFixed(0)}),
+                : AppStrings.current.text('save_rs_c7ccc7', {
+                    'p0': _currentCalculatedTotal.toStringAsFixed(2),
+                  }),
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
@@ -206,26 +249,41 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
   }
 
   Widget _buildConfidenceCard() {
-    final percent = (widget.receipt.confidence * 100).round();
-    final low = widget.receipt.confidence < 0.7;
+    final uncertain = _rows.where((row) => row.needsReview).length;
+    final empty = _receipt.total <= 0 && _receipt.items.isEmpty;
+    final attention = empty || uncertain > 0 || _receipt.issues.isNotEmpty;
     return Card(
       elevation: 0,
-      color: low
+      color: attention
           ? Theme.of(context).colorScheme.errorContainer
           : Theme.of(context).colorScheme.secondaryContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(low ? Icons.warning_amber_rounded : Icons.fact_check_outlined),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                AppStrings.current.text('scan_confidence_check_names_and_amounts_before_s_6396a5', {'p0': percent}),
+            Text(
+              AppStrings.current.text(
+                empty
+                    ? 'receipt_not_detected'
+                    : uncertain > 0
+                    ? 'receipt_check_highlighted'
+                    : 'receipt_ready',
               ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
+            for (final issue in _receipt.issues)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(AppStrings.current.text(issue)),
+              ),
+            if (_receipt.adjustmentTotal.abs() > 0.01)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  AppStrings.current.text('receipt_adjustments_total'),
+                ),
+              ),
           ],
         ),
       ),
@@ -237,7 +295,9 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.2)),
+        side: BorderSide(
+          color: Theme.of(context).dividerColor.withOpacity(0.2),
+        ),
       ),
       margin: const EdgeInsets.only(bottom: 24),
       child: Padding(
@@ -247,7 +307,9 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
           children: [
             Text(
               AppStrings.current.text('payment_details_b8579d'),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 16),
             Row(
@@ -255,36 +317,66 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
-                    initialValue: wallets.any((wallet) => wallet.id == _globalWalletId)
+                    initialValue:
+                        wallets.any((wallet) => wallet.id == _globalWalletId)
                         ? _globalWalletId
                         : null,
                     decoration: InputDecoration(
                       labelText: AppStrings.current.text('paid_from_a2cf4d'),
                       isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    items: wallets.map((wallet) => DropdownMenuItem(
-                      value: wallet.id,
-                      child: Text(wallet.name, overflow: TextOverflow.ellipsis),
-                    )).toList(),
-                    onChanged: (value) => setState(() => _globalWalletId = value),
+                    items: wallets
+                        .map(
+                          (wallet) => DropdownMenuItem(
+                            value: wallet.id,
+                            child: Text(
+                              wallet.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() => _globalWalletId = value),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
-                    initialValue: categories.contains(_globalCategory) ? _globalCategory : null,
+                    initialValue: categories.contains(_globalCategory)
+                        ? _globalCategory
+                        : null,
                     decoration: InputDecoration(
                       labelText: AppStrings.current.text('category_a3c686'),
                       isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    items: categories.map((category) => DropdownMenuItem(
-                      value: category,
-                      child: Text(AppStrings.current.display(category), overflow: TextOverflow.ellipsis),
-                    )).toList(),
-                    onChanged: (value) => setState(() => _globalCategory = value),
+                    items: categories
+                        .map(
+                          (category) => DropdownMenuItem(
+                            value: category,
+                            child: Text(
+                              AppStrings.current.display(category),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() {
+                            _globalCategory = value;
+                            for (final row in _rows) {
+                              row.category = value;
+                            }
+                          }),
                   ),
                 ),
               ],
@@ -297,22 +389,30 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
 
   List<Widget> _buildItemEditor() {
     return [
-      Text(AppStrings.current.text('receipt_items_7103c3'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+      Text(
+        AppStrings.current.text('receipt_items_7103c3'),
+        style: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+      ),
       const SizedBox(height: 4),
       Text(
-        AppStrings.current.text('selected_items_are_saved_atomically_either_all_a_690c15'),
+        AppStrings.current.text(
+          'selected_items_are_saved_atomically_either_all_a_690c15',
+        ),
         style: Theme.of(context).textTheme.bodySmall,
       ),
       const SizedBox(height: 12),
-      for (var index = 0; index < _rows.length; index++)
-        _buildItemRow(index),
+      for (var index = 0; index < _rows.length; index++) _buildItemRow(index),
       OutlinedButton.icon(
         onPressed: () {
           setState(() {
+            _confirmDiscrepancy = false;
             _rows.add(
               _ReceiptRow(
                 title: TextEditingController(),
                 amount: TextEditingController(),
+                category: _globalCategory,
               ),
             );
           });
@@ -323,13 +423,15 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       const SizedBox(height: 16),
       Card(
         elevation: 0,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              _totalLine('Detected receipt total', widget.receipt.total),
+              _totalLine('Detected receipt total', _receipt.total),
               _totalLine('Sum of selected items', _selectedTotal),
               const Divider(height: 16),
               _totalLine('Difference', _difference, signed: true),
@@ -338,13 +440,22 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _confirmDiscrepancy,
-                  title: Text(AppStrings.current.text('save_despite_this_difference_e206c1'), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                  title: Text(
+                    AppStrings.current.text(
+                      'save_despite_this_difference_e206c1',
+                    ),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
                   subtitle: Text(
-                    AppStrings.current.text('the_items_you_selected_do_not_match_the_total_de_d4d711'),
+                    AppStrings.current.text(
+                      'the_items_you_selected_do_not_match_the_total_de_d4d711',
+                    ),
                   ),
-                  onChanged: (value) => setState(
-                        () => _confirmDiscrepancy = value ?? false,
-                  ),
+                  onChanged: (value) =>
+                      setState(() => _confirmDiscrepancy = value ?? false),
                 ),
               ],
             ],
@@ -356,65 +467,96 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
 
   Widget _buildItemRow(int index) {
     final row = _rows[index];
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.15)),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-          ]
-      ),
-      child: Row(
+    final categories = ref.watch(categoryProvider);
+    final category = categories.contains(row.category)
+        ? row.category
+        : _globalCategory;
+    return Card(
+      key: ObjectKey(row),
+      color: row.needsReview
+          ? Theme.of(context).colorScheme.errorContainer
+          : null,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ExpansionTile(
+        initiallyExpanded: row.needsReview,
+        leading: Checkbox(
+          value: row.included,
+          onChanged: _saving
+              ? null
+              : (value) => setState(() {
+                  row.included = value ?? false;
+                  _confirmDiscrepancy = false;
+                }),
+        ),
+        title: Text(
+          row.title.text.isEmpty
+              ? AppStrings.current.text('item_name_497c97')
+              : row.title.text,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          'Rs ${row.amount.text} · ${AppStrings.current.display(category ?? 'General')}',
+        ),
+        childrenPadding: const EdgeInsets.all(12),
         children: [
-          Checkbox(
-            value: row.included,
-            onChanged: (value) => setState(() => row.included = value ?? false),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                TextField(
-                  controller: row.title,
-                  enabled: row.included,
-                  decoration: InputDecoration(
-                    labelText: AppStrings.current.text('item_name_497c97'),
-                    isDense: true,
-                    border: InputBorder.none,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                  ),
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                ),
-                Divider(height: 1, color: Theme.of(context).dividerColor.withOpacity(0.1)),
-                TextField(
-                  controller: row.amount,
-                  enabled: row.included,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: AppStrings.current.text('amount_rs_34c21f'),
-                    isDense: true,
-                    border: InputBorder.none,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                  ),
-                  style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ],
+          if (row.issue != null) Text(AppStrings.current.text(row.issue!)),
+          TextField(
+            controller: row.title,
+            enabled: row.included && !_saving,
+            decoration: InputDecoration(
+              labelText: AppStrings.current.text('item_name_497c97'),
             ),
+            onChanged: (_) => setState(() {}),
           ),
-          IconButton(
-            tooltip: AppStrings.current.text('remove_item_76ecba'),
-            onPressed: () {
-              setState(() {
-                final removed = _rows.removeAt(index);
-                removed.dispose();
-              });
-            },
-            icon: const Icon(Icons.close_rounded, color: Colors.grey),
+          TextField(
+            controller: row.amount,
+            enabled: row.included && !_saving,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: AppStrings.current.text('amount_rs_34c21f'),
+            ),
+            onChanged: (_) => setState(() {
+              row.verified = true;
+              _confirmDiscrepancy = false;
+            }),
+          ),
+          DropdownButtonFormField<String>(
+            key: ValueKey(category),
+            initialValue: categories.contains(category) ? category : null,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: AppStrings.current.text('category_a3c686'),
+            ),
+            items: categories
+                .map(
+                  (name) => DropdownMenuItem(
+                    value: name,
+                    child: Text(AppStrings.current.display(name)),
+                  ),
+                )
+                .toList(),
+            onChanged: row.included && !_saving
+                ? (value) => setState(() => row.category = value)
+                : null,
+          ),
+          if (row.issue != null)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: row.verified,
+              title: Text(AppStrings.current.text('receipt_checked_amount')),
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => row.verified = value ?? false),
+            ),
+          TextButton.icon(
+            onPressed: _saving
+                ? null
+                : () => setState(() {
+                    _rows.removeAt(index).dispose();
+                    _confirmDiscrepancy = false;
+                  }),
+            icon: const Icon(Icons.close),
+            label: Text(AppStrings.current.text('remove_item_76ecba')),
           ),
         ],
       ),
@@ -438,11 +580,20 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
           labelText: AppStrings.current.text('receipt_total_rs_5b78f7'),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        onChanged: (_) => setState(() {}),
+        onChanged: (_) => setState(() => _totalConfirmed = true),
       ),
+      if (_totalNeedsReview)
+        CheckboxListTile(
+          value: _totalConfirmed,
+          title: Text(AppStrings.current.text('receipt_checked_total')),
+          onChanged: (value) =>
+              setState(() => _totalConfirmed = value ?? false),
+        ),
       const SizedBox(height: 12),
       Text(
-        AppStrings.current.text('single_total_mode_creates_one_expense_only_indiv_71fae6'),
+        AppStrings.current.text(
+          'single_total_mode_creates_one_expense_only_indiv_71fae6',
+        ),
         style: TextStyle(color: Colors.grey),
       ),
     ];
@@ -454,22 +605,49 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Expanded(child: Text(AppStrings.current.display(label), style: const TextStyle(fontWeight: FontWeight.w500))),
-          Text('Rs $prefix${value.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Expanded(
+            child: Text(
+              AppStrings.current.display(label),
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          Text(
+            'Rs $prefix${value.toStringAsFixed(2)}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
         ],
       ),
     );
   }
 
   Future<void> _save() async {
+    if (_saving || _adjusting) return;
+    if ((_mode == _ReceiptSaveMode.items &&
+            _rows.any((row) => row.included && row.needsReview)) ||
+        (_mode == _ReceiptSaveMode.total && _totalNeedsReview)) {
+      _showError(AppStrings.current.text('receipt_check_highlighted'));
+      return;
+    }
+    if (_mode == _ReceiptSaveMode.items &&
+        _hasSuspiciousDifference &&
+        !_confirmDiscrepancy) {
+      _showError('Confirm the receipt total difference before saving.');
+      return;
+    }
     if (_globalWalletId == null || _globalCategory == null) {
       _showError('Choose a wallet and category at the top first.');
       return;
     }
 
     final wallets = ref.read(walletProvider);
-    final selectedWallet = wallets.firstWhere((w) => w.id == _globalWalletId, orElse: () => wallets.first);
-    final currentBalance = ref.read(walletProvider.notifier).getBalanceForWallet(selectedWallet.id);
+    if (!wallets.any((wallet) => wallet.id == _globalWalletId)) {
+      _showError('Choose a wallet and category at the top first.');
+      return;
+    }
+    final selectedWallet = wallets.firstWhere((w) => w.id == _globalWalletId);
+    final currentBalance = ref
+        .read(walletProvider.notifier)
+        .getBalanceForWallet(selectedWallet.id);
 
     double totalDeduction = 0.0;
     final entries = <Expense>[];
@@ -485,7 +663,9 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       entries.add(
         Expense(
           id: const Uuid().v4(),
-          title: _totalTitleController.text.trim().isEmpty ? 'Receipt purchase' : _totalTitleController.text.trim(),
+          title: _totalTitleController.text.trim().isEmpty
+              ? 'Receipt purchase'
+              : _totalTitleController.text.trim(),
           amount: amount,
           date: DateTime.now(),
           category: _globalCategory!,
@@ -497,7 +677,10 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
     } else {
       for (final row in _rows.where((row) => row.included)) {
         final amount = double.tryParse(row.amount.text.trim());
-        if (row.title.text.trim().isEmpty || amount == null || !amount.isFinite || amount <= 0) {
+        if (row.title.text.trim().isEmpty ||
+            amount == null ||
+            !amount.isFinite ||
+            amount <= 0) {
           _showError('Every selected item needs a valid name and amount.');
           return;
         }
@@ -508,7 +691,9 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
             title: row.title.text.trim(),
             amount: amount,
             date: DateTime.now(),
-            category: _globalCategory!,
+            category: ref.read(categoryProvider).contains(row.category)
+                ? row.category!
+                : _globalCategory!,
             colorValue: 0xFFEF4444,
             type: 'expense',
             walletId: _globalWalletId!,
@@ -523,7 +708,9 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
     }
 
     if (totalDeduction > currentBalance) {
-      _showError('Insufficient balance in ${selectedWallet.name}. Need Rs. ${totalDeduction.toStringAsFixed(0)}, but you only have Rs. ${currentBalance.toStringAsFixed(0)}.');
+      _showError(
+        'Insufficient balance in ${selectedWallet.name}. Need Rs. ${totalDeduction.toStringAsFixed(0)}, but you only have Rs. ${currentBalance.toStringAsFixed(0)}.',
+      );
       return;
     }
 
@@ -534,12 +721,14 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       TransactionResult result;
 
       if (_mode == _ReceiptSaveMode.total) {
-        result = await executor.execute(CreateTransactionCommand(entries.first));
+        result = await executor.execute(
+          CreateTransactionCommand(entries.first),
+        );
       } else {
         result = await executor.execute(
           CreateBatchTransactionsCommand(
             entries: entries,
-            detectedTotal: widget.receipt.total,
+            detectedTotal: _receipt.total,
             discrepancyConfirmed: _confirmDiscrepancy,
           ),
         );
@@ -552,6 +741,8 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
       }
 
       Navigator.of(context).pop(true);
+    } catch (_) {
+      _showError('The receipt could not be saved.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -561,11 +752,13 @@ class _ReceiptReviewScreenState extends ConsumerState<ReceiptReviewScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(AppStrings.current.display(message)),
-        backgroundColor: Colors.red.shade700,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.current.display(message)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 }
 
@@ -573,10 +766,16 @@ class _ReceiptRow {
   final TextEditingController title;
   final TextEditingController amount;
   bool included = true;
+  String? category;
+  final String? issue;
+  bool verified = false;
+  bool get needsReview => issue != null && !verified;
 
   _ReceiptRow({
     required this.title,
     required this.amount,
+    this.category,
+    this.issue,
   });
 
   void dispose() {
